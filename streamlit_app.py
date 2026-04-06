@@ -5,14 +5,12 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 import time
-import json
 
 # ==============================================================================
-# AEROVULPIS v2.0 - ULTRA PROFESSIONAL EDITION
+# AEROVULPIS v2.0 - STABLE PROFESSIONAL EDITION
 # Created by: Fahmi
 # Identity: DynamiHatch
 # ==============================================================================
@@ -37,7 +35,6 @@ st.markdown("""
         --deep-space: #050a14;
         --glass-bg: rgba(10, 20, 40, 0.7);
         --glass-border: rgba(0, 212, 255, 0.2);
-        --glow-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
     }
 
     /* Global Styles */
@@ -166,43 +163,9 @@ st.markdown("""
     ::-webkit-scrollbar-track { background: #050a14; }
     ::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 10px; }
 </style>
-
-<script>
-    // Audio Context for Futuristic SFX
-    let audioCtx;
-    function initAudio() {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-
-    function playDigitalBeep(freq = 880, duration = 0.1, type = 'square') {
-        initAudio();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
-        
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
-    }
-</script>
 """, unsafe_allow_html=True)
 
-# 3. AUDIO TRIGGER FUNCTION
-def trigger_sfx(effect_type="click"):
-    if effect_type == "click":
-        st.components.v1.html("<script>window.parent.playDigitalBeep(1200, 0.05, 'sine');</script>", height=0)
-    elif effect_type == "refresh":
-        st.components.v1.html("<script>window.parent.playDigitalBeep(880, 0.15, 'square');</script>", height=0)
-    elif effect_type == "alert":
-        st.components.v1.html("<script>window.parent.playDigitalBeep(440, 0.3, 'triangle');</script>", height=0)
-
-# 4. KONFIGURASI AI (GEMINI)
+# 3. KONFIGURASI AI (GEMINI)
 genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 
 def get_ai_analysis(ticker, price, indicators, news_context):
@@ -217,7 +180,7 @@ def get_ai_analysis(ticker, price, indicators, news_context):
         - Harga Terkini: {price}
         - RSI (14): {indicators.get('RSI', 'N/A')}
         - SMA (20): {indicators.get('SMA20', 'N/A')}
-        - Tren: {'Bullish' if price > indicators.get('SMA20', 0) else 'Bearish'}
+        - Tren: {'Bullish' if price and indicators.get('SMA20') and price > indicators.get('SMA20') else 'Bearish'}
         
         Berita Terkini:
         {news_context}
@@ -231,7 +194,7 @@ def get_ai_analysis(ticker, price, indicators, news_context):
     except Exception as e:
         return f"⚠️ AI Core Error: {str(e)}"
 
-# 5. ENGINE DATA (YFINANCE)
+# 4. ENGINE DATA (YFINANCE)
 class MarketEngine:
     @staticmethod
     @st.cache_data(ttl=60)
@@ -267,17 +230,24 @@ class MarketEngine:
         try:
             t = yf.Ticker(symbol)
             info = t.fast_info
+            # Penanganan data None untuk mencegah TypeError
+            price = info.get('lastPrice') or info.get('regularMarketPrice')
+            change = info.get('regularMarketChangePercent') or 0.0
+            volume = info.get('lastVolume') or 0
+            high = info.get('dayHigh') or price
+            low = info.get('dayLow') or price
+            
             return {
-                "price": info.get('lastPrice'),
-                "change": info.get('regularMarketChangePercent'),
-                "volume": info.get('lastVolume'),
-                "high": info.get('dayHigh'),
-                "low": info.get('dayLow')
+                "price": float(price) if price else 0.0,
+                "change": float(change),
+                "volume": int(volume),
+                "high": float(high) if high else 0.0,
+                "low": float(low) if low else 0.0
             }
         except:
             return None
 
-# 6. UI COMPONENTS
+# 5. UI COMPONENTS
 def render_header():
     st.markdown("""
     <div class="header-container">
@@ -338,13 +308,11 @@ def render_gauge(value, title, color):
     )
     return fig
 
-# 7. MAIN LOGIC
+# 6. MAIN LOGIC
 def main():
     # Session State Init
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
-    if 'last_refresh' not in st.session_state:
-        st.session_state.last_refresh = time.time()
 
     # Sidebar
     with st.sidebar:
@@ -393,19 +361,25 @@ def main():
             m1, m2, m3, m4 = st.columns(4)
             with m1:
                 st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-                st.metric("CURRENT PRICE", f"{live['price']:.2f}", f"{live['change']:.2f}%")
+                # Perbaikan format string untuk menangani data numerik dengan aman
+                price_val = live.get('price', 0.0)
+                change_val = live.get('change', 0.0)
+                st.metric("CURRENT PRICE", f"{price_val:,.2f}", f"{change_val:+.2f}%")
                 st.markdown('</div>', unsafe_allow_html=True)
             with m2:
                 st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-                st.metric("RSI (14)", f"{latest['RSI']:.2f}")
+                rsi_val = latest.get('RSI', 50.0)
+                st.metric("RSI (14)", f"{rsi_val:.2f}")
                 st.markdown('</div>', unsafe_allow_html=True)
             with m3:
                 st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-                st.metric("DAY HIGH", f"{live['high']:.2f}")
+                high_val = live.get('high', 0.0)
+                st.metric("DAY HIGH", f"{high_val:,.2f}")
                 st.markdown('</div>', unsafe_allow_html=True)
             with m4:
                 st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-                st.metric("DAY LOW", f"{live['low']:.2f}")
+                low_val = live.get('low', 0.0)
+                st.metric("DAY LOW", f"{low_val:,.2f}")
                 st.markdown('</div>', unsafe_allow_html=True)
 
             # Main Chart Area
@@ -415,11 +389,11 @@ def main():
                 st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
                 
                 # Plotly Chart
-                is_up = live['change'] >= 0
+                is_up = change_val >= 0
                 line_color = "#00ff88" if is_up else "#ff2a6d"
                 
                 fig = go.Figure()
-                # Price Line
+                # Price Line (Minimalist Line Chart)
                 fig.add_trace(go.Scatter(
                     x=df.index, y=df['Close'],
                     mode='lines',
@@ -449,15 +423,13 @@ def main():
                 st.plotly_chart(fig, use_container_width=True)
                 
                 if st.button("⚡ REFRESH SYSTEM DATA"):
-                    trigger_sfx("refresh")
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
             with col_gauge:
                 st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
                 # Trend Strength Logic
-                rsi_val = latest['RSI']
-                price_vs_sma = (latest['Close'] / latest['SMA20'] - 1) * 1000
+                price_vs_sma = (latest['Close'] / latest['SMA20'] - 1) * 1000 if latest['SMA20'] != 0 else 0
                 strength = 50 + (50 - rsi_val) + price_vs_sma
                 strength = max(0, min(100, strength))
                 
@@ -488,9 +460,9 @@ def main():
             with c1:
                 st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
                 st.markdown("### 📊 TECHNICAL SUMMARY")
-                st.write(f"**SMA 50:** {latest['SMA50']:.2f}")
-                st.write(f"**BB Upper:** {latest['BB_Upper']:.2f}")
-                st.write(f"**BB Lower:** {latest['BB_Lower']:.2f}")
+                st.write(f"**SMA 50:** {latest.get('SMA50', 0.0):,.2f}")
+                st.write(f"**BB Upper:** {latest.get('BB_Upper', 0.0):,.2f}")
+                st.write(f"**BB Lower:** {latest.get('BB_Lower', 0.0):,.2f}")
                 st.markdown('</div>', unsafe_allow_html=True)
             with c2:
                 st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
@@ -509,7 +481,6 @@ def main():
                     st.markdown(chat["content"])
             
             if prompt := st.chat_input("Ask AeroVulpis Intelligence..."):
-                trigger_sfx("click")
                 st.session_state.chat_history.append({"role": "user", "content": prompt})
                 with st.chat_message("user"):
                     st.markdown(prompt)
@@ -521,7 +492,7 @@ def main():
                         news = t_obj.news[:3]
                         news_text = "\n".join([f"- {n['title']}" for n in news])
                         
-                        response = get_ai_analysis(selected_label, live['price'], latest.to_dict(), news_text)
+                        response = get_ai_analysis(selected_label, price_val, latest.to_dict(), news_text)
                         st.markdown(response)
                         st.session_state.chat_history.append({"role": "assistant", "content": response})
             st.markdown('</div>', unsafe_allow_html=True)
@@ -565,7 +536,7 @@ def main():
         if st.button("RETRY CONNECTION"):
             st.rerun()
 
-    # 8. FOOTER (SIGNATURE)
+    # 7. FOOTER (SIGNATURE)
     st.markdown("""
     <div style="text-align: center; padding: 50px 0; margin-top: 50px; border-top: 1px solid rgba(255,255,255,0.05);">
         <p style="font-family: 'Rajdhani'; font-style: italic; font-size: 20px; color: #aaa; max-width: 600px; margin: 0 auto 20px;">
@@ -575,7 +546,7 @@ def main():
             — FAHMI (Pencipta AeroVulpis)
         </div>
         <div style="margin-top: 15px; font-family: 'Rajdhani'; font-size: 12px; color: #444; letter-spacing: 3px;">
-            DYNAMIHATCH IDENTITY • V2.0 ULTRA PRO • 2026
+            DYNAMIHATCH IDENTITY • V2.0 STABLE • 2026
         </div>
     </div>
     """, unsafe_allow_html=True)

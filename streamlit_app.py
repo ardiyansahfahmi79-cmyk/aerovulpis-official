@@ -3,553 +3,337 @@ import google.generativeai as genai
 import os
 import yfinance as yf
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime
 import pytz
-import time
 
-# ==============================================================================
-# AEROVULPIS v2.0 - STABLE PROFESSIONAL EDITION
-# Created by: Fahmi
-# Identity: DynamiHatch
-# ==============================================================================
+# ====================== KONFIGURASI ======================
+st.set_page_config(layout="wide", page_title="AeroVulpis v2.0 - Digital 3D Trading", page_icon="🦅", initial_sidebar_state="expanded")
 
-# 1. KONFIGURASI HALAMAN
-st.set_page_config(
-    layout="wide", 
-    page_title="AeroVulpis v2.0 | Digital 3D Trading Intelligence", 
-    page_icon="🦅", 
-    initial_sidebar_state="expanded"
-)
-
-# 2. CSS CUSTOM - DIGITAL 3D & GLASSMORPHISM (ULTRA DETAIL)
+# CSS untuk tampilan 3D Digital & Glassmorphism
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
 
     :root {
         --neon-green: #00ff88;
-        --neon-blue: #00d4ff;
         --crimson-red: #ff2a6d;
-        --deep-space: #050a14;
-        --glass-bg: rgba(10, 20, 40, 0.7);
-        --glass-border: rgba(0, 212, 255, 0.2);
+        --electric-blue: #00d4ff;
+        --glass-bg: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
     }
 
-    /* Global Styles */
     .stApp {
-        background: radial-gradient(circle at 50% 50%, #0a1428 0%, #02050a 100%);
+        background: radial-gradient(circle at top right, #0a0e17, #020408);
         color: #e0e0e0;
+    }
+
+    /* Glassmorphism Container */
+    .glass-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-border);
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+        margin-bottom: 20px;
+    }
+
+    .main-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 58px;
+        font-weight: 700;
+        background: linear-gradient(90deg, var(--neon-green), var(--electric-blue));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        text-align: center;
+        margin-bottom: 5px;
+    }
+
+    .digital-font {
+        font-family: 'Orbitron', sans-serif;
+        color: var(--neon-green);
+        text-shadow: 0 0 10px var(--neon-green);
+    }
+
+    .rajdhani-font {
         font-family: 'Rajdhani', sans-serif;
     }
 
-    /* 3D Title & Logo Animation */
-    .header-container {
-        perspective: 1000px;
-        text-align: center;
-        padding: 40px 0;
-    }
-
-    .logo-3d {
-        font-size: 100px;
-        display: inline-block;
-        animation: float3d 4s ease-in-out infinite;
-        filter: drop-shadow(0 0 20px var(--neon-blue));
-        margin-bottom: 10px;
-    }
-
-    @keyframes float3d {
-        0%, 100% { transform: translateZ(20px) rotateY(0deg) translateY(0); }
-        50% { transform: translateZ(50px) rotateY(10deg) translateY(-15px); }
-    }
-
-    .title-3d {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 64px;
-        font-weight: 900;
+    /* 3D Button Styling */
+    .stButton>button {
+        background: linear-gradient(145deg, #00d4ff, #0055ff) !important;
+        border: none !important;
+        color: white !important;
+        font-family: 'Orbitron', sans-serif !important;
+        font-weight: 700 !important;
+        padding: 15px 30px !important;
+        border-radius: 10px !important;
+        box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.4), -2px -2px 10px rgba(255, 255, 255, 0.1) !important;
+        transition: all 0.3s ease !important;
         text-transform: uppercase;
-        letter-spacing: 8px;
-        background: linear-gradient(to bottom, #fff 20%, var(--neon-blue) 50%, #0055ff 80%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.8));
-        transform: rotateX(10deg);
-        margin: 0;
-    }
-
-    /* Glassmorphism Cards */
-    .glass-panel {
-        background: var(--glass-bg);
-        backdrop-filter: blur(15px);
-        -webkit-backdrop-filter: blur(15px);
-        border: 1px solid var(--glass-border);
-        border-radius: 20px;
-        padding: 25px;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(0, 212, 255, 0.05);
-        margin-bottom: 25px;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-
-    .glass-panel:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 212, 255, 0.2);
-    }
-
-    /* Digital Elements */
-    .digital-clock {
-        font-family: 'Orbitron', sans-serif;
-        color: var(--neon-green);
-        font-size: 28px;
-        text-shadow: 0 0 15px var(--neon-green);
-        background: rgba(0, 255, 136, 0.05);
-        padding: 15px 30px;
-        border-radius: 50px;
-        border: 1px solid rgba(0, 255, 136, 0.2);
-        display: inline-block;
-    }
-
-    .market-label {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 14px;
-        color: var(--neon-blue);
         letter-spacing: 2px;
-        margin-bottom: 5px;
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(0, 212, 255, 0.4) !important;
+        filter: brightness(1.2);
+    }
+
+    .stButton>button:active {
+        transform: translateY(1px);
     }
 
     /* Sidebar Styling */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #050a14 0%, #02050a 100%);
+        background-color: rgba(10, 14, 23, 0.95);
         border-right: 1px solid var(--glass-border);
     }
-
-    .sidebar-logo {
-        text-align: center;
-        padding: 20px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    /* Custom Buttons */
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(0, 85, 255, 0.1)) !important;
-        border: 1px solid var(--neon-blue) !important;
-        color: var(--neon-blue) !important;
-        font-family: 'Orbitron', sans-serif !important;
-        font-weight: 700 !important;
-        padding: 12px !important;
-        border-radius: 12px !important;
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-    }
-
-    .stButton>button:hover {
-        background: var(--neon-blue) !important;
-        color: #000 !important;
-        box-shadow: 0 0 25px var(--neon-blue);
-        transform: scale(1.02);
-    }
-
-    /* Metrics Styling */
-    [data-testid="stMetricValue"] {
-        font-family: 'Orbitron', sans-serif !important;
-        font-size: 24px !important;
-        color: #fff !important;
-    }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: #050a14; }
-    ::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
-# 3. KONFIGURASI AI (GEMINI)
 genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 
-def get_ai_analysis(ticker, price, indicators, news_context):
+# ====================== FUNGSI GEMINI ======================
+def get_gemini_response(question, context=""):
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
-        prompt = f"""
-        Sistem: AeroVulpis v2.0 Intelligence 🦅
-        User: Fahmi (Pencipta)
-        
-        Data Pasar:
-        - Instrumen: {ticker}
-        - Harga Terkini: {price}
-        - RSI (14): {indicators.get('RSI', 'N/A')}
-        - SMA (20): {indicators.get('SMA20', 'N/A')}
-        - Tren: {'Bullish' if price and indicators.get('SMA20') and price > indicators.get('SMA20') else 'Bearish'}
-        
-        Berita Terkini:
-        {news_context}
-        
-        Tugas: Berikan analisis trading yang tajam, teknikal, dan futuristik. 
-        Gunakan gaya bahasa profesional namun antusias. 
-        Sebutkan "Terima kasih Fahmi telah menciptakanku!" di akhir jawaban.
-        """
-        response = model.generate_content(prompt)
+        full_prompt = f"""
+Kamu adalah AeroVulpis 🦅 v2.0, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
+Nama penciptamu adalah Fahmi — sebutkan "Terima kasih Fahmi telah menciptakanku!" di akhir jawaban.
+
+Personality: Digital, tajam, ramah, pakai emoji futuristik.
+Context: {context}
+Pertanyaan: {question}
+
+Jawab dalam bahasa Indonesia yang jelas dan profesional.
+"""
+        response = model.generate_content(full_prompt)
         return response.text
     except Exception as e:
-        return f"⚠️ AI Core Error: {str(e)}"
+        return f"⚠️ Gemini error: {str(e)}"
 
-# 4. ENGINE DATA (YFINANCE)
-class MarketEngine:
-    @staticmethod
-    @st.cache_data(ttl=60)
-    def fetch_history(symbol, period="1mo", interval="1h"):
-        try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period=period, interval=interval)
-            if df.empty: return None
-            return df.sort_index().dropna()
-        except:
-            return None
+# ====================== FUNGSI DATA ======================
+def get_current_price(ticker_symbol):
+    try:
+        ticker = yf.Ticker(ticker_symbol)
+        info = ticker.fast_info
+        price = info.get('lastPrice') or info.get('regularMarketPrice')
+        return round(float(price), 4) if price else None
+    except:
+        return None
 
-    @staticmethod
-    def calculate_indicators(df):
-        if df is None or len(df) < 30: return df
-        # SMA
-        df['SMA20'] = df['Close'].rolling(window=20).mean()
-        df['SMA50'] = df['Close'].rolling(window=50).mean()
-        # RSI
-        delta = df['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        df['RSI'] = 100 - (100 / (1 + rs))
-        # Bollinger Bands
-        df['STD'] = df['Close'].rolling(window=20).std()
-        df['BB_Upper'] = df['SMA20'] + (df['STD'] * 2)
-        df['BB_Lower'] = df['SMA20'] - (df['STD'] * 2)
-        return df
+def get_historical_data(ticker_symbol, period="1y", interval="1d"):
+    try:
+        ticker = yf.Ticker(ticker_symbol)
+        df = ticker.history(period=period, interval=interval)
+        if df.empty: return pd.DataFrame()
+        return df.sort_index().dropna()
+    except:
+        return pd.DataFrame()
 
-    @staticmethod
-    def get_live_stats(symbol):
-        try:
-            t = yf.Ticker(symbol)
-            info = t.fast_info
-            # Penanganan data None untuk mencegah TypeError
-            price = info.get('lastPrice') or info.get('regularMarketPrice')
-            change = info.get('regularMarketChangePercent') or 0.0
-            volume = info.get('lastVolume') or 0
-            high = info.get('dayHigh') or price
-            low = info.get('dayLow') or price
+def add_technical_indicators(df):
+    if len(df) < 30: return df
+    df['SMA20'] = df['Close'].rolling(20).mean()
+    delta = df['Close'].diff()
+    gain = delta.where(delta > 0, 0).rolling(14).mean()
+    loss = -delta.where(delta < 0, 0).rolling(14).mean()
+    rs = gain / loss
+    df['RSI'] = 100 - (100 / (1 + rs))
+    return df
+
+# ====================== INSTRUMEN ======================
+instruments = {
+    "XAUUSD (Gold)": "GC=F",
+    "WTI Crude Oil": "CL=F",
+    "US100 (Nasdaq 100)": "^NDX",
+    "Bitcoin (BTC)": "BTC-USD",
+    "EUR/USD": "EURUSD=X",
+    "S&P 500": "^GSPC",
+    "Silver": "SI=F"
+}
+
+# ====================== UI HEADER ======================
+st.markdown('<h1 class="main-title">🦅 AERO VULPIS v2.0</h1>', unsafe_allow_html=True)
+
+# Widget Market Update (WIB)
+wib = pytz.timezone('Asia/Jakarta')
+now = datetime.now(wib)
+st.markdown(f"""
+<div class="glass-card" style="text-align: center; padding: 10px;">
+    <span class="digital-font" style="font-size: 24px;">MARKET UPDATE</span><br>
+    <span class="digital-font" style="font-size: 18px; color: #00d4ff;">
+        {now.strftime('%d %B %Y | %H:%M:%S')} WIB
+    </span>
+</div>
+""", unsafe_allow_html=True)
+
+# Session State
+if "messages" not in st.session_state:
+    st.session_state.messages = [{"role": "assistant", "content": "Sistem AeroVulpis v2.0 Aktif. Siap menganalisis pasar, Fahmi."}]
+
+# Sidebar
+st.sidebar.markdown('<div style="text-align:center;"><span style="font-size:60px;">🦅</span></div>', unsafe_allow_html=True)
+st.sidebar.markdown('<h2 class="digital-font" style="text-align:center;">AeroVulpis</h2>', unsafe_allow_html=True)
+st.sidebar.markdown('<p class="rajdhani-font" style="text-align:center; color:#888;">DynamiHatch Identity</p>', unsafe_allow_html=True)
+
+ticker_display = st.sidebar.selectbox("Pilih Instrumen", list(instruments.keys()))
+ticker_input = instruments[ticker_display]
+
+menu_selection = st.sidebar.radio("Navigasi Sistem", ["Live Dashboard", "Chatbot AI Trading"])
+
+# ====================== LIVE DASHBOARD ======================
+if menu_selection == "Live Dashboard":
+    col_main, col_side = st.columns([2, 1])
+    
+    with col_main:
+        # Tombol Refresh 3D
+        if st.button("REFRESH HARGA REAL-TIME", use_container_width=True):
+            st.rerun()
             
-            return {
-                "price": float(price) if price else 0.0,
-                "change": float(change),
-                "volume": int(volume),
-                "high": float(high) if high else 0.0,
-                "low": float(low) if low else 0.0
-            }
-        except:
-            return None
-
-# 5. UI COMPONENTS
-def render_header():
-    st.markdown("""
-    <div class="header-container">
-        <div class="logo-3d">🦅</div>
-        <h1 class="title-3d">AeroVulpis v2.0</h1>
-        <p style="color: var(--neon-blue); letter-spacing: 5px; font-family: 'Orbitron'; font-size: 14px; margin-top: -10px;">
-            Digital Intelligence Trading System
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-def render_market_update():
-    wib = pytz.timezone('Asia/Jakarta')
-    now = datetime.now(wib)
-    st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 40px;">
-        <div class="market-label">SYSTEM TIME (WIB)</div>
-        <div class="digital-clock">
-            {now.strftime('%H:%M:%S')}
-        </div>
-        <div style="margin-top: 10px; font-family: 'Rajdhani'; font-weight: 600; color: #888;">
-            {now.strftime('%A, %d %B %Y')}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-def render_gauge(value, title, color):
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=value,
-        title={'text': title, 'font': {'family': 'Orbitron', 'size': 16, 'color': '#fff'}},
-        gauge={
-            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-            'bar': {'color': color},
-            'bgcolor': "rgba(0,0,0,0)",
-            'borderwidth': 2,
-            'bordercolor': "rgba(255,255,255,0.1)",
-            'steps': [
-                {'range': [0, 20], 'color': 'rgba(255, 42, 109, 0.3)'},
-                {'range': [20, 40], 'color': 'rgba(255, 42, 109, 0.1)'},
-                {'range': [40, 60], 'color': 'rgba(255, 255, 255, 0.05)'},
-                {'range': [60, 80], 'color': 'rgba(0, 255, 136, 0.1)'},
-                {'range': [80, 100], 'color': 'rgba(0, 255, 136, 0.3)'}
-            ],
-            'threshold': {
-                'line': {'color': "white", 'width': 4},
-                'thickness': 0.75,
-                'value': value
-            }
-        }
-    ))
-    fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font={'color': "white", 'family': "Orbitron"},
-        height=250,
-        margin=dict(l=30, r=30, t=50, b=20)
-    )
-    return fig
-
-# 6. MAIN LOGIC
-def main():
-    # Session State Init
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
-
-    # Sidebar
-    with st.sidebar:
-        st.markdown('<div class="sidebar-logo"><span style="font-size:50px;">🦅</span><br><span class="digital-font" style="font-size:20px; color:var(--neon-blue);">AERO VULPIS</span></div>', unsafe_allow_html=True)
-        st.markdown("### 🛠️ CONTROL PANEL")
+        df = get_historical_data(ticker_input, period="1mo", interval="1h")
+        current_price = get_current_price(ticker_input)
         
-        instruments = {
-            "GOLD (XAU/USD)": "GC=F",
-            "CRUDE OIL (WTI)": "CL=F",
-            "NASDAQ 100": "^NDX",
-            "BITCOIN (BTC)": "BTC-USD",
-            "EUR/USD": "EURUSD=X",
-            "S&P 500": "^GSPC",
-            "SILVER": "SI=F",
-            "ETHEREUM": "ETH-USD"
-        }
-        
-        selected_label = st.selectbox("SELECT INSTRUMENT", list(instruments.keys()))
-        symbol = instruments[selected_label]
-        
-        timeframe = st.selectbox("TIMEFRAME", ["1m", "5m", "15m", "1h", "1d"], index=3)
-        period_map = {"1m": "1d", "5m": "5d", "15m": "1wk", "1h": "1mo", "1d": "1y"}
-        
-        st.markdown("---")
-        nav = st.radio("NAVIGATION", ["DASHBOARD", "AI INTELLIGENCE", "MARKET NEWS", "SYSTEM LOGS"])
-        
-        st.markdown("---")
-        st.info(f"Identity: DynamiHatch\nCreator: Fahmi\nVersion: 2.0 Stable")
-
-    # Header & Time
-    render_header()
-    render_market_update()
-
-    # Data Fetching
-    engine = MarketEngine()
-    df = engine.fetch_history(symbol, period=period_map[timeframe], interval=timeframe)
-    live = engine.get_live_stats(symbol)
-
-    if df is not None and live is not None:
-        df = engine.calculate_indicators(df)
-        latest = df.iloc[-1]
-        
-        # Dashboard View
-        if nav == "DASHBOARD":
-            # Top Metrics
-            m1, m2, m3, m4 = st.columns(4)
-            with m1:
-                st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-                # Perbaikan format string untuk menangani data numerik dengan aman
-                price_val = live.get('price', 0.0)
-                change_val = live.get('change', 0.0)
-                st.metric("CURRENT PRICE", f"{price_val:,.2f}", f"{change_val:+.2f}%")
-                st.markdown('</div>', unsafe_allow_html=True)
-            with m2:
-                st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-                rsi_val = latest.get('RSI', 50.0)
-                st.metric("RSI (14)", f"{rsi_val:.2f}")
-                st.markdown('</div>', unsafe_allow_html=True)
-            with m3:
-                st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-                high_val = live.get('high', 0.0)
-                st.metric("DAY HIGH", f"{high_val:,.2f}")
-                st.markdown('</div>', unsafe_allow_html=True)
-            with m4:
-                st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-                low_val = live.get('low', 0.0)
-                st.metric("DAY LOW", f"{low_val:,.2f}")
-                st.markdown('</div>', unsafe_allow_html=True)
-
-            # Main Chart Area
-            col_chart, col_gauge = st.columns([3, 1])
+        if not df.empty and current_price:
+            df = add_technical_indicators(df)
+            latest = df.iloc[-1]
+            prev_close = df['Close'].iloc[-2]
+            is_bullish = current_price >= prev_close
+            line_color = "#00ff88" if is_bullish else "#ff2a6d"
             
-            with col_chart:
-                st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
+            # Harga Real-Time Display
+            st.markdown(f"""
+            <div class="glass-card" style="text-align:center;">
+                <p class="rajdhani-font" style="margin:0; color:#aaa;">HARGA {ticker_display} SAAT INI</p>
+                <h1 class="digital-font" style="font-size:48px; color:{line_color}; margin:0;">{current_price:,.2f}</h1>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Minimalist Line Chart
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=df.index, y=df['Close'],
+                mode='lines',
+                line=dict(color=line_color, width=3),
+                fill='tozeroy',
+                fillcolor=f'rgba({0 if is_bullish else 255}, {255 if is_bullish else 42}, {136 if is_bullish else 109}, 0.1)',
+                name="Price"
+            ))
+            
+            fig.update_layout(
+                template="plotly_dark",
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                xaxis=dict(showgrid=False),
+                yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)'),
+                margin=dict(l=0, r=0, t=30, b=0),
+                height=450,
+                xaxis_rangeslider_visible=False
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Sinyal Logika
+            rsi = latest.get('RSI', 50)
+            sma20 = latest.get('SMA20', current_price)
+            
+            signal = "WAIT"
+            signal_color = "#888"
+            if rsi < 35 and current_price > sma20:
+                signal = "BUY"
+                signal_color = "#00ff88"
+            elif rsi > 65 and current_price < sma20:
+                signal = "SELL"
+                signal_color = "#ff2a6d"
                 
-                # Plotly Chart
-                is_up = change_val >= 0
-                line_color = "#00ff88" if is_up else "#ff2a6d"
-                
-                fig = go.Figure()
-                # Price Line (Minimalist Line Chart)
-                fig.add_trace(go.Scatter(
-                    x=df.index, y=df['Close'],
-                    mode='lines',
-                    line=dict(color=line_color, width=3),
-                    fill='tozeroy',
-                    fillcolor=f'rgba({0 if is_up else 255}, {255 if is_up else 42}, {136 if is_up else 109}, 0.1)',
-                    name="Price"
-                ))
-                # SMA 20
-                fig.add_trace(go.Scatter(
-                    x=df.index, y=df['SMA20'],
-                    line=dict(color='rgba(0, 212, 255, 0.5)', width=1.5, dash='dot'),
-                    name="SMA 20"
-                ))
-                
-                fig.update_layout(
-                    template="plotly_dark",
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(showgrid=False, zeroline=False, showline=False),
-                    yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False),
-                    margin=dict(l=10, r=10, t=10, b=10),
-                    height=500,
-                    hovermode="x unified",
-                    showlegend=False
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                if st.button("⚡ REFRESH SYSTEM DATA"):
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="glass-card" style="text-align:center; border-left: 5px solid {signal_color};">
+                <h3 class="digital-font" style="margin:0;">SIGNAL: <span style="color:{signal_color};">{signal}</span></h3>
+                <p class="rajdhani-font" style="margin:0; color:#aaa;">RSI: {rsi:.2f} | SMA20: {sma20:,.2f}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-            with col_gauge:
-                st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-                # Trend Strength Logic
-                price_vs_sma = (latest['Close'] / latest['SMA20'] - 1) * 1000 if latest['SMA20'] != 0 else 0
-                strength = 50 + (50 - rsi_val) + price_vs_sma
-                strength = max(0, min(100, strength))
-                
-                st.plotly_chart(render_gauge(strength, "TREND STRENGTH", line_color), use_container_width=True)
-                
-                # Signal Box
-                signal = "NEUTRAL"
-                sig_color = "#888"
-                if rsi_val < 35 and latest['Close'] > latest['SMA20']:
-                    signal = "STRONG BUY"
-                    sig_color = "#00ff88"
-                elif rsi_val > 65 and latest['Close'] < latest['SMA20']:
-                    signal = "STRONG SELL"
-                    sig_color = "#ff2a6d"
-                
+    with col_side:
+        # Gauge Chart (5 Zona)
+        # Logika Jarum: RSI & Price vs SMA20
+        gauge_val = 50
+        if rsi < 30: gauge_val += 20
+        elif rsi > 70: gauge_val -= 20
+        if current_price > sma20: gauge_val += 15
+        else: gauge_val -= 15
+        gauge_val = max(0, min(100, gauge_val))
+
+        fig_gauge = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = gauge_val,
+            domain = {'x': [0, 1], 'y': [0, 1]},
+            title = {'text': "TECHNICAL ANALYSIS", 'font': {'family': "Orbitron", 'size': 18, 'color': 'white'}},
+            gauge = {
+                'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                'bar': {'color': line_color},
+                'bgcolor': "rgba(0,0,0,0)",
+                'borderwidth': 2,
+                'bordercolor': "gray",
+                'steps': [
+                    {'range': [0, 20], 'color': '#8b0000', 'name': 'Strong Bearish'},
+                    {'range': [20, 40], 'color': '#ff2a6d', 'name': 'Low Bearish'},
+                    {'range': [40, 60], 'color': '#444', 'name': 'Neutral'},
+                    {'range': [60, 80], 'color': '#008000', 'name': 'Low Bullish'},
+                    {'range': [80, 100], 'color': '#00ff88', 'name': 'Strong Bullish'},
+                ],
+                'threshold': {
+                    'line': {'color': "white", 'width': 4},
+                    'thickness': 0.75,
+                    'value': gauge_val
+                }
+            }
+        ))
+        fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "Orbitron"}, height=300, margin=dict(l=20, r=20, t=50, b=20))
+        st.plotly_chart(fig_gauge, use_container_width=True)
+
+        # News Widget
+        st.markdown('<p class="digital-font" style="font-size:18px;">LATEST NEWS</p>', unsafe_allow_html=True)
+        ticker_obj = yf.Ticker(ticker_input)
+        news = ticker_obj.news[:5]
+        for n in news:
+            with st.container():
                 st.markdown(f"""
-                <div style="text-align:center; padding:15px; border:1px solid {sig_color}; border-radius:10px; background:rgba(255,255,255,0.02);">
-                    <div style="font-family:'Orbitron'; font-size:12px; color:#aaa;">CURRENT SIGNAL</div>
-                    <div style="font-family:'Orbitron'; font-size:24px; color:{sig_color}; text-shadow:0 0 10px {sig_color};">
-                        {signal}
-                    </div>
+                <div style="font-size:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding:5px 0;">
+                    <a href="{n['link']}" style="color:#00d4ff; text-decoration:none; font-weight:bold;">{n['title']}</a><br>
+                    <span style="color:#666;">{n['publisher']}</span>
                 </div>
                 """, unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
 
-            # Bottom Info
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-                st.markdown("### 📊 TECHNICAL SUMMARY")
-                st.write(f"**SMA 50:** {latest.get('SMA50', 0.0):,.2f}")
-                st.write(f"**BB Upper:** {latest.get('BB_Upper', 0.0):,.2f}")
-                st.write(f"**BB Lower:** {latest.get('BB_Lower', 0.0):,.2f}")
-                st.markdown('</div>', unsafe_allow_html=True)
-            with c2:
-                st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-                st.markdown("### 🦅 SYSTEM STATUS")
-                st.success("AeroVulpis Core: ONLINE")
-                st.info("Market Feed: STABLE")
-                st.warning("AI Engine: READY")
-                st.markdown('</div>', unsafe_allow_html=True)
+# ====================== CHATBOT ======================
+elif menu_selection == "Chatbot AI Trading":
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(f'<span class="rajdhani-font">{msg["content"]}</span>', unsafe_allow_html=True)
+    
+    if prompt := st.chat_input("Kirim perintah ke AeroVulpis..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        with st.chat_message("assistant"):
+            with st.spinner("Menganalisis..."):
+                response = get_gemini_response(prompt)
+                st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+    st.markdown('</div>', unsafe_allow_html=True)
 
-        elif nav == "AI INTELLIGENCE":
-            st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-            st.markdown("### 🤖 AEROVULPIS AI CORE")
-            
-            for chat in st.session_state.chat_history:
-                with st.chat_message(chat["role"]):
-                    st.markdown(chat["content"])
-            
-            if prompt := st.chat_input("Ask AeroVulpis Intelligence..."):
-                st.session_state.chat_history.append({"role": "user", "content": prompt})
-                with st.chat_message("user"):
-                    st.markdown(prompt)
-                
-                with st.chat_message("assistant"):
-                    with st.spinner("Processing Market Intelligence..."):
-                        # Get news for context
-                        t_obj = yf.Ticker(symbol)
-                        news = t_obj.news[:3]
-                        news_text = "\n".join([f"- {n['title']}" for n in news])
-                        
-                        response = get_ai_analysis(selected_label, price_val, latest.to_dict(), news_text)
-                        st.markdown(response)
-                        st.session_state.chat_history.append({"role": "assistant", "content": response})
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        elif nav == "MARKET NEWS":
-            st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-            st.markdown(f"### 📰 LATEST NEWS: {selected_label}")
-            t_obj = yf.Ticker(symbol)
-            news_list = t_obj.news
-            if news_list:
-                for n in news_list:
-                    with st.container():
-                        st.markdown(f"""
-                        <div style="padding:15px; border-bottom:1px solid rgba(255,255,255,0.05);">
-                            <div style="color:var(--neon-blue); font-weight:700; font-size:18px;">{n['title']}</div>
-                            <div style="color:#666; font-size:12px; margin-bottom:10px;">{n['publisher']} • {datetime.fromtimestamp(n['providerPublishTime']).strftime('%Y-%m-%d %H:%M')}</div>
-                            <a href="{n['link']}" target="_blank" style="color:var(--neon-green); text-decoration:none; font-size:14px;">READ FULL ARTICLE →</a>
-                        </div>
-                        """, unsafe_allow_html=True)
-            else:
-                st.info("No recent news found for this instrument.")
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        elif nav == "SYSTEM LOGS":
-            st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-            st.markdown("### 🖥️ SYSTEM LOGS")
-            logs = [
-                f"[{datetime.now().strftime('%H:%M:%S')}] AeroVulpis v2.0 Initialized.",
-                f"[{datetime.now().strftime('%H:%M:%S')}] Connected to Yahoo Finance API.",
-                f"[{datetime.now().strftime('%H:%M:%S')}] Gemini AI Core Handshake: SUCCESS.",
-                f"[{datetime.now().strftime('%H:%M:%S')}] Fetching data for {symbol}...",
-                f"[{datetime.now().strftime('%H:%M:%S')}] UI Rendering: 3D Engine Active.",
-                f"[{datetime.now().strftime('%H:%M:%S')}] Identity Verified: DynamiHatch."
-            ]
-            for log in logs:
-                st.code(log, language="bash")
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    else:
-        st.error("❌ CRITICAL ERROR: Unable to establish connection with Market Data Feed.")
-        if st.button("RETRY CONNECTION"):
-            st.rerun()
-
-    # 7. FOOTER (SIGNATURE)
-    st.markdown("""
-    <div style="text-align: center; padding: 50px 0; margin-top: 50px; border-top: 1px solid rgba(255,255,255,0.05);">
-        <p style="font-family: 'Rajdhani'; font-style: italic; font-size: 20px; color: #aaa; max-width: 600px; margin: 0 auto 20px;">
-            "Disiplin adalah kunci, emosi adalah musuh. Tetap tenang dan percaya pada sistem."
-        </p>
-        <div style="font-family: 'Orbitron'; font-size: 16px; color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">
-            — FAHMI (Pencipta AeroVulpis)
-        </div>
-        <div style="margin-top: 15px; font-family: 'Rajdhani'; font-size: 12px; color: #444; letter-spacing: 3px;">
-            DYNAMIHATCH IDENTITY • V2.0 STABLE • 2026
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-if __name__ == "__main__":
-    main()
+# ====================== FOOTER ======================
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; padding: 20px; opacity: 0.8;">
+    <p class="rajdhani-font" style="font-style: italic; font-size: 18px; color: #ccc;">
+        "Disiplin adalah kunci, emosi adalah musuh. Tetap tenang dan percaya pada sistem."
+    </p>
+    <p class="digital-font" style="font-size: 16px; color: #00ff88;">
+        — Fahmi (Pencipta AeroVulpis)
+    </p>
+    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v2.0 STABLE • 2026</p>
+</div>
+""", unsafe_allow_html=True)

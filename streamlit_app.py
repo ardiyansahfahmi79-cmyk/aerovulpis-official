@@ -49,7 +49,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# Tambahkan peringatan jika API key Gemini belum ada
+# Cek API key Gemini
 if not os.environ.get("GOOGLE_API_KEY"):
     st.error("⚠️ GOOGLE_API_KEY tidak ditemukan di environment variables. Pastikan sudah diatur.")
 else:
@@ -78,6 +78,7 @@ Jawab dalam bahasa Indonesia yang jelas dan hidup.
         else:
             return "⚠️ Gemini tidak mengembalikan teks. Coba ulang."
     except Exception as e:
+        model_id = "gemini-1.5-flash-latest"
         return f"⚠️ Gemini error: {str(e)}
 Coba refresh halaman atau pastikan API Key benar dan model {model_id} diaktifkan di Google Cloud Console."
 

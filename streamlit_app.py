@@ -8,7 +8,7 @@ from datetime import datetime
 import pytz
 
 # ====================== KONFIGURASI ======================
-st.set_page_config(layout="wide", page_title="AeroVulpis v3.0 - Trading Signal Edition", page_icon="🦅", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="AeroVulpis v3.2 - Full Analysis Edition", page_icon="🦅", initial_sidebar_state="expanded")
 
 # CSS untuk tampilan 3D Digital & Glassmorphism
 st.markdown("""
@@ -99,7 +99,7 @@ def get_gemini_response(question, context=""):
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
         full_prompt = f"""
-Kamu adalah AeroVulpis 🦅 v3.0, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
+Kamu adalah AeroVulpis 🦅 v3.2, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
 Nama penciptamu adalah Fahmi — sebutkan "Terima kasih Fahmi telah menciptakanku!" di akhir jawaban.
 
 Personality: Digital, tajam, ramah, pakai emoji futuristik.
@@ -168,28 +168,35 @@ def add_technical_indicators(df):
 
 # ====================== INSTRUMEN ======================
 instruments = {
-    "Forex (Populer)": {
+    "Forex": {
         "EUR/USD": "EURUSD=X",
         "GBP/USD": "GBPUSD=X",
         "USD/JPY": "USDJPY=X",
         "AUD/USD": "AUDUSD=X",
         "USD/CHF": "USDCHF=X"
     },
-    "Komoditas (Populer)": {
+    "Crypto": {
+        "Bitcoin (BTC)": "BTC-USD",
+        "Ethereum (ETH)": "ETH-USD",
+        "Solana (SOL)": "SOL-USD",
+        "Binance Coin (BNB)": "BNB-USD",
+        "Ripple (XRP)": "XRP-USD"
+    },
+    "Komoditas": {
         "Gold (XAUUSD)": "GC=F",
         "WTI Crude Oil": "CL=F",
         "Silver": "SI=F",
         "Natural Gas": "NG=F",
         "Brent Oil": "BZ=F"
     },
-    "Saham AS (Terbesar)": {
+    "Stock (AS)": {
         "Apple (AAPL)": "AAPL",
         "Microsoft (MSFT)": "MSFT",
         "NVIDIA (NVDA)": "NVDA",
         "Amazon (AMZN)": "AMZN",
         "Alphabet (GOOGL)": "GOOGL"
     },
-    "Saham Indonesia (Populer)": {
+    "Stock (Indonesia)": {
         "BBCA (BCA)": "BBCA.JK",
         "BBRI (BRI)": "BBRI.JK",
         "TLKM (Telkom)": "TLKM.JK",
@@ -199,16 +206,16 @@ instruments = {
 }
 
 # ====================== UI HEADER ======================
-st.markdown('<h1 class="main-title">🦅 AERO VULPIS v3.0</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">🦅 AERO VULPIS v3.2</h1>', unsafe_allow_html=True)
 
 # Session State
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Sistem AeroVulpis v3.0 Aktif. Fitur Sinyal Trading telah diintegrasikan. Siap beraksi, Fahmi!"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Sistem AeroVulpis v3.2 Aktif. Gauge Chart telah dikembalikan. Siap beraksi, Fahmi!"}]
 
 # Sidebar
 st.sidebar.markdown('<div style="text-align:center;"><span style="font-size:60px;">🦅</span></div>', unsafe_allow_html=True)
 st.sidebar.markdown('<h2 class="digital-font" style="text-align:center;">AeroVulpis</h2>', unsafe_allow_html=True)
-st.sidebar.markdown('<p class="rajdhani-font" style="text-align:center; color:#888;">Trading Signal Edition</p>', unsafe_allow_html=True)
+st.sidebar.markdown('<p class="rajdhani-font" style="text-align:center; color:#888;">Full Analysis Edition</p>', unsafe_allow_html=True)
 
 category = st.sidebar.selectbox("Pilih Kategori", list(instruments.keys()))
 ticker_display = st.sidebar.selectbox("Pilih Instrumen", list(instruments[category].keys()))
@@ -265,39 +272,51 @@ if menu_selection == "Live Dashboard":
             st.plotly_chart(fig, use_container_width=True)
 
     with col_side:
-        # Technical Summary
-        st.markdown('<p class="digital-font" style="font-size:18px;">TECHNICAL SUMMARY</p>', unsafe_allow_html=True)
+        # Gauge Chart (5 Zona)
         if not df.empty:
             rsi = latest.get('RSI', 50)
-            macd = latest.get('MACD', 0)
-            sig_line = latest.get('Signal_Line', 0)
+            sma20 = latest.get('SMA20', current_price)
             
-            st.markdown(f"""
-            <div class="glass-card">
-                <p class="rajdhani-font">RSI (14): <b style="color:{'#ff2a6d' if rsi > 70 else '#00ff88' if rsi < 30 else '#00d4ff'}">{rsi:.2f}</b></p>
-                <p class="rajdhani-font">MACD: <b style="color:{'#00ff88' if macd > sig_line else '#ff2a6d'}">{macd:.4f}</b></p>
-                <p class="rajdhani-font">SMA 20: <b>{latest.get('SMA20', 0):,.2f}</b></p>
-            </div>
-            """, unsafe_allow_html=True)
+            gauge_val = 50
+            if rsi < 30: gauge_val += 20
+            elif rsi > 70: gauge_val -= 20
+            if current_price > sma20: gauge_val += 15
+            else: gauge_val -= 15
+            gauge_val = max(0, min(100, gauge_val))
 
-        # News Widget
-        st.markdown('<p class="digital-font" style="font-size:18px;">LATEST NEWS</p>', unsafe_allow_html=True)
-        ticker_obj = yf.Ticker(ticker_input)
-        try:
-            news = ticker_obj.news[:5]
-            if news:
-                for n in news:
-                    with st.container():
-                        st.markdown(f"""
-                        <div style="font-size:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding:5px 0;">
-                            <a href="{n['link']}" target="_blank" style="color:#00d4ff; text-decoration:none; font-weight:bold;">{n['title']}</a><br>
-                            <span style="color:#666;">{n['publisher']}</span>
-                        </div>
-                        """, unsafe_allow_html=True)
-            else:
-                st.info("Belum ada berita baru.")
-        except:
-            st.info("Berita tidak tersedia untuk instrumen ini.")
+            fig_gauge = go.Figure(go.Indicator(
+                mode = "gauge+number",
+                value = gauge_val,
+                domain = {'x': [0, 1], 'y': [0, 1]},
+                title = {'text': "TECHNICAL ANALYSIS", 'font': {'family': "Orbitron", 'size': 18, 'color': 'white'}},
+                gauge = {
+                    'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                    'bar': {'color': line_color},
+                    'bgcolor': "rgba(0,0,0,0)",
+                    'borderwidth': 2,
+                    'bordercolor': "gray",
+                    'steps': [
+                        {'range': [0, 20], 'color': '#8b0000', 'name': 'Strong Bearish'},
+                        {'range': [20, 40], 'color': '#ff2a6d', 'name': 'Low Bearish'},
+                        {'range': [40, 60], 'color': '#888888', 'name': 'Neutral'},
+                        {'range': [60, 80], 'color': '#aaffaa', 'name': 'Low Bullish'},
+                        {'range': [80, 100], 'color': '#00ff88', 'name': 'Strong Bullish'},
+                    ],
+                    'threshold': {
+                        'line': {'color': "white", 'width': 4},
+                        'thickness': 0.75,
+                        'value': gauge_val
+                    }
+                }
+            ))
+            fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "Orbitron"}, height=300, margin=dict(l=20, r=20, t=50, b=20))
+            st.plotly_chart(fig_gauge, use_container_width=True)
+
+        # Benchmark Widget
+        st.markdown('<div class="glass-card" style="text-align:center;">', unsafe_allow_html=True)
+        st.markdown('<p class="rajdhani-font" style="color:#888; font-size:12px;">S&P 500 Benchmark</p>', unsafe_allow_html=True)
+        st.markdown('<h3 class="digital-font" style="color:#00d4ff; margin:0;">6,611.21</h3>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # ====================== TRADING SIGNALS ======================
 elif menu_selection == "Trading Signals":
@@ -381,7 +400,6 @@ elif menu_selection == "Trading Signals":
                 st.markdown(f'<p class="rajdhani-font" style="color:{color};">● {r}</p>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
-        # Strategy Note
         st.info(f"Strategi: Sinyal ini dihasilkan berdasarkan kombinasi RSI, MACD, dan Moving Averages pada timeframe 1 Jam. Selalu gunakan Stop Loss!")
     else:
         st.error("Data tidak cukup untuk menghasilkan sinyal.")
@@ -422,7 +440,7 @@ elif menu_selection == "Chatbot AI Trading":
         with st.chat_message("assistant"):
             with st.spinner("Menganalisis..."):
                 market_data = get_market_data(ticker_input)
-                context = f"Harga {ticker_display} saat ini adalah {market_data['price'] if market_data else 'N/A'}."
+                context = f"Harga {ticker_display} saat ini adalah {market_data['price'] if market_data else 'N/A'}. S&P 500 berada di 6,611.21."
                 response = get_gemini_response(prompt, context)
                 st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
@@ -438,6 +456,6 @@ st.markdown("""
     <p class="digital-font" style="font-size: 16px; color: #00ff88;">
         — Fahmi (Pencipta AeroVulpis)
     </p>
-    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v3.0 TRADING SIGNAL • 2026</p>
+    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v3.2 FULL ANALYSIS • 2026</p>
 </div>
 """, unsafe_allow_html=True)

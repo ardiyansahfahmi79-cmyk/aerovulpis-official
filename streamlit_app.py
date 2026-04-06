@@ -8,7 +8,7 @@ from datetime import datetime
 import pytz
 
 # ====================== KONFIGURASI ======================
-st.set_page_config(layout="wide", page_title="AeroVulpis v3.1 - Fixed Edition", page_icon="🦅", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="AeroVulpis v3.1 - Pro Edition", page_icon="🦅", initial_sidebar_state="expanded")
 
 # CSS untuk tampilan 3D Digital & Glassmorphism
 st.markdown("""
@@ -119,7 +119,6 @@ def get_market_data(ticker_symbol):
         ticker = yf.Ticker(ticker_symbol)
         info = ticker.fast_info
         
-        # Prioritas pengambilan harga
         price = info.get('lastPrice') or info.get('regularMarketPrice')
         
         hist = ticker.history(period="1d")
@@ -160,7 +159,6 @@ def add_technical_indicators(df):
     delta = df['Close'].diff()
     gain = delta.where(delta > 0, 0).rolling(14).mean()
     loss = -delta.where(delta < 0, 0).rolling(14).mean()
-    # Avoid division by zero
     rs = gain / loss.replace(0, 0.001)
     df['RSI'] = 100 - (100 / (1 + rs))
     # MACD
@@ -225,6 +223,22 @@ category = st.sidebar.selectbox("Pilih Kategori", list(instruments.keys()))
 ticker_display = st.sidebar.selectbox("Pilih Instrumen", list(instruments[category].keys()))
 ticker_input = instruments[category][ticker_display]
 
+# ====================== TIMEFRAME SELECTION ======================
+st.sidebar.markdown("---")
+st.sidebar.markdown('<p class="digital-font" style="font-size:14px;">TIMEFRAME SETTINGS</p>', unsafe_allow_html=True)
+tf_options = {
+    "30m": {"period": "5d", "interval": "30m"},
+    "1h": {"period": "1mo", "interval": "1h"},
+    "4h": {"period": "3mo", "interval": "1h"}, # 4h not native in yfinance, using 1h as proxy
+    "1D": {"period": "1y", "interval": "1d"},
+    "1W": {"period": "2y", "interval": "1wk"},
+    "1Month": {"period": "5y", "interval": "1mo"},
+    "1year": {"period": "max", "interval": "1y"}
+}
+selected_tf = st.sidebar.selectbox("Pilih Timeframe", list(tf_options.keys()), index=1)
+period = tf_options[selected_tf]["period"]
+interval = tf_options[selected_tf]["interval"]
+
 menu_selection = st.sidebar.radio("Navigasi Sistem", ["Live Dashboard", "Trading Signals", "Market History", "Chatbot AI Trading"])
 
 # ====================== LIVE DASHBOARD ======================
@@ -236,7 +250,7 @@ if menu_selection == "Live Dashboard":
             st.rerun()
             
         market_data = get_market_data(ticker_input)
-        df = get_historical_data(ticker_input, period="1mo", interval="1h")
+        df = get_historical_data(ticker_input, period=period, interval=interval)
         
         if market_data and not df.empty:
             current_price = market_data['price']
@@ -246,7 +260,6 @@ if menu_selection == "Live Dashboard":
             is_bullish = current_price >= prev_close
             line_color = "#00ff88" if is_bullish else "#ff2a6d"
             
-            # Perbaikan format harga agar tidak error
             try:
                 if "USD" in ticker_display or "/" in ticker_display:
                     formatted_price = f"{float(current_price):,.4f}"
@@ -257,7 +270,7 @@ if menu_selection == "Live Dashboard":
             
             st.markdown(f"""
             <div class="glass-card" style="text-align:center;">
-                <p class="rajdhani-font" style="margin:0; color:#aaa;">HARGA {ticker_display} SAAT INI</p>
+                <p class="rajdhani-font" style="margin:0; color:#aaa;">HARGA {ticker_display} ({selected_tf})</p>
                 <h1 class="digital-font" style="font-size:48px; color:{line_color}; margin:0;">{formatted_price}</h1>
             </div>
             """, unsafe_allow_html=True)
@@ -285,7 +298,6 @@ if menu_selection == "Live Dashboard":
             st.plotly_chart(fig, use_container_width=True)
 
     with col_side:
-        # Gauge Chart (5 Zona)
         if market_data and not df.empty:
             latest = df.iloc[-1]
             rsi = latest.get('RSI', 50)
@@ -298,11 +310,18 @@ if menu_selection == "Live Dashboard":
             else: gauge_val -= 15
             gauge_val = max(0, min(100, gauge_val))
 
+            # Tentukan Label Status
+            if gauge_val <= 20: status_label = "STRONG BEARISH"
+            elif gauge_val <= 40: status_label = "LOW BEARISH"
+            elif gauge_val <= 60: status_label = "NEUTRAL"
+            elif gauge_val <= 80: status_label = "LOW BULLISH"
+            else: status_label = "STRONG BULLISH"
+
             fig_gauge = go.Figure(go.Indicator(
                 mode = "gauge+number",
                 value = gauge_val,
                 domain = {'x': [0, 1], 'y': [0, 1]},
-                title = {'text': "TECHNICAL ANALYSIS", 'font': {'family': "Orbitron", 'size': 18, 'color': 'white'}},
+                title = {'text': f"ANALYSIS: {status_label}", 'font': {'family': "Orbitron", 'size': 16, 'color': line_color}},
                 gauge = {
                     'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
                     'bar': {'color': line_color},
@@ -310,11 +329,11 @@ if menu_selection == "Live Dashboard":
                     'borderwidth': 2,
                     'bordercolor': "gray",
                     'steps': [
-                        {'range': [0, 20], 'color': '#8b0000', 'name': 'Strong Bearish'},
-                        {'range': [20, 40], 'color': '#ff2a6d', 'name': 'Low Bearish'},
-                        {'range': [40, 60], 'color': '#888888', 'name': 'Neutral'},
-                        {'range': [60, 80], 'color': '#aaffaa', 'name': 'Low Bullish'},
-                        {'range': [80, 100], 'color': '#00ff88', 'name': 'Strong Bullish'},
+                        {'range': [0, 20], 'color': '#8b0000'},
+                        {'range': [20, 40], 'color': '#ff2a6d'},
+                        {'range': [40, 60], 'color': '#888888'},
+                        {'range': [60, 80], 'color': '#aaffaa'},
+                        {'range': [80, 100], 'color': '#00ff88'},
                     ],
                     'threshold': {
                         'line': {'color': "white", 'width': 4},
@@ -326,7 +345,6 @@ if menu_selection == "Live Dashboard":
             fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "Orbitron"}, height=300, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig_gauge, use_container_width=True)
 
-        # Benchmark Widget
         st.markdown('<div class="glass-card" style="text-align:center;">', unsafe_allow_html=True)
         st.markdown('<p class="rajdhani-font" style="color:#888; font-size:12px;">S&P 500 Benchmark</p>', unsafe_allow_html=True)
         st.markdown('<h3 class="digital-font" style="color:#00d4ff; margin:0;">6,611.21</h3>', unsafe_allow_html=True)
@@ -337,9 +355,9 @@ if menu_selection == "Live Dashboard":
 
 # ====================== TRADING SIGNALS ======================
 elif menu_selection == "Trading Signals":
-    st.markdown('<h2 class="digital-font">⚡ Trading Signals</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="digital-font">⚡ Trading Signals ({selected_tf})</h2>', unsafe_allow_html=True)
     
-    df = get_historical_data(ticker_input, period="1mo", interval="1h")
+    df = get_historical_data(ticker_input, period=period, interval=interval)
     if not df.empty:
         df = add_technical_indicators(df)
         latest = df.iloc[-1]
@@ -350,7 +368,6 @@ elif menu_selection == "Trading Signals":
         sma20 = latest.get('SMA20', price)
         sma50 = latest.get('SMA50', price)
         
-        # Logika Sinyal
         score = 0
         reasons = []
         
@@ -382,7 +399,6 @@ elif menu_selection == "Trading Signals":
             score -= 1
             reasons.append("Death Cross Tendency (Bearish)")
 
-        # Penentuan Sinyal Akhir
         if score >= 2:
             final_signal = "STRONG BUY"
             sig_color = "#00ff88"
@@ -403,7 +419,7 @@ elif menu_selection == "Trading Signals":
         with col1:
             st.markdown(f"""
             <div class="glass-card" style="text-align:center; border-top: 5px solid {sig_color};">
-                <p class="rajdhani-font" style="color:#aaa; margin:0;">REKOMENDASI</p>
+                <p class="rajdhani-font" style="color:#aaa; margin:0;">REKOMENDASI ({selected_tf})</p>
                 <h1 class="digital-font" style="color:{sig_color}; font-size:50px; margin:10px 0;">{final_signal}</h1>
                 <p class="rajdhani-font">Confidence Score: {abs(score)}/5</p>
             </div>
@@ -417,13 +433,13 @@ elif menu_selection == "Trading Signals":
                 st.markdown(f'<p class="rajdhani-font" style="color:{color};">● {r}</p>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
-        st.info(f"Strategi: Sinyal ini dihasilkan berdasarkan kombinasi RSI, MACD, dan Moving Averages pada timeframe 1 Jam. Selalu gunakan Stop Loss!")
+        st.info(f"Strategi: Sinyal ini dihasilkan berdasarkan kombinasi RSI, MACD, dan Moving Averages pada timeframe {selected_tf}. Selalu gunakan Stop Loss!")
     else:
         st.error("Data tidak cukup untuk menghasilkan sinyal.")
 
 # ====================== MARKET HISTORY ======================
 elif menu_selection == "Market History":
-    st.markdown('<h2 class="digital-font">📊 Market History</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="digital-font">📊 Market History ({selected_tf})</h2>', unsafe_allow_html=True)
     
     market_data = get_market_data(ticker_input)
     if market_data:
@@ -433,13 +449,12 @@ elif menu_selection == "Market History":
         c3.metric("LOW", f"{market_data['low']:,.2f}")
         c4.metric("CLOSE", f"{market_data['close']:,.2f}")
         
-    df_hist = get_historical_data(ticker_input, period="1y", interval="1d")
+    df_hist = get_historical_data(ticker_input, period=period, interval=interval)
     if not df_hist.empty:
         df_hist = df_hist.sort_index(ascending=False)
-        # Format index to show Date, Month, Year
-        df_hist.index = df_hist.index.strftime('%d %B %Y')
+        df_hist.index = df_hist.index.strftime('%d %B %Y %H:%M')
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.dataframe(df_hist[['Open', 'High', 'Low', 'Close', 'Volume']].head(30), use_container_width=True)
+        st.dataframe(df_hist[['Open', 'High', 'Low', 'Close', 'Volume']].head(50), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.error("Gagal mengambil data history.")
@@ -459,7 +474,7 @@ elif menu_selection == "Chatbot AI Trading":
             with st.spinner("Menganalisis..."):
                 market_data = get_market_data(ticker_input)
                 price_val = market_data['price'] if market_data else 'N/A'
-                context = f"Harga {ticker_display} saat ini adalah {price_val}. S&P 500 berada di 6,611.21."
+                context = f"Harga {ticker_display} saat ini adalah {price_val} pada timeframe {selected_tf}. S&P 500 berada di 6,611.21."
                 response = get_gemini_response(prompt, context)
                 st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})

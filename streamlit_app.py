@@ -8,7 +8,7 @@ from datetime import datetime
 import pytz
 
 # ====================== KONFIGURASI ======================
-st.set_page_config(layout="wide", page_title="AeroVulpis v2.0 - Digital 3D Trading", page_icon="🦅", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="AeroVulpis v2.0 - Ultra Stable", page_icon="🦅", initial_sidebar_state="expanded")
 
 # CSS untuk tampilan 3D Digital & Glassmorphism
 st.markdown("""
@@ -83,10 +83,6 @@ st.markdown("""
         filter: brightness(1.2);
     }
 
-    .stButton>button:active {
-        transform: translateY(1px);
-    }
-
     /* Sidebar Styling */
     [data-testid="stSidebar"] {
         background-color: rgba(10, 14, 23, 0.95);
@@ -95,6 +91,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Konfigurasi Gemini
 genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
 
 # ====================== FUNGSI GEMINI ======================
@@ -117,16 +114,34 @@ Jawab dalam bahasa Indonesia yang jelas dan profesional.
         return f"⚠️ Gemini error: {str(e)}"
 
 # ====================== FUNGSI DATA ======================
-def get_current_price(ticker_symbol):
+def get_market_data(ticker_symbol):
     try:
         ticker = yf.Ticker(ticker_symbol)
+        # Ambil data terbaru (fast_info)
         info = ticker.fast_info
         price = info.get('lastPrice') or info.get('regularMarketPrice')
-        return round(float(price), 4) if price else None
+        
+        # Ambil data history untuk Open, High, Low, Close hari ini
+        hist = ticker.history(period="1d")
+        if not hist.empty:
+            open_p = hist['Open'].iloc[-1]
+            high_p = hist['High'].iloc[-1]
+            low_p = hist['Low'].iloc[-1]
+            close_p = hist['Close'].iloc[-1]
+        else:
+            open_p = high_p = low_p = close_p = price
+            
+        return {
+            "price": round(float(price), 4) if price else 0.0,
+            "open": round(float(open_p), 4) if open_p else 0.0,
+            "high": round(float(high_p), 4) if high_p else 0.0,
+            "low": round(float(low_p), 4) if low_p else 0.0,
+            "close": round(float(close_p), 4) if close_p else 0.0
+        }
     except:
         return None
 
-def get_historical_data(ticker_symbol, period="1y", interval="1d"):
+def get_historical_data(ticker_symbol, period="1mo", interval="1h"):
     try:
         ticker = yf.Ticker(ticker_symbol)
         df = ticker.history(period=period, interval=interval)
@@ -147,12 +162,12 @@ def add_technical_indicators(df):
 
 # ====================== INSTRUMEN ======================
 instruments = {
+    "S&P 500": "^GSPC",
     "XAUUSD (Gold)": "GC=F",
     "WTI Crude Oil": "CL=F",
     "US100 (Nasdaq 100)": "^NDX",
     "Bitcoin (BTC)": "BTC-USD",
     "EUR/USD": "EURUSD=X",
-    "S&P 500": "^GSPC",
     "Silver": "SI=F"
 }
 
@@ -183,21 +198,21 @@ st.sidebar.markdown('<p class="rajdhani-font" style="text-align:center; color:#8
 ticker_display = st.sidebar.selectbox("Pilih Instrumen", list(instruments.keys()))
 ticker_input = instruments[ticker_display]
 
-menu_selection = st.sidebar.radio("Navigasi Sistem", ["Live Dashboard", "Chatbot AI Trading"])
+menu_selection = st.sidebar.radio("Navigasi Sistem", ["Live Dashboard", "Market History", "Chatbot AI Trading"])
 
 # ====================== LIVE DASHBOARD ======================
 if menu_selection == "Live Dashboard":
     col_main, col_side = st.columns([2, 1])
     
     with col_main:
-        # Tombol Refresh 3D
         if st.button("REFRESH HARGA REAL-TIME", use_container_width=True):
             st.rerun()
             
+        market_data = get_market_data(ticker_input)
         df = get_historical_data(ticker_input, period="1mo", interval="1h")
-        current_price = get_current_price(ticker_input)
         
-        if not df.empty and current_price:
+        if market_data and not df.empty:
+            current_price = market_data['price']
             df = add_technical_indicators(df)
             latest = df.iloc[-1]
             prev_close = df['Close'].iloc[-2]
@@ -257,7 +272,6 @@ if menu_selection == "Live Dashboard":
 
     with col_side:
         # Gauge Chart (5 Zona)
-        # Logika Jarum: RSI & Price vs SMA20
         gauge_val = 50
         if rsi < 30: gauge_val += 20
         elif rsi > 70: gauge_val -= 20
@@ -297,14 +311,40 @@ if menu_selection == "Live Dashboard":
         st.markdown('<p class="digital-font" style="font-size:18px;">LATEST NEWS</p>', unsafe_allow_html=True)
         ticker_obj = yf.Ticker(ticker_input)
         news = ticker_obj.news[:5]
-        for n in news:
-            with st.container():
-                st.markdown(f"""
-                <div style="font-size:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding:5px 0;">
-                    <a href="{n['link']}" style="color:#00d4ff; text-decoration:none; font-weight:bold;">{n['title']}</a><br>
-                    <span style="color:#666;">{n['publisher']}</span>
-                </div>
-                """, unsafe_allow_html=True)
+        if news:
+            for n in news:
+                with st.container():
+                    st.markdown(f"""
+                    <div style="font-size:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding:5px 0;">
+                        <a href="{n['link']}" style="color:#00d4ff; text-decoration:none; font-weight:bold;">{n['title']}</a><br>
+                        <span style="color:#666;">{n['publisher']}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info("Belum ada berita baru.")
+
+# ====================== MARKET HISTORY ======================
+elif menu_selection == "Market History":
+    st.markdown('<h2 class="digital-font">📊 Market History</h2>', unsafe_allow_html=True)
+    
+    market_data = get_market_data(ticker_input)
+    if market_data:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("OPEN", f"{market_data['open']:,.2f}")
+        c2.metric("HIGH", f"{market_data['high']:,.2f}")
+        c3.metric("LOW", f"{market_data['low']:,.2f}")
+        c4.metric("CLOSE", f"{market_data['close']:,.2f}")
+        
+    df_hist = get_historical_data(ticker_input, period="1y", interval="1d")
+    if not df_hist.empty:
+        df_hist = df_hist.sort_index(ascending=False)
+        # Format index to show Date, Month, Year
+        df_hist.index = df_hist.index.strftime('%d %B %Y')
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.dataframe(df_hist[['Open', 'High', 'Low', 'Close', 'Volume']].head(30), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.error("Gagal mengambil data history.")
 
 # ====================== CHATBOT ======================
 elif menu_selection == "Chatbot AI Trading":
@@ -319,7 +359,10 @@ elif menu_selection == "Chatbot AI Trading":
             st.markdown(prompt)
         with st.chat_message("assistant"):
             with st.spinner("Menganalisis..."):
-                response = get_gemini_response(prompt)
+                # Ambil data harga untuk konteks chatbot
+                market_data = get_market_data(ticker_input)
+                context = f"Harga {ticker_display} saat ini adalah {market_data['price'] if market_data else 'N/A'}."
+                response = get_gemini_response(prompt, context)
                 st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
     st.markdown('</div>', unsafe_allow_html=True)
@@ -334,6 +377,6 @@ st.markdown("""
     <p class="digital-font" style="font-size: 16px; color: #00ff88;">
         — Fahmi (Pencipta AeroVulpis)
     </p>
-    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v2.0 STABLE • 2026</p>
+    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v2.0 ULTRA STABLE • 2026</p>
 </div>
 """, unsafe_allow_html=True)

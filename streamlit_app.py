@@ -118,6 +118,8 @@ def get_market_data(ticker_symbol):
     try:
         ticker = yf.Ticker(ticker_symbol)
         info = ticker.fast_info
+        
+        # Prioritas pengambilan harga
         price = info.get('lastPrice') or info.get('regularMarketPrice')
         
         hist = ticker.history(period="1d")
@@ -126,15 +128,16 @@ def get_market_data(ticker_symbol):
             high_p = hist['High'].iloc[-1]
             low_p = hist['Low'].iloc[-1]
             close_p = hist['Close'].iloc[-1]
+            if not price: price = close_p
         else:
             open_p = high_p = low_p = close_p = price
             
         return {
-            "price": round(float(price), 4) if price else 0.0,
-            "open": round(float(open_p), 4) if open_p else 0.0,
-            "high": round(float(high_p), 4) if high_p else 0.0,
-            "low": round(float(low_p), 4) if low_p else 0.0,
-            "close": round(float(close_p), 4) if close_p else 0.0
+            "price": round(float(price), 4) if price is not None else 0.0,
+            "open": round(float(open_p), 4) if open_p is not None else 0.0,
+            "high": round(float(high_p), 4) if high_p is not None else 0.0,
+            "low": round(float(low_p), 4) if low_p is not None else 0.0,
+            "close": round(float(close_p), 4) if close_p is not None else 0.0
         }
     except:
         return None
@@ -157,7 +160,8 @@ def add_technical_indicators(df):
     delta = df['Close'].diff()
     gain = delta.where(delta > 0, 0).rolling(14).mean()
     loss = -delta.where(delta < 0, 0).rolling(14).mean()
-    rs = gain / loss
+    # Avoid division by zero
+    rs = gain / loss.replace(0, 0.001)
     df['RSI'] = 100 - (100 / (1 + rs))
     # MACD
     exp1 = df['Close'].ewm(span=12, adjust=False).mean()
@@ -238,15 +242,18 @@ if menu_selection == "Live Dashboard":
             current_price = market_data['price']
             df = add_technical_indicators(df)
             latest = df.iloc[-1]
-            prev_close = df['Close'].iloc[-2]
+            prev_close = df['Close'].iloc[-2] if len(df) > 1 else current_price
             is_bullish = current_price >= prev_close
             line_color = "#00ff88" if is_bullish else "#ff2a6d"
             
             # Perbaikan format harga agar tidak error
-            if "USD" in ticker_display or "/" in ticker_display:
-                formatted_price = f"{current_price:,.4f}"
-            else:
-                formatted_price = f"{current_price:,.2f}"
+            try:
+                if "USD" in ticker_display or "/" in ticker_display:
+                    formatted_price = f"{float(current_price):,.4f}"
+                else:
+                    formatted_price = f"{float(current_price):,.2f}"
+            except (ValueError, TypeError):
+                formatted_price = str(current_price)
             
             st.markdown(f"""
             <div class="glass-card" style="text-align:center;">
@@ -279,7 +286,8 @@ if menu_selection == "Live Dashboard":
 
     with col_side:
         # Gauge Chart (5 Zona)
-        if not df.empty:
+        if market_data and not df.empty:
+            latest = df.iloc[-1]
             rsi = latest.get('RSI', 50)
             sma20 = latest.get('SMA20', current_price)
             
@@ -323,6 +331,9 @@ if menu_selection == "Live Dashboard":
         st.markdown('<p class="rajdhani-font" style="color:#888; font-size:12px;">S&P 500 Benchmark</p>', unsafe_allow_html=True)
         st.markdown('<h3 class="digital-font" style="color:#00d4ff; margin:0;">6,611.21</h3>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
+    
+    if not market_data or df.empty:
+        st.error("Gagal mengambil data market. Periksa koneksi atau simbol ticker.")
 
 # ====================== TRADING SIGNALS ======================
 elif menu_selection == "Trading Signals":
@@ -332,12 +343,12 @@ elif menu_selection == "Trading Signals":
     if not df.empty:
         df = add_technical_indicators(df)
         latest = df.iloc[-1]
-        rsi = latest['RSI']
-        macd = latest['MACD']
-        sig_line = latest['Signal_Line']
+        rsi = latest.get('RSI', 50)
+        macd = latest.get('MACD', 0)
+        sig_line = latest.get('Signal_Line', 0)
         price = latest['Close']
-        sma20 = latest['SMA20']
-        sma50 = latest['SMA50']
+        sma20 = latest.get('SMA20', price)
+        sma50 = latest.get('SMA50', price)
         
         # Logika Sinyal
         score = 0
@@ -447,7 +458,8 @@ elif menu_selection == "Chatbot AI Trading":
         with st.chat_message("assistant"):
             with st.spinner("Menganalisis..."):
                 market_data = get_market_data(ticker_input)
-                context = f"Harga {ticker_display} saat ini adalah {market_data['price'] if market_data else 'N/A'}. S&P 500 berada di 6,611.21."
+                price_val = market_data['price'] if market_data else 'N/A'
+                context = f"Harga {ticker_display} saat ini adalah {price_val}. S&P 500 berada di 6,611.21."
                 response = get_gemini_response(prompt, context)
                 st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})

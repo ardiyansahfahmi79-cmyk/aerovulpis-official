@@ -117,19 +117,28 @@ Jawab dalam bahasa Indonesia yang jelas dan profesional.
 def get_market_data(ticker_symbol):
     try:
         ticker = yf.Ticker(ticker_symbol)
-        info = ticker.fast_info
         
-        price = info.get('lastPrice') or info.get('regularMarketPrice')
-        
-        hist = ticker.history(period="1d")
+        # Menggunakan history(period='1d') untuk mendapatkan harga terbaru yang lebih akurat daripada fast_info
+        hist = ticker.history(period="1d", interval="1m")
         if not hist.empty:
-            open_p = hist['Open'].iloc[-1]
-            high_p = hist['High'].iloc[-1]
-            low_p = hist['Low'].iloc[-1]
-            close_p = hist['Close'].iloc[-1]
-            if not price: price = close_p
+            price = hist['Close'].iloc[-1]
+            open_p = hist['Open'].iloc[0]
+            high_p = hist['High'].max()
+            low_p = hist['Low'].min()
+            close_p = price
         else:
-            open_p = high_p = low_p = close_p = price
+            # Fallback jika interval 1m gagal (misal saat market tutup)
+            hist_daily = ticker.history(period="1d")
+            if not hist_daily.empty:
+                price = hist_daily['Close'].iloc[-1]
+                open_p = hist_daily['Open'].iloc[-1]
+                high_p = hist_daily['High'].iloc[-1]
+                low_p = hist_daily['Low'].iloc[-1]
+                close_p = price
+            else:
+                info = ticker.fast_info
+                price = info.get('lastPrice') or info.get('regularMarketPrice') or 0.0
+                open_p = high_p = low_p = close_p = price
             
         return {
             "price": round(float(price), 4) if price is not None else 0.0,
@@ -229,7 +238,7 @@ st.sidebar.markdown('<p class="digital-font" style="font-size:14px;">TIMEFRAME S
 tf_options = {
     "30m": {"period": "5d", "interval": "30m"},
     "1h": {"period": "1mo", "interval": "1h"},
-    "4h": {"period": "3mo", "interval": "1h"}, # 4h not native in yfinance, using 1h as proxy
+    "4h": {"period": "3mo", "interval": "1h"}, 
     "1D": {"period": "1y", "interval": "1d"},
     "1W": {"period": "2y", "interval": "1wk"},
     "1Month": {"period": "5y", "interval": "1mo"},
@@ -246,9 +255,6 @@ if menu_selection == "Live Dashboard":
     col_main, col_side = st.columns([2, 1])
     
     with col_main:
-        if st.button("REFRESH HARGA REAL-TIME", use_container_width=True):
-            st.rerun()
-            
         market_data = get_market_data(ticker_input)
         df = get_historical_data(ticker_input, period=period, interval=interval)
         
@@ -310,7 +316,6 @@ if menu_selection == "Live Dashboard":
             else: gauge_val -= 15
             gauge_val = max(0, min(100, gauge_val))
 
-            # Tentukan Label Status
             if gauge_val <= 20: status_label = "STRONG BEARISH"
             elif gauge_val <= 40: status_label = "LOW BEARISH"
             elif gauge_val <= 60: status_label = "NEUTRAL"
@@ -345,10 +350,9 @@ if menu_selection == "Live Dashboard":
             fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "Orbitron"}, height=300, margin=dict(l=20, r=20, t=50, b=20))
             st.plotly_chart(fig_gauge, use_container_width=True)
 
-        st.markdown('<div class="glass-card" style="text-align:center;">', unsafe_allow_html=True)
-        st.markdown('<p class="rajdhani-font" style="color:#888; font-size:12px;">S&P 500 Benchmark</p>', unsafe_allow_html=True)
-        st.markdown('<h3 class="digital-font" style="color:#00d4ff; margin:0;">6,611.21</h3>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Tombol Refresh dipindahkan ke sini (di bawah Gauge)
+        if st.button("REFRESH HARGA REAL-TIME", use_container_width=True):
+            st.rerun()
     
     if not market_data or df.empty:
         st.error("Gagal mengambil data market. Periksa koneksi atau simbol ticker.")

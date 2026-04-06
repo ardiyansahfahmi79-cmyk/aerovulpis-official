@@ -8,7 +8,7 @@ from datetime import datetime
 import pytz
 
 # ====================== KONFIGURASI ======================
-st.set_page_config(layout="wide", page_title="AeroVulpis v3.3 - Ultimate Trading Edition", page_icon="🦅", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="AeroVulpis v3.1 - Ultimate Trading Edition", page_icon="🦅", initial_sidebar_state="expanded")
 
 # CSS untuk tampilan 3D Digital & Glassmorphism
 st.markdown("""
@@ -99,7 +99,7 @@ def get_gemini_response(question, context=""):
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
         full_prompt = f"""
-Kamu adalah AeroVulpis 🦅 v3.3, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
+Kamu adalah AeroVulpis 🦅 v3.1, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
 Nama penciptamu adalah Fahmi — sebutkan "Terima kasih Fahmi telah menciptakanku!" di akhir jawaban.
 
 Personality: Digital, tajam, ramah, pakai emoji futuristik.
@@ -206,11 +206,11 @@ instruments = {
 }
 
 # ====================== UI HEADER ======================
-st.markdown('<h1 class="main-title">🦅 AERO VULPIS v3.3</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">🦅 AERO VULPIS v3.1</h1>', unsafe_allow_html=True)
 
 # Session State
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Sistem AeroVulpis v3.3 Aktif. Semua fitur visual v2.0 dipertahankan dengan peningkatan sinyal trading. Siap beraksi, Fahmi!"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Sistem AeroVulpis v3.1 Aktif. Semua kategori instrumen telah diperbarui. Siap beraksi, Fahmi!"}]
 
 # Sidebar
 st.sidebar.markdown('<div style="text-align:center;"><span style="font-size:60px;">🦅</span></div>', unsafe_allow_html=True)
@@ -419,8 +419,8 @@ elif menu_selection == "Market History":
     df_hist = get_historical_data(ticker_input, period="1y", interval="1d")
     if not df_hist.empty:
         df_hist = df_hist.sort_index(ascending=False)
-        # Format index to show Date, Month, Year, and Time
-        df_hist.index = df_hist.index.strftime('%d %B %Y | %H:%M')
+        # Format index to show Date, Month, Year
+        df_hist.index = df_hist.index.strftime('%d %B %Y')
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
         st.dataframe(df_hist[['Open', 'High', 'Low', 'Close', 'Volume']].head(30), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -457,6 +457,6 @@ st.markdown("""
     <p class="digital-font" style="font-size: 16px; color: #00ff88;">
         — Fahmi (Pencipta AeroVulpis)
     </p>
-    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v3.3 ULTIMATE • 2026</p>
+    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v3.1 ULTIMATE • 2026</p>
 </div>
 """, unsafe_allow_html=True)

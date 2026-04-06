@@ -8,7 +8,7 @@ from datetime import datetime
 import pytz
 
 # ====================== KONFIGURASI ======================
-st.set_page_config(layout="wide", page_title="AeroVulpis v3.1 - Ultimate Trading Edition", page_icon="🦅", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="AeroVulpis v3.1 - Fixed Edition", page_icon="🦅", initial_sidebar_state="expanded")
 
 # CSS untuk tampilan 3D Digital & Glassmorphism
 st.markdown("""
@@ -242,10 +242,16 @@ if menu_selection == "Live Dashboard":
             is_bullish = current_price >= prev_close
             line_color = "#00ff88" if is_bullish else "#ff2a6d"
             
+            # Perbaikan format harga agar tidak error
+            if "USD" in ticker_display or "/" in ticker_display:
+                formatted_price = f"{current_price:,.4f}"
+            else:
+                formatted_price = f"{current_price:,.2f}"
+            
             st.markdown(f"""
             <div class="glass-card" style="text-align:center;">
                 <p class="rajdhani-font" style="margin:0; color:#aaa;">HARGA {ticker_display} SAAT INI</p>
-                <h1 class="digital-font" style="font-size:48px; color:{line_color}; margin:0;">{current_price:,.4f if "USD" in ticker_display or "/" in ticker_display else current_price:,.2f}</h1>
+                <h1 class="digital-font" style="font-size:48px; color:{line_color}; margin:0;">{formatted_price}</h1>
             </div>
             """, unsafe_allow_html=True)
             

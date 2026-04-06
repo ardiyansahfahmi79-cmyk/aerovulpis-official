@@ -8,7 +8,7 @@ from datetime import datetime
 import pytz
 
 # ====================== KONFIGURASI ======================
-st.set_page_config(layout="wide", page_title="AeroVulpis v2.0 - Ultra Stable", page_icon="🦅", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="AeroVulpis v3.0 - Trading Signal Edition", page_icon="🦅", initial_sidebar_state="expanded")
 
 # CSS untuk tampilan 3D Digital & Glassmorphism
 st.markdown("""
@@ -99,7 +99,7 @@ def get_gemini_response(question, context=""):
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
         full_prompt = f"""
-Kamu adalah AeroVulpis 🦅 v2.0, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
+Kamu adalah AeroVulpis 🦅 v3.0, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
 Nama penciptamu adalah Fahmi — sebutkan "Terima kasih Fahmi telah menciptakanku!" di akhir jawaban.
 
 Personality: Digital, tajam, ramah, pakai emoji futuristik.
@@ -117,11 +117,9 @@ Jawab dalam bahasa Indonesia yang jelas dan profesional.
 def get_market_data(ticker_symbol):
     try:
         ticker = yf.Ticker(ticker_symbol)
-        # Ambil data terbaru (fast_info)
         info = ticker.fast_info
         price = info.get('lastPrice') or info.get('regularMarketPrice')
         
-        # Ambil data history untuk Open, High, Low, Close hari ini
         hist = ticker.history(period="1d")
         if not hist.empty:
             open_p = hist['Open'].iloc[-1]
@@ -152,53 +150,71 @@ def get_historical_data(ticker_symbol, period="1mo", interval="1h"):
 
 def add_technical_indicators(df):
     if len(df) < 30: return df
+    # SMA
     df['SMA20'] = df['Close'].rolling(20).mean()
+    df['SMA50'] = df['Close'].rolling(50).mean()
+    # RSI
     delta = df['Close'].diff()
     gain = delta.where(delta > 0, 0).rolling(14).mean()
     loss = -delta.where(delta < 0, 0).rolling(14).mean()
     rs = gain / loss
     df['RSI'] = 100 - (100 / (1 + rs))
+    # MACD
+    exp1 = df['Close'].ewm(span=12, adjust=False).mean()
+    exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+    df['MACD'] = exp1 - exp2
+    df['Signal_Line'] = df['MACD'].ewm(span=9, adjust=False).mean()
     return df
 
 # ====================== INSTRUMEN ======================
 instruments = {
-    "S&P 500": "^GSPC",
-    "XAUUSD (Gold)": "GC=F",
-    "WTI Crude Oil": "CL=F",
-    "US100 (Nasdaq 100)": "^NDX",
-    "Bitcoin (BTC)": "BTC-USD",
-    "EUR/USD": "EURUSD=X",
-    "Silver": "SI=F"
+    "Forex (Populer)": {
+        "EUR/USD": "EURUSD=X",
+        "GBP/USD": "GBPUSD=X",
+        "USD/JPY": "USDJPY=X",
+        "AUD/USD": "AUDUSD=X",
+        "USD/CHF": "USDCHF=X"
+    },
+    "Komoditas (Populer)": {
+        "Gold (XAUUSD)": "GC=F",
+        "WTI Crude Oil": "CL=F",
+        "Silver": "SI=F",
+        "Natural Gas": "NG=F",
+        "Brent Oil": "BZ=F"
+    },
+    "Saham AS (Terbesar)": {
+        "Apple (AAPL)": "AAPL",
+        "Microsoft (MSFT)": "MSFT",
+        "NVIDIA (NVDA)": "NVDA",
+        "Amazon (AMZN)": "AMZN",
+        "Alphabet (GOOGL)": "GOOGL"
+    },
+    "Saham Indonesia (Populer)": {
+        "BBCA (BCA)": "BBCA.JK",
+        "BBRI (BRI)": "BBRI.JK",
+        "TLKM (Telkom)": "TLKM.JK",
+        "BMRI (Mandiri)": "BMRI.JK",
+        "ASII (Astra)": "ASII.JK"
+    }
 }
 
 # ====================== UI HEADER ======================
-st.markdown('<h1 class="main-title">🦅 AERO VULPIS v2.0</h1>', unsafe_allow_html=True)
-
-# Widget Market Update (WIB)
-wib = pytz.timezone('Asia/Jakarta')
-now = datetime.now(wib)
-st.markdown(f"""
-<div class="glass-card" style="text-align: center; padding: 10px;">
-    <span class="digital-font" style="font-size: 24px;">MARKET UPDATE</span><br>
-    <span class="digital-font" style="font-size: 18px; color: #00d4ff;">
-        {now.strftime('%d %B %Y | %H:%M:%S')} WIB
-    </span>
-</div>
-""", unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">🦅 AERO VULPIS v3.0</h1>', unsafe_allow_html=True)
 
 # Session State
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Sistem AeroVulpis v2.0 Aktif. Siap menganalisis pasar, Fahmi."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Sistem AeroVulpis v3.0 Aktif. Fitur Sinyal Trading telah diintegrasikan. Siap beraksi, Fahmi!"}]
 
 # Sidebar
 st.sidebar.markdown('<div style="text-align:center;"><span style="font-size:60px;">🦅</span></div>', unsafe_allow_html=True)
 st.sidebar.markdown('<h2 class="digital-font" style="text-align:center;">AeroVulpis</h2>', unsafe_allow_html=True)
-st.sidebar.markdown('<p class="rajdhani-font" style="text-align:center; color:#888;">DynamiHatch Identity</p>', unsafe_allow_html=True)
+st.sidebar.markdown('<p class="rajdhani-font" style="text-align:center; color:#888;">Trading Signal Edition</p>', unsafe_allow_html=True)
 
-ticker_display = st.sidebar.selectbox("Pilih Instrumen", list(instruments.keys()))
-ticker_input = instruments[ticker_display]
+category = st.sidebar.selectbox("Pilih Kategori", list(instruments.keys()))
+ticker_display = st.sidebar.selectbox("Pilih Instrumen", list(instruments[category].keys()))
+ticker_input = instruments[category][ticker_display]
 
-menu_selection = st.sidebar.radio("Navigasi Sistem", ["Live Dashboard", "Market History", "Chatbot AI Trading"])
+menu_selection = st.sidebar.radio("Navigasi Sistem", ["Live Dashboard", "Trading Signals", "Market History", "Chatbot AI Trading"])
 
 # ====================== LIVE DASHBOARD ======================
 if menu_selection == "Live Dashboard":
@@ -219,15 +235,13 @@ if menu_selection == "Live Dashboard":
             is_bullish = current_price >= prev_close
             line_color = "#00ff88" if is_bullish else "#ff2a6d"
             
-            # Harga Real-Time Display
             st.markdown(f"""
             <div class="glass-card" style="text-align:center;">
                 <p class="rajdhani-font" style="margin:0; color:#aaa;">HARGA {ticker_display} SAAT INI</p>
-                <h1 class="digital-font" style="font-size:48px; color:{line_color}; margin:0;">{current_price:,.2f}</h1>
+                <h1 class="digital-font" style="font-size:48px; color:{line_color}; margin:0;">{current_price:,.4f if "USD" in ticker_display or "/" in ticker_display else current_price:,.2f}</h1>
             </div>
             """, unsafe_allow_html=True)
             
-            # Minimalist Line Chart
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=df.index, y=df['Close'],
@@ -249,79 +263,128 @@ if menu_selection == "Live Dashboard":
                 xaxis_rangeslider_visible=False
             )
             st.plotly_chart(fig, use_container_width=True)
-            
-            # Sinyal Logika
-            rsi = latest.get('RSI', 50)
-            sma20 = latest.get('SMA20', current_price)
-            
-            signal = "WAIT"
-            signal_color = "#888"
-            if rsi < 35 and current_price > sma20:
-                signal = "BUY"
-                signal_color = "#00ff88"
-            elif rsi > 65 and current_price < sma20:
-                signal = "SELL"
-                signal_color = "#ff2a6d"
-                
-            st.markdown(f"""
-            <div class="glass-card" style="text-align:center; border-left: 5px solid {signal_color};">
-                <h3 class="digital-font" style="margin:0;">SIGNAL: <span style="color:{signal_color};">{signal}</span></h3>
-                <p class="rajdhani-font" style="margin:0; color:#aaa;">RSI: {rsi:.2f} | SMA20: {sma20:,.2f}</p>
-            </div>
-            """, unsafe_allow_html=True)
 
     with col_side:
-        # Gauge Chart (5 Zona)
-        gauge_val = 50
-        if rsi < 30: gauge_val += 20
-        elif rsi > 70: gauge_val -= 20
-        if current_price > sma20: gauge_val += 15
-        else: gauge_val -= 15
-        gauge_val = max(0, min(100, gauge_val))
-
-        fig_gauge = go.Figure(go.Indicator(
-            mode = "gauge+number",
-            value = gauge_val,
-            domain = {'x': [0, 1], 'y': [0, 1]},
-            title = {'text': "TECHNICAL ANALYSIS", 'font': {'family': "Orbitron", 'size': 18, 'color': 'white'}},
-            gauge = {
-                'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-                'bar': {'color': line_color},
-                'bgcolor': "rgba(0,0,0,0)",
-                'borderwidth': 2,
-                'bordercolor': "gray",
-                'steps': [
-                    {'range': [0, 20], 'color': '#8b0000', 'name': 'Strong Bearish'},
-                    {'range': [20, 40], 'color': '#ff2a6d', 'name': 'Low Bearish'},
-                    {'range': [40, 60], 'color': '#444', 'name': 'Neutral'},
-                    {'range': [60, 80], 'color': '#008000', 'name': 'Low Bullish'},
-                    {'range': [80, 100], 'color': '#00ff88', 'name': 'Strong Bullish'},
-                ],
-                'threshold': {
-                    'line': {'color': "white", 'width': 4},
-                    'thickness': 0.75,
-                    'value': gauge_val
-                }
-            }
-        ))
-        fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "Orbitron"}, height=300, margin=dict(l=20, r=20, t=50, b=20))
-        st.plotly_chart(fig_gauge, use_container_width=True)
+        # Technical Summary
+        st.markdown('<p class="digital-font" style="font-size:18px;">TECHNICAL SUMMARY</p>', unsafe_allow_html=True)
+        if not df.empty:
+            rsi = latest.get('RSI', 50)
+            macd = latest.get('MACD', 0)
+            sig_line = latest.get('Signal_Line', 0)
+            
+            st.markdown(f"""
+            <div class="glass-card">
+                <p class="rajdhani-font">RSI (14): <b style="color:{'#ff2a6d' if rsi > 70 else '#00ff88' if rsi < 30 else '#00d4ff'}">{rsi:.2f}</b></p>
+                <p class="rajdhani-font">MACD: <b style="color:{'#00ff88' if macd > sig_line else '#ff2a6d'}">{macd:.4f}</b></p>
+                <p class="rajdhani-font">SMA 20: <b>{latest.get('SMA20', 0):,.2f}</b></p>
+            </div>
+            """, unsafe_allow_html=True)
 
         # News Widget
         st.markdown('<p class="digital-font" style="font-size:18px;">LATEST NEWS</p>', unsafe_allow_html=True)
         ticker_obj = yf.Ticker(ticker_input)
-        news = ticker_obj.news[:5]
-        if news:
-            for n in news:
-                with st.container():
-                    st.markdown(f"""
-                    <div style="font-size:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding:5px 0;">
-                        <a href="{n['link']}" style="color:#00d4ff; text-decoration:none; font-weight:bold;">{n['title']}</a><br>
-                        <span style="color:#666;">{n['publisher']}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
+        try:
+            news = ticker_obj.news[:5]
+            if news:
+                for n in news:
+                    with st.container():
+                        st.markdown(f"""
+                        <div style="font-size:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding:5px 0;">
+                            <a href="{n['link']}" target="_blank" style="color:#00d4ff; text-decoration:none; font-weight:bold;">{n['title']}</a><br>
+                            <span style="color:#666;">{n['publisher']}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("Belum ada berita baru.")
+        except:
+            st.info("Berita tidak tersedia untuk instrumen ini.")
+
+# ====================== TRADING SIGNALS ======================
+elif menu_selection == "Trading Signals":
+    st.markdown('<h2 class="digital-font">⚡ Trading Signals</h2>', unsafe_allow_html=True)
+    
+    df = get_historical_data(ticker_input, period="1mo", interval="1h")
+    if not df.empty:
+        df = add_technical_indicators(df)
+        latest = df.iloc[-1]
+        rsi = latest['RSI']
+        macd = latest['MACD']
+        sig_line = latest['Signal_Line']
+        price = latest['Close']
+        sma20 = latest['SMA20']
+        sma50 = latest['SMA50']
+        
+        # Logika Sinyal
+        score = 0
+        reasons = []
+        
+        if rsi < 30: 
+            score += 2
+            reasons.append("RSI Oversold (Bullish)")
+        elif rsi > 70: 
+            score -= 2
+            reasons.append("RSI Overbought (Bearish)")
+            
+        if macd > sig_line: 
+            score += 1
+            reasons.append("MACD Crossover Up (Bullish)")
+        else: 
+            score -= 1
+            reasons.append("MACD Crossover Down (Bearish)")
+            
+        if price > sma20: 
+            score += 1
+            reasons.append("Price above SMA20 (Bullish)")
+        else: 
+            score -= 1
+            reasons.append("Price below SMA20 (Bearish)")
+
+        if sma20 > sma50:
+            score += 1
+            reasons.append("Golden Cross Tendency (Bullish)")
         else:
-            st.info("Belum ada berita baru.")
+            score -= 1
+            reasons.append("Death Cross Tendency (Bearish)")
+
+        # Penentuan Sinyal Akhir
+        if score >= 2:
+            final_signal = "STRONG BUY"
+            sig_color = "#00ff88"
+        elif score == 1:
+            final_signal = "BUY"
+            sig_color = "#aaffaa"
+        elif score == -1:
+            final_signal = "SELL"
+            sig_color = "#ffaaaa"
+        elif score <= -2:
+            final_signal = "STRONG SELL"
+            sig_color = "#ff2a6d"
+        else:
+            final_signal = "NEUTRAL / WAIT"
+            sig_color = "#888888"
+
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.markdown(f"""
+            <div class="glass-card" style="text-align:center; border-top: 5px solid {sig_color};">
+                <p class="rajdhani-font" style="color:#aaa; margin:0;">REKOMENDASI</p>
+                <h1 class="digital-font" style="color:{sig_color}; font-size:50px; margin:10px 0;">{final_signal}</h1>
+                <p class="rajdhani-font">Confidence Score: {abs(score)}/5</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with col2:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            st.markdown('<p class="digital-font">SIGNAL ANALYSIS</p>', unsafe_allow_html=True)
+            for r in reasons:
+                color = "#00ff88" if "Bullish" in r else "#ff2a6d"
+                st.markdown(f'<p class="rajdhani-font" style="color:{color};">● {r}</p>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        # Strategy Note
+        st.info(f"Strategi: Sinyal ini dihasilkan berdasarkan kombinasi RSI, MACD, dan Moving Averages pada timeframe 1 Jam. Selalu gunakan Stop Loss!")
+    else:
+        st.error("Data tidak cukup untuk menghasilkan sinyal.")
 
 # ====================== MARKET HISTORY ======================
 elif menu_selection == "Market History":
@@ -338,7 +401,6 @@ elif menu_selection == "Market History":
     df_hist = get_historical_data(ticker_input, period="1y", interval="1d")
     if not df_hist.empty:
         df_hist = df_hist.sort_index(ascending=False)
-        # Format index to show Date, Month, Year
         df_hist.index = df_hist.index.strftime('%d %B %Y')
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
         st.dataframe(df_hist[['Open', 'High', 'Low', 'Close', 'Volume']].head(30), use_container_width=True)
@@ -359,7 +421,6 @@ elif menu_selection == "Chatbot AI Trading":
             st.markdown(prompt)
         with st.chat_message("assistant"):
             with st.spinner("Menganalisis..."):
-                # Ambil data harga untuk konteks chatbot
                 market_data = get_market_data(ticker_input)
                 context = f"Harga {ticker_display} saat ini adalah {market_data['price'] if market_data else 'N/A'}."
                 response = get_gemini_response(prompt, context)
@@ -377,6 +438,6 @@ st.markdown("""
     <p class="digital-font" style="font-size: 16px; color: #00ff88;">
         — Fahmi (Pencipta AeroVulpis)
     </p>
-    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v2.0 ULTRA STABLE • 2026</p>
+    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v3.0 TRADING SIGNAL • 2026</p>
 </div>
 """, unsafe_allow_html=True)

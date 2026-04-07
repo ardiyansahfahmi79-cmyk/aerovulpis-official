@@ -2,7 +2,4 @@ streamlit
 google-generativeai
 yfinance
 pandas
-numpy
 plotly
-ta
-pytz

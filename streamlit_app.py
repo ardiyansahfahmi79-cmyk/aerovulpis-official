@@ -7,6 +7,10 @@ import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime
 import pytz
+from dotenv import load_dotenv
+
+# Memuat variabel lingkungan dari file .env
+load_dotenv()
 
 # ====================== KONFIGURASI ======================
 st.set_page_config(layout="wide", page_title="AeroVulpis v3.2 - Digital Edition", page_icon="🦅", initial_sidebar_state="expanded")
@@ -89,8 +93,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Konfigurasi Gemini
-genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+# Konfigurasi Gemini dengan penanganan error
+api_key = os.getenv("GOOGLE_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    st.sidebar.error("⚠️ GOOGLE_API_KEY tidak ditemukan di file .env")
 
 # ====================== FUNGSI DATA & INDIKATOR ======================
 def get_market_data(ticker_symbol):
@@ -196,6 +204,29 @@ def add_technical_indicators(df):
     
     return df
 
+# ====================== FUNGSI GEMINI (FIXED) ======================
+def get_gemini_response(question, context=""):
+    if not api_key:
+        return "⚠️ Chatbot tidak aktif: API Key belum dikonfigurasi di file .env."
+    
+    try:
+        # Menggunakan model gemini-1.5-flash yang stabil
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        full_prompt = f"""
+Kamu adalah AeroVulpis 🦅 v3.2, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
+Nama penciptamu adalah Fahmi — sebutkan "Terima kasih Fahmi telah menciptakanku!" di akhir jawaban.
+
+Personality: Digital, tajam, ramah, pakai emoji futuristik.
+Context: {context}
+Pertanyaan: {question}
+
+Jawab dalam bahasa Indonesia yang jelas dan profesional.
+"""
+        response = model.generate_content(full_prompt)
+        return response.text
+    except Exception as e:
+        return f"⚠️ Chatbot error: {str(e)}. Pastikan API Key valid dan model tersedia."
+
 # ====================== INSTRUMEN ======================
 instruments = {
     "Forex": {
@@ -246,7 +277,7 @@ selected_tf = st.sidebar.selectbox("Pilih Timeframe", list(tf_options.keys()), i
 period = tf_options[selected_tf]["period"]
 interval = tf_options[selected_tf]["interval"]
 
-menu_selection = st.sidebar.radio("Navigasi Sistem", ["Live Dashboard", "Trading Signals", "Risk Management", "Market History"])
+menu_selection = st.sidebar.radio("Navigasi Sistem", ["Live Dashboard", "Trading Signals", "Risk Management", "Market History", "Chatbot AI Trading"])
 
 # ====================== LIVE DASHBOARD ======================
 if menu_selection == "Live Dashboard":
@@ -366,7 +397,7 @@ elif menu_selection == "Trading Signals":
     else:
         st.error("Data tidak cukup untuk analisis 10 indikator. Coba timeframe lebih besar.")
 
-# ====================== RISK MANAGEMENT (NEW v3.2) ======================
+# ====================== RISK MANAGEMENT ======================
 elif menu_selection == "Risk Management":
     st.markdown('<h2 class="digital-font">🛡️ Risk Management Protocol</h2>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
@@ -412,6 +443,34 @@ elif menu_selection == "Market History":
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
         st.dataframe(df_hist[['Open', 'High', 'Low', 'Close', 'Volume']].head(50), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
+
+# ====================== CHATBOT AI TRADING (FIXED) ======================
+elif menu_selection == "Chatbot AI Trading":
+    st.markdown('<h2 class="digital-font">🤖 Chatbot AI Trading</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    
+    # Inisialisasi history pesan
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "assistant", "content": "Sistem AeroVulpis v3.2 Aktif. Siap beraksi, Fahmi!"}]
+        
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(f'<span class="rajdhani-font">{msg["content"]}</span>', unsafe_allow_html=True)
+    
+    if prompt := st.chat_input("Kirim perintah ke AeroVulpis..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+            
+        with st.chat_message("assistant"):
+            with st.spinner("Menganalisis..."):
+                market_data = get_market_data(ticker_input)
+                price_val = market_data['price'] if market_data else 'N/A'
+                context = f"Harga {ticker_display} saat ini adalah {price_val} pada timeframe {selected_tf}."
+                response = get_gemini_response(prompt, context)
+                st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ====================== FOOTER ======================
 st.markdown("---")

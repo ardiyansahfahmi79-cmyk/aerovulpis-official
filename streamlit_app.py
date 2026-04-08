@@ -98,7 +98,7 @@ api_key = os.getenv("GOOGLE_API_KEY")
 if api_key:
     genai.configure(api_key=api_key)
 else:
-    st.sidebar.error("⚠️ GOOGLE_API_KEY tidak ditemukan di file .env")
+    st.sidebar.error("⚠️ GOOGLE_API_KEY tidak ditemukan di file .env atau Secrets")
 
 # ====================== FUNGSI DATA & INDIKATOR ======================
 def get_market_data(ticker_symbol):
@@ -204,13 +204,14 @@ def add_technical_indicators(df):
     
     return df
 
-# ====================== FUNGSI GEMINI (FIXED) ======================
+# ====================== FUNGSI GEMINI (FIXED MODEL NAME) ======================
 def get_gemini_response(question, context=""):
     if not api_key:
-        return "⚠️ Chatbot tidak aktif: API Key belum dikonfigurasi di file .env."
+        return "⚠️ Chatbot tidak aktif: API Key belum dikonfigurasi di file .env atau Secrets."
     
     try:
-        # Menggunakan model gemini-1.5-flash yang stabil
+        # Menggunakan nama model yang lebih stabil: 'gemini-1.5-flash'
+        # Jika masih error, gunakan 'models/gemini-1.5-flash'
         model = genai.GenerativeModel('gemini-1.5-flash')
         full_prompt = f"""
 Kamu adalah AeroVulpis 🦅 v3.2, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
@@ -223,9 +224,17 @@ Pertanyaan: {question}
 Jawab dalam bahasa Indonesia yang jelas dan profesional.
 """
         response = model.generate_content(full_prompt)
-        return response.text
+        # Pastikan response memiliki text
+        if response and response.text:
+            return response.text
+        else:
+            return "⚠️ Gemini tidak memberikan respons teks. Silakan coba lagi."
     except Exception as e:
-        return f"⚠️ Chatbot error: {str(e)}. Pastikan API Key valid dan model tersedia."
+        # Menangani error 404 atau model not found
+        error_msg = str(e)
+        if "404" in error_msg or "not found" in error_msg.lower():
+            return f"⚠️ Chatbot error (404): Model 'gemini-1.5-flash' tidak ditemukan. Pastikan API Key Anda memiliki akses ke model ini di Google AI Studio."
+        return f"⚠️ Chatbot error: {error_msg}. Pastikan API Key valid dan koneksi internet stabil."
 
 # ====================== INSTRUMEN ======================
 instruments = {

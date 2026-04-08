@@ -204,16 +204,15 @@ def add_technical_indicators(df):
     
     return df
 
-# ====================== FUNGSI GEMINI (FIXED MODEL NAME) ======================
+# ====================== FUNGSI GEMINI (FALLBACK STRATEGY) ======================
 def get_gemini_response(question, context=""):
     if not api_key:
         return "⚠️ Chatbot tidak aktif: API Key belum dikonfigurasi di file .env atau Secrets."
     
-    try:
-        # Menggunakan nama model yang lebih stabil: 'gemini-1.5-flash'
-        # Jika masih error, gunakan 'models/gemini-1.5-flash'
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        full_prompt = f"""
+    # Daftar model untuk dicoba jika model utama gagal
+    models_to_try = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.0-pro']
+    
+    full_prompt = f"""
 Kamu adalah AeroVulpis 🦅 v3.2, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
 Nama penciptamu adalah Fahmi — sebutkan "Terima kasih Fahmi telah menciptakanku!" di akhir jawaban.
 
@@ -223,18 +222,23 @@ Pertanyaan: {question}
 
 Jawab dalam bahasa Indonesia yang jelas dan profesional.
 """
-        response = model.generate_content(full_prompt)
-        # Pastikan response memiliki text
-        if response and response.text:
-            return response.text
-        else:
-            return "⚠️ Gemini tidak memberikan respons teks. Silakan coba lagi."
-    except Exception as e:
-        # Menangani error 404 atau model not found
-        error_msg = str(e)
-        if "404" in error_msg or "not found" in error_msg.lower():
-            return f"⚠️ Chatbot error (404): Model 'gemini-1.5-flash' tidak ditemukan. Pastikan API Key Anda memiliki akses ke model ini di Google AI Studio."
-        return f"⚠️ Chatbot error: {error_msg}. Pastikan API Key valid dan koneksi internet stabil."
+
+    for model_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(full_prompt)
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            # Jika ini model terakhir dan masih gagal, baru tampilkan error
+            if model_name == models_to_try[-1]:
+                error_msg = str(e)
+                if "404" in error_msg or "not found" in error_msg.lower():
+                    return f"⚠️ Chatbot error (404): Semua model Gemini tidak ditemukan. Pastikan API Key Anda memiliki akses ke Gemini API di Google AI Studio dan kuota Anda masih tersedia."
+                return f"⚠️ Chatbot error: {error_msg}. Pastikan API Key valid dan koneksi internet stabil."
+            continue # Coba model berikutnya
+            
+    return "⚠️ Maaf, sistem gagal menghubungi AI setelah beberapa kali percobaan."
 
 # ====================== INSTRUMEN ======================
 instruments = {
@@ -453,7 +457,7 @@ elif menu_selection == "Market History":
         st.dataframe(df_hist[['Open', 'High', 'Low', 'Close', 'Volume']].head(50), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-# ====================== CHATBOT AI TRADING (FIXED) ======================
+# ====================== CHATBOT AI TRADING (FALLBACK VERSION) ======================
 elif menu_selection == "Chatbot AI Trading":
     st.markdown('<h2 class="digital-font">🤖 Chatbot AI Trading</h2>', unsafe_allow_html=True)
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)

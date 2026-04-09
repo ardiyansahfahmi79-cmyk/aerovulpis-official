@@ -50,9 +50,18 @@ st.markdown("""
     }
 
     .main-logo {
-        font-size: 70px;
-        margin-bottom: -10px;
+        font-size: 85px;
+        margin-bottom: -15px;
         display: block;
+        /* Efek 3D Digital Neon pada Logo */
+        filter: drop-shadow(0 0 15px var(--neon-green)) drop-shadow(0 0 30px var(--electric-blue));
+        animation: pulse 3s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(1); filter: drop-shadow(0 0 10px var(--neon-green)); }
+        50% { transform: scale(1.05); filter: drop-shadow(0 0 25px var(--electric-blue)); }
+        100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--neon-green)); }
     }
 
     .main-title {
@@ -103,10 +112,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Konfigurasi Gemini dengan penanganan error
+# Konfigurasi Gemini dengan transport='rest' untuk mengatasi error 404
 api_key = os.getenv("GOOGLE_API_KEY")
 if api_key:
-    genai.configure(api_key=api_key)
+    # Gunakan transport='rest' sesuai instruksi untuk stabilitas API v1beta
+    genai.configure(api_key=api_key, transport='rest')
 else:
     st.sidebar.error("⚠️ GOOGLE_API_KEY tidak ditemukan di file .env atau Secrets")
 
@@ -214,14 +224,13 @@ def add_technical_indicators(df):
     
     return df
 
-# ====================== FUNGSI GEMINI (FALLBACK STRATEGY) ======================
+# ====================== FUNGSI GEMINI (FIXED VERSION) ======================
 def get_gemini_response(question, context=""):
     if not api_key:
         return "⚠️ Chatbot tidak aktif: API Key belum dikonfigurasi di file .env atau Secrets."
     
-    # Daftar model untuk dicoba jika model utama gagal
-    # Menggunakan 'gemini-1.5-flash-latest' sebagai prioritas utama sesuai instruksi
-    models_to_try = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-1.0-pro']
+    # Menggunakan model 'gemini-1.5-flash' sesuai instruksi
+    model_name = 'gemini-1.5-flash'
     
     full_prompt = f"""
 Kamu adalah AeroVulpis 🦅 v3.2, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
@@ -234,22 +243,18 @@ Pertanyaan: {question}
 Jawab dalam bahasa Indonesia yang jelas dan profesional.
 """
 
-    for model_name in models_to_try:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(full_prompt)
-            if response and response.text:
-                return response.text
-        except Exception as e:
-            # Jika ini model terakhir dan masih gagal, baru tampilkan error
-            if model_name == models_to_try[-1]:
-                error_msg = str(e)
-                if "404" in error_msg or "not found" in error_msg.lower():
-                    return f"⚠️ Chatbot error (404): Semua model Gemini tidak ditemukan. Pastikan API Key Anda memiliki akses ke Gemini API di Google AI Studio dan kuota Anda masih tersedia."
-                return f"⚠️ Chatbot error: {error_msg}. Pastikan API Key valid dan koneksi internet stabil."
-            continue # Coba model berikutnya
-            
-    return "⚠️ Maaf, sistem gagal menghubungi AI setelah beberapa kali percobaan."
+    try:
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(full_prompt)
+        if response and response.text:
+            return response.text
+        else:
+            return "⚠️ Gemini tidak memberikan respons teks. Silakan coba lagi."
+    except Exception as e:
+        error_msg = str(e)
+        if "404" in error_msg or "not found" in error_msg.lower():
+            return f"⚠️ Chatbot error (404): Model '{model_name}' tidak ditemukan. Pastikan API Key Anda memiliki akses ke Gemini API di Google AI Studio."
+        return f"⚠️ Chatbot error: {error_msg}. Pastikan API Key valid dan koneksi internet stabil."
 
 # ====================== INSTRUMEN ======================
 instruments = {
@@ -284,7 +289,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Sidebar
-st.sidebar.markdown('<div style="text-align:center;"><span style="font-size:60px;">🦅</span></div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div style="text-align:center;"><span style="font-size:60px; filter: drop-shadow(0 0 10px #00ff88);">🦅</span></div>', unsafe_allow_html=True)
 st.sidebar.markdown('<h2 class="digital-font" style="text-align:center;">AeroVulpis</h2>', unsafe_allow_html=True)
 st.sidebar.markdown('<p class="rajdhani-font" style="text-align:center; color:#888;">Ultimate Digital Edition</p>', unsafe_allow_html=True)
 
@@ -298,16 +303,14 @@ st.sidebar.markdown("---")
 tf_mapping = {
     "M30 (30 Minutes)": {"period": "5d", "interval": "30m"},
     "H1 (1 Hour)": {"period": "1mo", "interval": "1h"},
-    "H2 (2 Hours)": {"period": "1mo", "interval": "1h"}, # yfinance doesn't natively support 2h for all, fallback to 1h or handle manually
-    "H4 (4 Hours)": {"period": "3mo", "interval": "1h"}, # Fallback to 1h for better data density in 4h analysis
-    "H12 (12 Hours)": {"period": "1y", "interval": "1d"}, # Fallback to 1d
+    "H2 (2 Hours)": {"period": "1mo", "interval": "1h"}, 
+    "H4 (4 Hours)": {"period": "3mo", "interval": "1h"}, 
+    "H12 (12 Hours)": {"period": "1y", "interval": "1d"}, 
     "D1 (Daily)": {"period": "2y", "interval": "1d"},
     "W1 (Weekly)": {"period": "5y", "interval": "1wk"},
     "MN (Monthly)": {"period": "max", "interval": "1mo"}
 }
 
-# Khusus untuk H2 dan H4, yfinance bisa menerima interval "90m" atau "1h"
-# Kita gunakan interval 1h untuk H1-H4 agar data teknikal lebih akurat
 selected_tf_display = st.sidebar.selectbox("Pilih Timeframe", list(tf_mapping.keys()), index=1)
 period = tf_mapping[selected_tf_display]["period"]
 interval = tf_mapping[selected_tf_display]["interval"]
@@ -426,7 +429,7 @@ elif menu_selection == "Trading Signals":
         with col2:
             st.markdown('<div class="glass-card"><p class="digital-font">10-INDICATOR ANALYSIS</p>', unsafe_allow_html=True)
             for k, v in indicators.items():
-                col_c = "#00ff88" if v in ["BUY", "BULLISH", "STRONG"] else "#ff2a6d" if v in ["SELL", "BEARISH"] else "#88888"
+                col_c = "#00ff88" if v in ["BUY", "BULLISH", "STRONG"] else "#ff2a6d" if v in ["SELL", "BEARISH"] else "#888888"
                 st.markdown(f'<div style="display:flex; justify-content:space-between;"><span class="rajdhani-font">{k}</span><span class="digital-font" style="color:{col_c};">{v}</span></div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
     else:
@@ -479,7 +482,7 @@ elif menu_selection == "Market History":
         st.dataframe(df_hist[['Open', 'High', 'Low', 'Close', 'Volume']].head(50), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-# ====================== CHATBOT AI TRADING (FALLBACK VERSION) ======================
+# ====================== CHATBOT AI TRADING (FIXED VERSION) ======================
 elif menu_selection == "Chatbot AI Trading":
     st.markdown('<h2 class="digital-font">🤖 Chatbot AI Trading</h2>', unsafe_allow_html=True)
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)

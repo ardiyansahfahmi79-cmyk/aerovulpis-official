@@ -24,6 +24,7 @@ st.markdown("""
         --neon-green: #00ff88;
         --crimson-red: #ff2a6d;
         --electric-blue: #00d4ff;
+        --deep-blue: #0055ff;
         --glass-bg: rgba(255, 255, 255, 0.05);
         --glass-border: rgba(255, 255, 255, 0.1);
     }
@@ -53,25 +54,27 @@ st.markdown("""
         font-size: 85px;
         margin-bottom: -15px;
         display: block;
-        /* Efek 3D Digital Neon pada Logo */
-        filter: drop-shadow(0 0 15px var(--neon-green)) drop-shadow(0 0 30px var(--electric-blue));
+        /* Efek 3D Digital Neon BIRU pada Logo */
+        color: var(--electric-blue);
+        filter: drop-shadow(0 0 15px var(--electric-blue)) drop-shadow(0 0 30px var(--deep-blue));
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         animation: pulse 3s infinite ease-in-out;
     }
 
     @keyframes pulse {
-        0% { transform: scale(1); filter: drop-shadow(0 0 10px var(--neon-green)); }
-        50% { transform: scale(1.05); filter: drop-shadow(0 0 25px var(--electric-blue)); }
-        100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--neon-green)); }
+        0% { transform: scale(1); filter: drop-shadow(0 0 10px var(--electric-blue)); }
+        50% { transform: scale(1.05); filter: drop-shadow(0 0 25px var(--deep-blue)); }
+        100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--electric-blue)); }
     }
 
     .main-title {
         font-family: 'Orbitron', sans-serif;
         font-size: 58px;
         font-weight: 700;
-        background: linear-gradient(90deg, var(--neon-green), var(--electric-blue));
+        background: linear-gradient(90deg, var(--electric-blue), var(--deep-blue));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
         margin: 0;
     }
 
@@ -113,9 +116,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Konfigurasi Gemini dengan transport='rest' untuk mengatasi error 404
-api_key = os.getenv("GOOGLE_API_KEY")
+# Menggunakan penanganan rahasia yang fleksibel (Secrets atau .env)
+api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
 if api_key:
-    # Gunakan transport='rest' sesuai instruksi untuk stabilitas API v1beta
+    # Konfigurasi API dengan jalur REST agar lebih stabil sesuai instruksi Anda
     genai.configure(api_key=api_key, transport='rest')
 else:
     st.sidebar.error("⚠️ GOOGLE_API_KEY tidak ditemukan di file .env atau Secrets")
@@ -224,13 +228,13 @@ def add_technical_indicators(df):
     
     return df
 
-# ====================== FUNGSI GEMINI (FIXED VERSION) ======================
+# ====================== FUNGSI GEMINI (FINAL FIX) ======================
 def get_gemini_response(question, context=""):
     if not api_key:
         return "⚠️ Chatbot tidak aktif: API Key belum dikonfigurasi di file .env atau Secrets."
     
-    # Menggunakan model 'gemini-1.5-flash' sesuai instruksi
-    model_name = 'gemini-1.5-flash'
+    # Gunakan nama model lengkap sesuai instruksi Anda
+    MODEL_NAME = 'models/gemini-1.5-flash-latest'
     
     full_prompt = f"""
 Kamu adalah AeroVulpis 🦅 v3.2, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
@@ -244,7 +248,8 @@ Jawab dalam bahasa Indonesia yang jelas dan profesional.
 """
 
     try:
-        model = genai.GenerativeModel(model_name)
+        # Gunakan nama model lengkap sesuai instruksi Anda
+        model = genai.GenerativeModel(model_name=MODEL_NAME)
         response = model.generate_content(full_prompt)
         if response and response.text:
             return response.text
@@ -253,7 +258,7 @@ Jawab dalam bahasa Indonesia yang jelas dan profesional.
     except Exception as e:
         error_msg = str(e)
         if "404" in error_msg or "not found" in error_msg.lower():
-            return f"⚠️ Chatbot error (404): Model '{model_name}' tidak ditemukan. Pastikan API Key Anda memiliki akses ke Gemini API di Google AI Studio."
+            return f"⚠️ Chatbot error (404): Model '{MODEL_NAME}' tidak ditemukan. Pastikan API Key Anda memiliki akses ke Gemini API di Google AI Studio."
         return f"⚠️ Chatbot error: {error_msg}. Pastikan API Key valid dan koneksi internet stabil."
 
 # ====================== INSTRUMEN ======================
@@ -289,8 +294,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Sidebar
-st.sidebar.markdown('<div style="text-align:center;"><span style="font-size:60px; filter: drop-shadow(0 0 10px #00ff88);">🦅</span></div>', unsafe_allow_html=True)
-st.sidebar.markdown('<h2 class="digital-font" style="text-align:center;">AeroVulpis</h2>', unsafe_allow_html=True)
+st.sidebar.markdown('<div style="text-align:center;"><span style="font-size:60px; filter: drop-shadow(0 0 10px #00d4ff);">🦅</span></div>', unsafe_allow_html=True)
+st.sidebar.markdown('<h2 class="digital-font" style="text-align:center; color:#00d4ff;">AeroVulpis</h2>', unsafe_allow_html=True)
 st.sidebar.markdown('<p class="rajdhani-font" style="text-align:center; color:#888;">Ultimate Digital Edition</p>', unsafe_allow_html=True)
 
 category = st.sidebar.selectbox("Pilih Kategori", list(instruments.keys()))
@@ -482,7 +487,7 @@ elif menu_selection == "Market History":
         st.dataframe(df_hist[['Open', 'High', 'Low', 'Close', 'Volume']].head(50), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-# ====================== CHATBOT AI TRADING (FIXED VERSION) ======================
+# ====================== CHATBOT AI TRADING (FINAL FIX VERSION) ======================
 elif menu_selection == "Chatbot AI Trading":
     st.markdown('<h2 class="digital-font">🤖 Chatbot AI Trading</h2>', unsafe_allow_html=True)
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)

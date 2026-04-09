@@ -44,6 +44,17 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
+    .main-title-container {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .main-logo {
+        font-size: 70px;
+        margin-bottom: -10px;
+        display: block;
+    }
+
     .main-title {
         font-family: 'Orbitron', sans-serif;
         font-size: 58px;
@@ -52,8 +63,7 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
-        text-align: center;
-        margin-bottom: 5px;
+        margin: 0;
     }
 
     .digital-font {
@@ -210,7 +220,8 @@ def get_gemini_response(question, context=""):
         return "⚠️ Chatbot tidak aktif: API Key belum dikonfigurasi di file .env atau Secrets."
     
     # Daftar model untuk dicoba jika model utama gagal
-    models_to_try = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.0-pro']
+    # Menggunakan 'gemini-1.5-flash-latest' sebagai prioritas utama sesuai instruksi
+    models_to_try = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-1.0-pro']
     
     full_prompt = f"""
 Kamu adalah AeroVulpis 🦅 v3.2, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
@@ -265,7 +276,12 @@ instruments = {
 }
 
 # ====================== UI HEADER ======================
-st.markdown('<h1 class="main-title">🦅 AERO VULPIS v3.2</h1>', unsafe_allow_html=True)
+st.markdown("""
+<div class="main-title-container">
+    <span class="main-logo">🦅</span>
+    <h1 class="main-title">AERO VULPIS v3.2</h1>
+</div>
+""", unsafe_allow_html=True)
 
 # Sidebar
 st.sidebar.markdown('<div style="text-align:center;"><span style="font-size:60px;">🦅</span></div>', unsafe_allow_html=True)
@@ -278,17 +294,23 @@ ticker_input = instruments[category][ticker_display]
 
 # Timeframe
 st.sidebar.markdown("---")
-tf_options = {
-    "30m": {"period": "5d", "interval": "30m"},
-    "1h": {"period": "1mo", "interval": "1h"},
-    "4h": {"period": "3mo", "interval": "1h"}, 
-    "1D": {"period": "1y", "interval": "1d"},
-    "1W": {"period": "2y", "interval": "1wk"},
-    "1Month": {"period": "5y", "interval": "1mo"}
+# Mapping timeframe standar internasional ke format yfinance
+tf_mapping = {
+    "M30 (30 Minutes)": {"period": "5d", "interval": "30m"},
+    "H1 (1 Hour)": {"period": "1mo", "interval": "1h"},
+    "H2 (2 Hours)": {"period": "1mo", "interval": "1h"}, # yfinance doesn't natively support 2h for all, fallback to 1h or handle manually
+    "H4 (4 Hours)": {"period": "3mo", "interval": "1h"}, # Fallback to 1h for better data density in 4h analysis
+    "H12 (12 Hours)": {"period": "1y", "interval": "1d"}, # Fallback to 1d
+    "D1 (Daily)": {"period": "2y", "interval": "1d"},
+    "W1 (Weekly)": {"period": "5y", "interval": "1wk"},
+    "MN (Monthly)": {"period": "max", "interval": "1mo"}
 }
-selected_tf = st.sidebar.selectbox("Pilih Timeframe", list(tf_options.keys()), index=1)
-period = tf_options[selected_tf]["period"]
-interval = tf_options[selected_tf]["interval"]
+
+# Khusus untuk H2 dan H4, yfinance bisa menerima interval "90m" atau "1h"
+# Kita gunakan interval 1h untuk H1-H4 agar data teknikal lebih akurat
+selected_tf_display = st.sidebar.selectbox("Pilih Timeframe", list(tf_mapping.keys()), index=1)
+period = tf_mapping[selected_tf_display]["period"]
+interval = tf_mapping[selected_tf_display]["interval"]
 
 menu_selection = st.sidebar.radio("Navigasi Sistem", ["Live Dashboard", "Trading Signals", "Risk Management", "Market History", "Chatbot AI Trading"])
 
@@ -310,7 +332,7 @@ if menu_selection == "Live Dashboard":
             
             st.markdown(f"""
             <div class="glass-card" style="text-align:center;">
-                <p class="rajdhani-font" style="margin:0; color:#aaa;">HARGA {ticker_display} ({selected_tf})</p>
+                <p class="rajdhani-font" style="margin:0; color:#aaa;">HARGA {ticker_display} ({selected_tf_display})</p>
                 <h1 class="digital-font" style="font-size:48px; color:{line_color}; margin:0;">{current_price:,.4f}</h1>
             </div>
             """, unsafe_allow_html=True)
@@ -370,7 +392,7 @@ if menu_selection == "Live Dashboard":
 
 # ====================== TRADING SIGNALS (10 Indikator) ======================
 elif menu_selection == "Trading Signals":
-    st.markdown(f'<h2 class="digital-font">⚡ Trading Signals ({selected_tf})</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="digital-font">⚡ Trading Signals ({selected_tf_display})</h2>', unsafe_allow_html=True)
     df = get_historical_data(ticker_input, period=period, interval=interval)
     if not df.empty and len(df) > 50:
         df = add_technical_indicators(df)
@@ -404,7 +426,7 @@ elif menu_selection == "Trading Signals":
         with col2:
             st.markdown('<div class="glass-card"><p class="digital-font">10-INDICATOR ANALYSIS</p>', unsafe_allow_html=True)
             for k, v in indicators.items():
-                col_c = "#00ff88" if v in ["BUY", "BULLISH", "STRONG"] else "#ff2a6d" if v in ["SELL", "BEARISH"] else "#888888"
+                col_c = "#00ff88" if v in ["BUY", "BULLISH", "STRONG"] else "#ff2a6d" if v in ["SELL", "BEARISH"] else "#88888"
                 st.markdown(f'<div style="display:flex; justify-content:space-between;"><span class="rajdhani-font">{k}</span><span class="digital-font" style="color:{col_c};">{v}</span></div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
     else:
@@ -440,7 +462,7 @@ elif menu_selection == "Risk Management":
 
 # ====================== MARKET HISTORY ======================
 elif menu_selection == "Market History":
-    st.markdown(f'<h2 class="digital-font">📊 Market History ({selected_tf})</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="digital-font">📊 Market History ({selected_tf_display})</h2>', unsafe_allow_html=True)
     market_data = get_market_data(ticker_input)
     if market_data:
         c1, c2, c3, c4 = st.columns(4)
@@ -479,7 +501,7 @@ elif menu_selection == "Chatbot AI Trading":
             with st.spinner("Menganalisis..."):
                 market_data = get_market_data(ticker_input)
                 price_val = market_data['price'] if market_data else 'N/A'
-                context = f"Harga {ticker_display} saat ini adalah {price_val} pada timeframe {selected_tf}."
+                context = f"Harga {ticker_display} saat ini adalah {price_val} pada timeframe {selected_tf_display}."
                 response = get_gemini_response(prompt, context)
                 st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})

@@ -54,51 +54,23 @@ st.markdown("""
         position: relative;
         display: inline-block;
         animation: float 4s infinite ease-in-out;
+        padding: 15px 0;
     }
 
-    .main-logo {
-        font-size: 85px;
-        margin-bottom: -15px;
-        display: block;
-        color: var(--electric-blue);
-        filter: drop-shadow(0 0 10px var(--electric-blue)) drop-shadow(0 0 20px var(--deep-blue));
-        text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8);
-        position: relative;
+    .custom-logo {
+        width: 150px;
+        filter: drop-shadow(0 0 15px var(--electric-blue)) drop-shadow(0 0 30px var(--deep-blue));
+        transition: all 0.5s ease;
     }
 
-    /* Eye Glow Animation */
-    .main-logo::after {
-        content: '• •';
-        position: absolute;
-        top: 42%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 14px;
-        letter-spacing: 8px;
-        color: transparent;
-        text-shadow: 0 0 0px var(--electric-blue);
-        animation: eye-glow 5s infinite;
-        pointer-events: none;
+    .custom-logo:hover {
+        transform: scale(1.1);
+        filter: drop-shadow(0 0 25px var(--electric-blue)) brightness(1.2);
     }
 
     @keyframes float {
         0%, 100% { transform: translateY(0px); }
         50% { transform: translateY(-15px); }
-    }
-
-    @keyframes eye-glow {
-        0%, 10%, 90%, 100% { 
-            color: transparent;
-            text-shadow: 0 0 0px var(--electric-blue);
-        }
-        30%, 70% { 
-            color: var(--electric-blue);
-            text-shadow: 0 0 8px var(--electric-blue), 0 0 15px var(--electric-blue);
-        }
-        50% { 
-            color: #ffffff;
-            text-shadow: 0 0 12px var(--electric-blue), 0 0 25px var(--electric-blue);
-        }
     }
 
     .main-title {
@@ -323,14 +295,14 @@ instruments = {
 st.markdown("""
 <div class="main-title-container">
     <div class="main-logo-container">
-        <span class="main-logo">🦅</span>
+        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520909080/YqWNQNcEOEdklCbp.png" class="custom-logo">
     </div>
     <h1 class="main-title">AERO VULPIS v3.2</h1>
 </div>
 """, unsafe_allow_html=True)
 
 # Sidebar
-st.sidebar.markdown('<div style="text-align:center;"><span style="font-size:60px; filter: drop-shadow(0 0 10px #00d4ff);">🦅</span></div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520909080/YqWNQNcEOEdklCbp.png" style="width:100px; filter: drop-shadow(0 0 8px #00d4ff);"></div>', unsafe_allow_html=True)
 st.sidebar.markdown('<h2 class="digital-font" style="text-align:center; color:#00d4ff;">AeroVulpis</h2>', unsafe_allow_html=True)
 st.sidebar.markdown('<p class="rajdhani-font" style="text-align:center; color:#888;">Ultimate Digital Edition</p>', unsafe_allow_html=True)
 

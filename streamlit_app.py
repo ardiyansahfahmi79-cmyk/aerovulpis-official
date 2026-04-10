@@ -50,21 +50,55 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
+    .main-logo-container {
+        position: relative;
+        display: inline-block;
+        animation: float 4s infinite ease-in-out;
+    }
+
     .main-logo {
         font-size: 85px;
         margin-bottom: -15px;
         display: block;
-        /* Efek 3D Digital Neon BIRU pada Logo */
         color: var(--electric-blue);
-        filter: drop-shadow(0 0 15px var(--electric-blue)) drop-shadow(0 0 30px var(--deep-blue));
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        animation: pulse 3s infinite ease-in-out;
+        filter: drop-shadow(0 0 10px var(--electric-blue)) drop-shadow(0 0 20px var(--deep-blue));
+        text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8);
+        position: relative;
     }
 
-    @keyframes pulse {
-        0% { transform: scale(1); filter: drop-shadow(0 0 10px var(--electric-blue)); }
-        50% { transform: scale(1.05); filter: drop-shadow(0 0 25px var(--deep-blue)); }
-        100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--electric-blue)); }
+    /* Eye Glow Animation */
+    .main-logo::after {
+        content: '• •';
+        position: absolute;
+        top: 42%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 14px;
+        letter-spacing: 8px;
+        color: transparent;
+        text-shadow: 0 0 0px var(--electric-blue);
+        animation: eye-glow 5s infinite;
+        pointer-events: none;
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-15px); }
+    }
+
+    @keyframes eye-glow {
+        0%, 10%, 90%, 100% { 
+            color: transparent;
+            text-shadow: 0 0 0px var(--electric-blue);
+        }
+        30%, 70% { 
+            color: var(--electric-blue);
+            text-shadow: 0 0 8px var(--electric-blue), 0 0 15px var(--electric-blue);
+        }
+        50% { 
+            color: #ffffff;
+            text-shadow: 0 0 12px var(--electric-blue), 0 0 25px var(--electric-blue);
+        }
     }
 
     .main-title {
@@ -288,7 +322,9 @@ instruments = {
 # ====================== UI HEADER ======================
 st.markdown("""
 <div class="main-title-container">
-    <span class="main-logo">🦅</span>
+    <div class="main-logo-container">
+        <span class="main-logo">🦅</span>
+    </div>
     <h1 class="main-title">AERO VULPIS v3.2</h1>
 </div>
 """, unsafe_allow_html=True)

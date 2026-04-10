@@ -56,6 +56,7 @@ st.markdown("""
         animation: float 4s infinite ease-in-out;
         padding: 20px 0;
         background: transparent !important;
+        perspective: 1000px;
     }
 
     .custom-logo {
@@ -63,16 +64,19 @@ st.markdown("""
         filter: drop-shadow(0 0 10px var(--electric-blue));
         transition: all 0.5s ease;
         background-color: transparent !important;
-    }
-
-    .custom-logo:hover {
-        transform: scale(1.1);
-        filter: drop-shadow(0 0 25px var(--electric-blue)) brightness(1.2);
+        animation: rotate3D 8s infinite linear;
+        transform-style: preserve-3d;
     }
 
     @keyframes float {
         0%, 100% { transform: translateY(0px); }
         50% { transform: translateY(-15px); }
+    }
+
+    @keyframes rotate3D {
+        0%, 20% { transform: rotateY(0deg); }
+        40%, 60% { transform: rotateY(360deg); }
+        80%, 100% { transform: rotateY(0deg); }
     }
 
     .main-title {
@@ -297,14 +301,14 @@ instruments = {
 st.markdown("""
 <div class="main-title-container">
     <div class="main-logo-container">
-        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520909080/JaWGmvPvJuMytYKq.png" class="custom-logo">
+        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520909080/jKwIFCTUEozSHcZQ.png" class="custom-logo">
     </div>
     <h1 class="main-title">AERO VULPIS v3.2</h1>
 </div>
 """, unsafe_allow_html=True)
 
 # Sidebar
-st.sidebar.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520909080/JaWGmvPvJuMytYKq.png" style="width:100px; filter: drop-shadow(0 0 5px #00d4ff);"></div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520909080/jKwIFCTUEozSHcZQ.png" style="width:100px; filter: drop-shadow(0 0 5px #00d4ff);"></div>', unsafe_allow_html=True)
 st.sidebar.markdown('<h2 class="digital-font" style="text-align:center; color:#00d4ff;">AeroVulpis</h2>', unsafe_allow_html=True)
 st.sidebar.markdown('<p class="rajdhani-font" style="text-align:center; color:#888;">Ultimate Digital Edition</p>', unsafe_allow_html=True)
 
@@ -440,7 +444,7 @@ elif menu_selection == "Trading Signals":
 
         col1, col2 = st.columns([1, 1])
         with col1:
-            st.markdown(f'<div class="glass-card" style="text-align:center; border-top: 5px solid {sig_col};"><p class="rajdhani-font">FINAL RECOMMENDATION</p><h1 class="digital-font" style="color:{sig_col}; font-size:50px;">{final_sig}</h1><p class="rajdhani-font">Score: {buy_count} Buy | {sell_count} Sell</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<divclass="glass-card" style="text-align:center; border-top: 5px solid {sig_col};"><p class="rajdhani-font">FINAL RECOMMENDATION</p><h1 class="digital-font" style="color:{sig_col}; font-size:50px;">{final_sig}</h1><p class="rajdhani-font">Score: {buy_count} Buy | {sell_count} Sell</p></div>', unsafe_allow_html=True)
         with col2:
             st.markdown('<div class="glass-card"><p class="digital-font">10-INDICATOR ANALYSIS</p>', unsafe_allow_html=True)
             for k, v in indicators.items():

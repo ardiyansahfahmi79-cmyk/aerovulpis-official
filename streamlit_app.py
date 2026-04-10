@@ -249,7 +249,7 @@ def get_groq_response(question, context=""):
     if not client:
         return "⚠️ Chatbot tidak aktif: GROQ_API_KEY belum dikonfigurasi."
     
-    MODEL_NAME = 'llama3-8b-8192'
+    MODEL_NAME = 'llama-3.1-8b-instant'
     
     system_prompt = f"""
     Kamu adalah AeroVulpis 🦅 v3.3, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.

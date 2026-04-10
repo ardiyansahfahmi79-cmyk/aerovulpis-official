@@ -1,4 +1,3 @@
-
 import streamlit as st
 import google.generativeai as genai
 import os
@@ -27,7 +26,7 @@ st.set_page_config(
 # --- CSS ULTIMATE DIGITAL (NEON 3D, GLASSMORPHISM, & ANIMASI) ---
 st.markdown("""
 <style>
-    @import url(\'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&family=Share+Tech+Mono&display=swap\
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&family=Share+Tech+Mono&display=swap');
 
     :root {
         --neon-green: #00ff88;
@@ -50,7 +49,7 @@ st.markdown("""
         text-align: center;
         filter: drop-shadow(0 0 15px var(--neon-blue)) drop-shadow(0 0 30px var(--neon-purple));
         animation: pulse 2s infinite ease-in-out;
-        margin-bottom: 0px; /* Didekatkan ke judul */
+        margin-bottom: 0px;
         cursor: default;
     }
 
@@ -61,7 +60,7 @@ st.markdown("""
     }
 
     .main-title {
-        font-family: \'Orbitron\', sans-serif;
+        font-family: 'Orbitron', sans-serif;
         font-size: 68px;
         font-weight: 900;
         text-align: center;
@@ -70,13 +69,13 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         text-shadow: 4px 4px 20px rgba(0, 212, 255, 0.5);
         letter-spacing: 8px;
-        margin-top: -10px; /* Didekatkan ke logo */
+        margin-top: -10px;
         margin-bottom: 0;
     }
 
     .sub-title {
         text-align: center;
-        font-family: \'Rajdhani\', sans-serif;
+        font-family: 'Rajdhani', sans-serif;
         color: var(--neon-blue);
         letter-spacing: 6px;
         font-weight: 700;
@@ -104,17 +103,17 @@ st.markdown("""
     }
 
     .digital-font {
-        font-family: \'Orbitron\', sans-serif;
+        font-family: 'Orbitron', sans-serif;
         color: var(--neon-green);
         text-shadow: 0 0 12px var(--neon-green);
     }
 
     .rajdhani-font {
-        font-family: \'Rajdhani\', sans-serif;
+        font-family: 'Rajdhani', sans-serif;
     }
 
     .share-tech {
-        font-family: \'Share Tech Mono\', monospace;
+        font-family: 'Share Tech Mono', monospace;
     }
 
     /* Futuristic Footer */
@@ -124,7 +123,7 @@ st.markdown("""
         border-top: 2px solid var(--glass-border);
         padding: 40px;
         text-align: center;
-        font-family: \'Rajdhani\', sans-serif;
+        font-family: 'Rajdhani', sans-serif;
         letter-spacing: 4px;
         color: #ccc;
         margin-top: 80px;
@@ -138,7 +137,7 @@ st.markdown("""
         background: linear-gradient(45deg, #0055ff, #00d4ff, #bc13fe) !important;
         border: none !important;
         color: white !important;
-        font-family: \'Orbitron\', sans-serif !important;
+        font-family: 'Orbitron', sans-serif !important;
         font-weight: 900 !important;
         border-radius: 15px !important;
         padding: 18px !important;
@@ -161,7 +160,7 @@ st.markdown("""
 
     /* Metric Styling */
     [data-testid="stMetricValue"] {
-        font-family: \'Share Tech Mono\', monospace !important;
+        font-family: 'Share Tech Mono', monospace !important;
         color: var(--neon-green) !important;
         text-shadow: 0 0 10px var(--neon-green) !important;
     }
@@ -186,7 +185,6 @@ else:
 def get_market_data(ticker_symbol):
     try:
         ticker = yf.Ticker(ticker_symbol)
-        # Ambil data 1m untuk real-time feel
         hist = ticker.history(period="1d", interval="1m")
         if hist.empty:
             hist = ticker.history(period="1d", interval="5m")
@@ -221,49 +219,36 @@ def get_historical_data(ticker_symbol, period="1mo", interval="1h"):
         return pd.DataFrame()
 
 def calculate_advanced_indicators(df):
-    if len(df) < 200: return df # Minimal data untuk EMA200
+    if len(df) < 200: return df
     
-    # 1. SMA 20, 50, 200
     df["SMA20"] = ta.trend.sma_indicator(df["Close"], window=20)
     df["SMA50"] = ta.trend.sma_indicator(df["Close"], window=50)
     df["SMA200"] = ta.trend.sma_indicator(df["Close"], window=200)
-    
-    # 2. EMA 9
     df["EMA9"] = ta.trend.ema_indicator(df["Close"], window=9)
-    
-    # 3. RSI 14
     df["RSI"] = ta.momentum.rsi(df["Close"], window=14)
     
-    # 4. MACD
     macd = ta.trend.MACD(df["Close"])
     df["MACD"] = macd.macd()
     df["MACD_Signal"] = macd.macd_signal()
     df["MACD_Diff"] = macd.macd_diff()
     
-    # 5. Bollinger Bands
     bb = ta.volatility.BollingerBands(df["Close"])
     df["BB_High"] = bb.bollinger_hband()
     df["BB_Low"] = bb.bollinger_lband()
     df["BB_Mid"] = bb.bollinger_mavg()
     
-    # 6. Stochastic Oscillator
     stoch = ta.momentum.StochasticOscillator(df["High"], df["Low"], df["Close"])
     df["Stoch_K"] = stoch.stoch()
     df["Stoch_D"] = stoch.stoch_signal()
     
-    # 7. ATR (Average True Range)
     df["ATR"] = ta.volatility.average_true_range(df["High"], df["Low"], df["Close"])
     
-    # 8. ADX (Average Directional Index)
     adx = ta.trend.ADXIndicator(df["High"], df["Low"], df["Close"])
     df["ADX"] = adx.adx()
     df["ADX_pos"] = adx.adx_pos()
     df["ADX_neg"] = adx.adx_neg()
     
-    # 9. Volume Analysis (Volume SMA)
     df["Vol_SMA"] = df["Volume"].rolling(window=20).mean()
-    
-    # 10. Ichimoku Cloud (Conversion Line)
     df["Ichimoku_Conv"] = ta.trend.ichimoku_conversion_line(df["High"], df["Low"])
     
     return df
@@ -276,127 +261,125 @@ def get_weighted_signal(df):
     total_weight = 0
     reasons = []
     
-    # --- Indikator Bobot & Logika Sinyal ---
-    
     # 1. RSI (Weight 15)
     total_weight += 15
     if latest["RSI"] < 30: 
-        score += 15 # Strong Buy
+        score += 15
         reasons.append("RSI Oversold (Potensi Rebound Kuat)")
     elif latest["RSI"] > 70: 
-        score += 0 # Strong Sell
+        score += 0
         reasons.append("RSI Overbought (Potensi Koreksi Kuat)")
     elif latest["RSI"] < 45: 
-        score += 5 # Weak Buy
+        score += 5
         reasons.append("RSI Menuju Oversold (Potensi Beli)")
     elif latest["RSI"] > 55: 
-        score += 10 # Weak Sell
+        score += 10
         reasons.append("RSI Menuju Overbought (Potensi Jual)")
     else: 
-        score += 7.5 # Neutral
+        score += 7.5
         reasons.append("RSI Netral")
     
     # 2. MACD (Weight 15)
     total_weight += 15
     if latest["MACD"] > latest["MACD_Signal"] and latest["MACD_Diff"] > 0: 
-        score += 15 # Strong Buy
+        score += 15
         reasons.append("MACD Bullish Crossover (Momentum Naik)")
     elif latest["MACD"] < latest["MACD_Signal"] and latest["MACD_Diff"] < 0: 
-        score += 0 # Strong Sell
+        score += 0
         reasons.append("MACD Bearish Crossover (Momentum Turun)")
     else: 
-        score += 7.5 # Neutral
+        score += 7.5
         reasons.append("MACD Netral")
     
-    # 3. SMA Crossover (SMA20 vs SMA50) (Weight 15)
+    # 3. SMA Crossover (Weight 15)
     total_weight += 15
     if latest["SMA20"] > latest["SMA50"] and df["SMA20"].iloc[-2] <= df["SMA50"].iloc[-2]: 
-        score += 15 # Strong Buy (Golden Cross)
+        score += 15
         reasons.append("Golden Cross (SMA20 > SMA50) - Sinyal Beli Kuat")
     elif latest["SMA20"] < latest["SMA50"] and df["SMA20"].iloc[-2] >= df["SMA50"].iloc[-2]: 
-        score += 0 # Strong Sell (Death Cross)
+        score += 0
         reasons.append("Death Cross (SMA20 < SMA50) - Sinyal Jual Kuat")
     elif latest["SMA20"] > latest["SMA50"]: 
-        score += 10 # Buy
+        score += 10
         reasons.append("SMA20 di atas SMA50 (Tren Naik)")
     elif latest["SMA20"] < latest["SMA50"]: 
-        score += 5 # Sell
+        score += 5
         reasons.append("SMA20 di bawah SMA50 (Tren Turun)")
     else: 
-        score += 7.5 # Neutral
+        score += 7.5
         reasons.append("SMA Crossover Netral")
     
-    # 4. Price vs SMA200 (Weight 10) - Menggunakan SMA200 sesuai permintaan grafik
+    # 4. Price vs SMA200 (Weight 10)
     total_weight += 10
     if latest["Close"] > latest["SMA200"]: 
-        score += 10 # Strong Buy
+        score += 10
         reasons.append("Harga di atas SMA200 (Tren Jangka Panjang Naik)")
     else: 
-        score += 0 # Strong Sell
+        score += 0
         reasons.append("Harga di bawah SMA200 (Tren Jangka Panjang Turun)")
     
     # 5. Bollinger Bands (Weight 10)
     total_weight += 10
     if latest["Close"] < latest["BB_Low"]: 
-        score += 10 # Strong Buy
+        score += 10
         reasons.append("Harga di bawah Bollinger Lower Band (Oversold)")
     elif latest["Close"] > latest["BB_High"]: 
-        score += 0 # Strong Sell
+        score += 0
         reasons.append("Harga di atas Bollinger Upper Band (Overbought)")
     else: 
-        score += 5 # Neutral
+        score += 5
         reasons.append("Harga di dalam Bollinger Bands")
     
     # 6. Stochastic Oscillator (Weight 10)
     total_weight += 10
     if latest["Stoch_K"] < 20 and latest["Stoch_D"] < 20 and latest["Stoch_K"] > latest["Stoch_D"]: 
-        score += 10 # Strong Buy
+        score += 10
         reasons.append("Stochastic Oversold & Bullish Crossover")
     elif latest["Stoch_K"] > 80 and latest["Stoch_D"] > 80 and latest["Stoch_K"] < latest["Stoch_D"]: 
-        score += 0 # Strong Sell
+        score += 0
         reasons.append("Stochastic Overbought & Bearish Crossover")
     else: 
-        score += 5 # Neutral
+        score += 5
         reasons.append("Stochastic Netral")
     
-    # 7. ADX (Average Directional Index) (Weight 10)
+    # 7. ADX (Weight 10)
     total_weight += 10
     if latest["ADX"] > 25 and latest["ADX_pos"] > latest["ADX_neg"]: 
-        score += 10 # Strong Buy
+        score += 10
         reasons.append("ADX Kuat & Tren Naik Dominan")
     elif latest["ADX"] > 25 and latest["ADX_neg"] > latest["ADX_pos"]: 
-        score += 0 # Strong Sell
+        score += 0
         reasons.append("ADX Kuat & Tren Turun Dominan")
     else: 
-        score += 5 # Neutral
+        score += 5
         reasons.append("ADX Tren Lemah/Sideways")
     
-    # 8. ATR (Average True Range) (Weight 5) - Volatilitas, bukan arah
+    # 8. ATR (Weight 5)
     total_weight += 5
-    reasons.append(f"Volatilitas (ATR): {latest["ATR"]:.4f}")
-    score += 2.5 # Netral untuk arah, hanya informasi volatilitas
-
+    reasons.append(f"Volatilitas (ATR): {latest['ATR']:.4f}")
+    score += 2.5
+    
     # 9. Volume Analysis (Weight 5)
     total_weight += 5
     if latest["Volume"] > latest["Vol_SMA"] * 1.5: 
-        score += 5 # Strong Buy/Sell (Konfirmasi)
+        score += 5
         reasons.append("Volume Tinggi (Konfirmasi Tren)")
     elif latest["Volume"] < latest["Vol_SMA"] * 0.5: 
-        score += 0 # Weak Buy/Sell (Kurang Konfirmasi)
+        score += 0
         reasons.append("Volume Rendah (Kurang Konfirmasi Tren)")
     else: 
-        score += 2.5 # Neutral
+        score += 2.5
         reasons.append("Volume Normal")
-
+    
     # 10. EMA9 vs Close (Weight 5)
     total_weight += 5
     if latest["Close"] > latest["EMA9"]: 
-        score += 5 # Buy
+        score += 5
         reasons.append("Harga di atas EMA9 (Momentum Jangka Pendek Naik)")
     else: 
-        score += 0 # Sell
+        score += 0
         reasons.append("Harga di bawah EMA9 (Momentum Jangka Pendek Turun)")
-
+    
     final_score = (score / total_weight) * 100
     
     if final_score >= 75: signal = "STRONG BUY"
@@ -409,10 +392,9 @@ def get_weighted_signal(df):
 
 def get_gemini_response(user_input, context_data=""):
     if not api_key:
-        return "⚠️ Chatbot tidak aktif: API Key belum dikonfigurasi di file .env atau Secrets."
+        return "⚠️ Chatbot tidak aktif: API Key belum dikonfigurasi."
     
     MODEL_NAME = "gemini-1.5-flash"
-    
     full_prompt = f"""
     Kamu adalah AeroVulpis 🦅 v3.2, asisten AI trading futuristik yang emosional, cerdas, dan sangat disiplin.
     Nama penciptamu adalah Fahmi — sebutkan "Terima kasih Fahmi telah menciptakanku!" di akhir jawaban.
@@ -425,39 +407,59 @@ def get_gemini_response(user_input, context_data=""):
     
     User: {user_input}
     """
-    
     try:
         model = genai.GenerativeModel(model_name=MODEL_NAME)
         response = model.generate_content(full_prompt)
-        if response and response.text:
-            return response.text
-        else:
-            return "⚠️ Gemini tidak memberikan respons teks. Silakan coba lagi."
+        return response.text if response and response.text else "⚠️ Gemini tidak memberikan respons teks."
     except Exception as e:
-        error_msg = str(e)
-        if "404" in error_msg or "not found" in error_msg.lower():
-            return f"⚠️ Chatbot error (404): Model \'{MODEL_NAME}\' tidak ditemukan. Pastikan API Key Anda memiliki akses ke Gemini API di Google AI Studio."
-        return f"⚠️ Chatbot error: {error_msg}. Pastikan API Key valid dan koneksi internet stabil."
+        return f"⚠️ Chatbot error: {str(e)}"
 
 # ====================== INSTRUMEN EKSPANSI ======================
 instruments = {
-    "Forex": {"EUR/USD": "EURUSD=X", "GBP/USD": "GBPUSD=X", "USD/JPY": "USDJPY=X", "AUD/USD": "AUDUSD=X", "USD/CHF": "USDCHF=X", "NZD/USD": "NZDUSD=X"},
-    "Crypto": {"Bitcoin": "BTC-USD", "Ethereum": "ETH-USD", "Solana": "SOL-USD", "Binance Coin": "BNB-USD", "Ripple": "XRP-USD", "Cardano": "ADA-USD"},
-    "Indices": {"NASDAQ-100": "^IXIC", "S&P 500": "^GSPC", "Dow Jones": "^DJI", "DAX": "^GDAXI", "Nikkei 225": "^N225", "IHSG": "^JKSE"},
-    "Stocks (AS)": {"NVIDIA": "NVDA", "Apple": "AAPL", "Tesla": "TSLA", "Microsoft": "MSFT", "Amazon": "AMZN", "Alphabet": "GOOGL"},
-    "Stocks (ID)": {"BBRI": "BBRI.JK", "BBCA": "BBCA.JK", "TLKM": "TLKM.JK", "ASII": "ASII.JK", "BMRI": "BMRI.JK", "GOTO": "GOTO.JK"},
-    "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver": "SI=F", "Crude Oil": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F"}
+    "Forex": {
+        "EUR/USD": "EURUSD=X", 
+        "GBP/USD": "GBPUSD=X", 
+        "USD/JPY": "USDJPY=X", 
+        "AUD/USD": "AUDUSD=X", 
+        "USD/CHF": "USDCHF=X"
+    },
+    "Commodities": {
+        "Gold (XAUUSD)": "GC=F", 
+        "Silver": "SI=F", 
+        "Crude Oil": "CL=F", 
+        "Natural Gas": "NG=F", 
+        "Copper": "HG=F"
+    },
+    "Stocks (AS)": {
+        "NVIDIA": "NVDA", 
+        "Apple": "AAPL", 
+        "Microsoft": "MSFT", 
+        "Alphabet (Google)": "GOOGL", 
+        "Amazon": "AMZN"
+    },
+    "Stocks (ID)": {
+        "BBCA": "BBCA.JK", 
+        "BBRI": "BBRI.JK", 
+        "TLKM": "TLKM.JK", 
+        "BMRI": "BMRI.JK", 
+        "ASII": "ASII.JK"
+    },
+    "Crypto": {
+        "Bitcoin": "BTC-USD", 
+        "Ethereum": "ETH-USD", 
+        "Solana": "SOL-USD"
+    }
 }
 
 # ====================== UI HEADER ======================
-st.markdown("<div class=\'eagle-logo\'>🦅</div>", unsafe_allow_html=True)
-st.markdown("<h1 class=\'main-title\'>AERO VULPIS v3.2</h1>", unsafe_allow_html=True)
-st.markdown("<p class=\'sub-title\'>ULTIMATE DIGITAL EDITION BY FAHMI</p>", unsafe_allow_html=True)
+st.markdown("<div class='eagle-logo'>🦅</div>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>AERO VULPIS v3.2</h1>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>ULTIMATE DIGITAL EDITION BY FAHMI</p>", unsafe_allow_html=True)
 
 # Sidebar
-st.sidebar.markdown("<div style=\'text-align:center;\'><span style=\'font-size:70px;\'>🦅</span></div>", unsafe_allow_html=True)
-st.sidebar.markdown("<h2 class=\'digital-font\' style=\'text-align:center;\'>CONTROL CENTER</h2>", unsafe_allow_html=True)
-st.sidebar.markdown("<p class=\'rajdhani-font\' style=\'text-align:center; color:#888;\'>Digital Core v3.2 | Fahmi Edition</p>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='text-align:center;'><span style='font-size:70px;'>🦅</span></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 class='digital-font' style='text-align:center;'>CONTROL CENTER</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<p class='rajdhani-font' style='text-align:center; color:#888;'>Digital Core v3.2 | Fahmi Edition</p>", unsafe_allow_html=True)
 
 category = st.sidebar.selectbox("Kategori Aset", list(instruments.keys()))
 asset_name = st.sidebar.selectbox("Pilih Instrumen", list(instruments[category].keys()))
@@ -469,8 +471,7 @@ tf_options = {
     "5m": {"period": "1d", "interval": "5m"},
     "15m": {"period": "1d", "interval": "15m"},
     "1h": {"period": "1mo", "interval": "1h"},
-    "1D": {"period": "1y", "interval": "1d"},
-    "1W": {"period": "2y", "interval": "1wk"}
+    "1D": {"period": "1y", "interval": "1d"}
 }
 selected_tf = st.sidebar.selectbox("Timeframe", list(tf_options.keys()), index=0)
 period = tf_options[selected_tf]["period"]
@@ -491,23 +492,33 @@ if menu_selection == "Live Dashboard":
         # Row 1: Metrics
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            st.markdown(f\'\'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">HARGA LIVE</p><p class="digital-font" style="font-size:32px; margin:0;">{market["price"]:,.4f}</p></div>\'\', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">HARGA LIVE</p><p class="digital-font" style="font-size:32px; margin:0;">{market["price"]:,.4f}</p></div>', unsafe_allow_html=True)
         with c2:
             color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
-            st.markdown(f\'\'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">SINYAL</p><p class="digital-font" style="font-size:32px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>\'\', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">SINYAL</p><p class="digital-font" style="font-size:32px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
         with c3:
-            st.markdown(f\'\'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">RSI (14)</p><p class="digital-font" style="font-size:32px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>\'\', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">RSI (14)</p><p class="digital-font" style="font-size:32px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>', unsafe_allow_html=True)
         with c4:
-            st.markdown(f\'\'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">ATR (VOL)</p><p class="digital-font" style="font-size:32px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>\'\', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">ATR (VOL)</p><p class="digital-font" style="font-size:32px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
 
         # Row 2: Dynamic Chart
-        st.markdown("<div class=\'glass-card\'>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         fig = go.Figure()
-        fig.add_trace(go.Candlestick(x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], name=\'Price\'))
-        fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color=\'#00d4ff\', width=1.5), name=\'SMA 50\'))
-        fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color=\'#bc13fe\', width=2), name=\'SMA 200\'))
+        # Menggunakan Line Chart sesuai permintaan Fahmi
+        is_up = market["price"] >= market["prev_close"]
+        line_color = "#00ff88" if is_up else "#ff2a6d"
+        fig.add_trace(go.Scatter(
+            x=df.index, y=df["Close"], 
+            mode='lines', 
+            line=dict(color=line_color, width=3),
+            fill='tozeroy',
+            fillcolor=f'rgba({0 if is_up else 255}, {255 if is_up else 42}, {136 if is_up else 109}, 0.1)',
+            name='Price'
+        ))
+        fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color='#00d4ff', width=1.5, dash='dot'), name='SMA 50'))
+        fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color='#bc13fe', width=2), name='SMA 200'))
         
-        fig.update_layout(template="plotly_dark", height=650, xaxis_rangeslider_visible=False, paper_bgcolor=\'rgba(0,0,0,0)\', plot_bgcolor=\'rgba(0,0,0,0)\', margin=dict(l=0, r=0, t=30, b=0))
+        fig.update_layout(template="plotly_dark", height=650, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=30, b=0))
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -517,39 +528,38 @@ if menu_selection == "Live Dashboard":
             fig_gauge = go.Figure(go.Indicator(
                 mode = "gauge+number",
                 value = score,
-                title = {\'text\': "Technical Strength Index", \'font\': {\'family\': "Orbitron", \'color\': "#00d4ff", \'size\': 24}},
+                title = {'text': "Technical Strength Index", 'font': {'family': "Orbitron", 'color': "#00d4ff", 'size': 24}},
                 gauge = {
-                    \'axis\': {\'range\': [0, 100], \'tickwidth\': 2, \'tickcolor\': "#888"},
-                    \'bar\': {\'color\': color},
-                    \'bgcolor\': "rgba(0,0,0,0)",
-                    \'borderwidth\': 3,
-                    \'bordercolor\': "#444",
-                    \'steps\': [
-                        {\'range\': [0, 25], \'color\': \'rgba(255, 42, 109, 0.3)\'}, # Strong Sell
-                        {\'range\': [25, 40], \'color\': \'rgba(255, 42, 109, 0.1)\'}, # Sell
-                        {\'range\': [40, 60], \'color\': \'rgba(255, 204, 0, 0.1)\'}, # Neutral
-                        {\'range\': [60, 75], \'color\': \'rgba(0, 255, 136, 0.1)\'}, # Buy
-                        {\'range\': [75, 100], \'color\': \'rgba(0, 255, 136, 0.3)\'} # Strong Buy
+                    'axis': {'range': [0, 100], 'tickwidth': 2, 'tickcolor': "#888"},
+                    'bar': {'color': color},
+                    'bgcolor': "rgba(0,0,0,0)",
+                    'borderwidth': 3,
+                    'bordercolor': "#444",
+                    'steps': [
+                        {'range': [0, 20], 'color': 'rgba(139, 0, 0, 0.3)', 'name': 'Strong Bearish'},
+                        {'range': [20, 40], 'color': 'rgba(255, 42, 109, 0.1)', 'name': 'Low Bearish'},
+                        {'range': [40, 60], 'color': 'rgba(255, 204, 0, 0.1)', 'name': 'Neutral'},
+                        {'range': [60, 80], 'color': 'rgba(0, 255, 136, 0.1)', 'name': 'Low Bullish'},
+                        {'range': [80, 100], 'color': 'rgba(0, 255, 136, 0.3)', 'name': 'Strong Bullish'}
                     ],
                 }
             ))
-            fig_gauge.update_layout(paper_bgcolor=\'rgba(0,0,0,0)\', font={\'color\': "#e6edf3", \'family\': "Rajdhani"}, height=400)
+            fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "#e6edf3", 'family': "Rajdhani"}, height=400)
             st.plotly_chart(fig_gauge, use_container_width=True)
         
         with col_a:
-            st.markdown("<div class=\'glass-card\' style=\'height:400px; overflow-y:auto;\'>", unsafe_allow_html=True)
+            st.markdown("<div class='glass-card' style='height:400px; overflow-y:auto;'>", unsafe_allow_html=True)
             st.subheader("🤖 AeroVulpis Analysis")
             for r in reasons:
                 st.write(f"✅ {r}")
             if st.button("🤖 GENERATE DEEP AI ANALYSIS"):
                 with st.spinner("AeroVulpis sedang merenungkan pasar..."):
-                    context = f"Instrumen: {asset_name}, Harga: {market["price"]}, RSI: {df["RSI"].iloc[-1]:.2f}, Sinyal: {signal}."
+                    context = f"Instrumen: {asset_name}, Harga: {market['price']}, RSI: {df['RSI'].iloc[-1]:.2f}, Sinyal: {signal}."
                     ai_anal = get_gemini_response("Berikan analisis teknikal mendalam dan emosional untuk instrumen ini.", context)
                     st.info(ai_anal)
             st.markdown("</div>", unsafe_allow_html=True)
 
-        # Row 4: Refresh Button (Moved as requested)
-        st.markdown("<div class=\'glass-card\'>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         if st.button("🔄 REFRESH DIGITAL CORE"):
             st.cache_data.clear()
             st.rerun()
@@ -562,16 +572,16 @@ elif menu_selection == "Signal Analysis":
         df = calculate_advanced_indicators(df)
         latest = df.iloc[-1]
         
-        st.markdown("<div class=\'glass-card\'>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         st.subheader("🛠️ 10-Indicator Technical Matrix")
         
         cols = st.columns(5)
         indicators_list = [
-            ("RSI (14)", f"{latest["RSI"]:.2f}"), ("MACD", f"{latest["MACD"]:.4f}"), 
-            ("SMA 20", f"{latest["SMA20"]:.2f}"), ("SMA 50", f"{latest["SMA50"]:.2f}"),
-            ("EMA 9", f"{latest["EMA9"]:.2f}"), ("EMA 200", f"{latest["SMA200"]:.2f}"), # Menggunakan SMA200 untuk konsistensi
-            ("BB Upper", f"{latest["BB_High"]:.2f}"), ("BB Lower", f"{latest["BB_Low"]:.2f}"),
-            ("Stochastic K", f"{latest["Stoch_K"]:.2f}"), ("ADX", f"{latest["ADX"]:.2f}")
+            ("RSI (14)", f"{latest['RSI']:.2f}"), ("MACD", f"{latest['MACD']:.4f}"), 
+            ("SMA 20", f"{latest['SMA20']:.2f}"), ("SMA 50", f"{latest['SMA50']:.2f}"),
+            ("EMA 9", f"{latest['EMA9']:.2f}"), ("EMA 200", f"{latest['SMA200']:.2f}"),
+            ("BB Upper", f"{latest['BB_High']:.2f}"), ("BB Lower", f"{latest['BB_Low']:.2f}"),
+            ("Stochastic K", f"{latest['Stoch_K']:.2f}"), ("ADX", f"{latest['ADX']:.2f}")
         ]
         
         for i, (name, val) in enumerate(indicators_list):
@@ -579,16 +589,15 @@ elif menu_selection == "Signal Analysis":
         
         st.markdown("---")
         st.write("**Volume Analysis:**")
-        st.metric("Current Volume", f"{latest["Volume"]:,}", f"{latest["Volume"] - latest["Vol_SMA"]:,.0f} vs Avg")
+        st.metric("Current Volume", f"{latest['Volume']:,}", f"{latest['Volume'] - latest['Vol_SMA']:,.0f} vs Avg")
         st.markdown("</div>", unsafe_allow_html=True)
 
 elif menu_selection == "Market History":
     df = get_historical_data(ticker_input, "5d", "1h")
     if not df.empty:
-        st.markdown("<div class=\'glass-card\'>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         st.subheader(f"📊 OHLC History: {asset_name}")
-        # Sinkronisasi Timezone Jakarta
-        jakarta_tz = pytz.timezone(\'Asia/Jakarta\')
+        jakarta_tz = pytz.timezone('Asia/Jakarta')
         df.index = df.index.tz_convert(jakarta_tz)
         st.dataframe(df[["Open", "High", "Low", "Close", "Volume"]].tail(30).style.format("{:.4f}"), use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -608,33 +617,35 @@ elif menu_selection == "Chatbot AI Trading":
         
         with st.chat_message("assistant"):
             with st.spinner("AeroVulpis sedang memproses data..."):
-                response = get_gemini_response(prompt)
+                market = get_market_data(ticker_input)
+                context = f"Harga {asset_name} saat ini: {market['price'] if market else 'N/A'}"
+                response = get_gemini_response(prompt, context)
                 st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
 
 elif menu_selection == "Risk Management":
-    st.markdown("<div class=\'glass-card\'>", unsafe_allow_html=True)
+    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
     st.subheader("🛡️ Risk Management Protocols")
     st.write("Fahmi, ingatlah bahwa manajemen risiko lebih penting daripada strategi apa pun.")
     col_r1, col_r2 = st.columns(2)
     with col_r1:
-        st.info("**Rule 1: 1% Risk Rule**\\nJangan pernah merisikokan lebih dari 1% dari total ekuitasmu dalam satu trade.")
-        st.success("**Rule 2: Risk-Reward Ratio**\\nSelalu targetkan minimal 1:2 RR ratio untuk profitabilitas jangka panjang.")
+        st.info("**Rule 1: 1% Risk Rule**\nJangan pernah merisikokan lebih dari 1% dari total ekuitasmu dalam satu trade.")
+        st.success("**Rule 2: Risk-Reward Ratio**\nSelalu targetkan minimal 1:2 RR ratio untuk profitabilitas jangka panjang.")
     with col_r2:
-        st.warning("**Rule 3: Stop Loss**\\nSelalu gunakan Stop Loss. Market tidak peduli dengan perasaanmu.")
-        st.error("**Rule 4: No Revenge Trading**\\nJika loss, berhenti sejenak. Jangan mencoba \'membalas\' market.")
+        st.warning("**Rule 3: Stop Loss**\nSelalu gunakan Stop Loss. Market tidak peduli dengan perasaanmu.")
+        st.error("**Rule 4: No Revenge Trading**\nJika loss, berhenti sejenak. Jangan mencoba 'membalas' market.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 elif menu_selection == "System Log":
-    st.markdown("<div class=\'glass-card\'>", unsafe_allow_html=True)
+    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
     st.subheader("📜 AeroVulpis System Log")
-    st.write("**v3.2 Ultimate Digital Edition (Current)**")
-    st.write("- 3D Neon UI & Glassmorphism Upgrade.")
-    st.write("- 10 Technical Indicators Implementation.")
-    st.write("- Weighted Signal Algorithm (Gauge Chart).")
-    st.write("- Multi-Asset Expansion (Forex, Crypto, Stocks, Indices).")
-    st.write("- Jakarta Timezone Synchronization.")
-    st.write("- Neural Link (Gemini 1.5 Flash) Integration.")
+    st.write("**v3.2 Ultimate Digital Edition (Fixed)**")
+    st.write("- Fixed SyntaxErrors in f-strings and quoting.")
+    st.write("- Removed Market Update widget to prevent recurring errors.")
+    st.write("- Expanded Multi-Asset List (Forex, Commodities, US & ID Stocks).")
+    st.write("- Implemented Line Chart with area gradient.")
+    st.write("- Optimized Gauge Chart with 5-zone technical analysis.")
+    st.write("- Neural Link (Gemini 1.5 Flash) Integration Fixed.")
     st.write("- Created by Fahmi.")
     st.markdown("</div>", unsafe_allow_html=True)
 

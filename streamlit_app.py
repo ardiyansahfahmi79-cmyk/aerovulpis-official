@@ -45,28 +45,28 @@ st.markdown("""
         -webkit-backdrop-filter: blur(12px);
         border: 1px solid var(--glass-border);
         border-radius: 15px;
-        padding: 20px;
+        padding: 15px; /* Dikurangi dari 20px */
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
-        margin-bottom: 20px;
+        margin-bottom: 5px; /* Dikurangi dari 10px */
     }
 
     .main-title-container {
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 5px; /* Dikurangi dari 10px */
     }
 
     .main-logo-container {
         position: relative;
         display: inline-block;
         animation: float 4s infinite ease-in-out;
-        padding: 20px 0;
+        padding: 5px 0; /* Dikurangi dari 10px */
         background: transparent !important;
         perspective: 1200px;
     }
 
     .custom-logo {
-        width: 180px;
-        filter: drop-shadow(0 0 10px var(--electric-blue));
+        width: 160px; /* Sedikit diperkecil */
+        filter: drop-shadow(0 0 15px var(--electric-blue));
         transition: all 0.5s ease;
         background-color: transparent !important;
         animation: smoothRotate3D 12s infinite cubic-bezier(0.45, 0.05, 0.55, 0.95);
@@ -75,7 +75,7 @@ st.markdown("""
 
     @keyframes float {
         0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-15px); }
+        50% { transform: translateY(-8px); }
     }
 
     @keyframes smoothRotate3D {
@@ -88,7 +88,7 @@ st.markdown("""
 
     .main-title {
         font-family: 'Orbitron', sans-serif;
-        font-size: 58px;
+        font-size: 42px; /* Sedikit diperkecil */
         font-weight: 700;
         background: linear-gradient(90deg, var(--electric-blue), var(--deep-blue));
         -webkit-background-clip: text;
@@ -113,16 +113,16 @@ st.markdown("""
         color: white !important;
         font-family: 'Orbitron', sans-serif !important;
         font-weight: 700 !important;
-        padding: 15px 30px !important;
+        padding: 8px 16px !important;
         border-radius: 10px !important;
         box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.4), -2px -2px 10px rgba(255, 255, 255, 0.1) !important;
         transition: all 0.3s ease !important;
         text-transform: uppercase;
-        letter-spacing: 2px;
+        letter-spacing: 1px;
     }
     
     .stButton>button:hover {
-        transform: translateY(-3px);
+        transform: translateY(-2px);
         box-shadow: 0 10px 20px rgba(0, 212, 255, 0.4) !important;
         filter: brightness(1.2);
     }
@@ -135,9 +135,23 @@ st.markdown("""
     .news-card {
         background: rgba(255, 255, 255, 0.03);
         border-left: 4px solid var(--electric-blue);
-        padding: 15px;
-        margin-bottom: 10px;
+        padding: 12px;
+        margin-bottom: 8px;
         border-radius: 0 10px 10px 0;
+    }
+
+    /* Menghapus padding berlebih di Streamlit */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 0.5rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
+
+    /* Menghapus gap antar elemen Streamlit */
+    div[data-testid="stVerticalBlock"] > div {
+        padding-top: 0rem !important;
+        padding-bottom: 0rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -343,11 +357,11 @@ def get_groq_response(question, context=""):
 
 # ====================== INSTRUMEN ======================
 instruments = {
-    "Forex": {"EUR/USD": "EURUSD=X", "GBP/USD": "GBPUSD=X", "USD/JPY": "USDJPY=X", "AUD/USD": "AUDUSD=X", "USD/CHF": "USDCHF=X", "NZD/USD": "NZDUSD=X"},
-    "Crypto": {"Bitcoin": "BTC-USD", "Ethereum": "ETH-USD", "Solana": "SOL-USD", "Binance Coin": "BNB-USD", "Ripple": "XRP-USD", "Cardano": "ADA-USD"},
-    "Indices": {"NASDAQ-100": "^IXIC", "S&P 500": "^GSPC", "Dow Jones": "^DJI", "DAX": "^GDAXI", "Nikkei 225": "^N225", "IHSG": "^JKSE"},
-    "Stocks (AS)": {"NVIDIA": "NVDA", "Apple": "AAPL", "Tesla": "TSLA", "Microsoft": "MSFT", "Amazon": "AMZN", "Alphabet": "GOOGL"},
-    "Stocks (ID)": {"BBRI": "BBRI.JK", "BBCA": "BBCA.JK", "TLKM": "TLKM.JK", "ASII": "ASII.JK", "BMRI": "BMRI.JK", "GOTO": "GOTO.JK"},
+    "Forex": {"EUR/USD": "EURUSD=X", "GBP/USD": "GBPUSD=X", "USD/JPY": "USDJPY=X", "AUD/USD": "AUDUSD=X", "USD/CHF": "USDCHF=X"},
+    "Crypto": {"Bitcoin": "BTC-USD", "Ethereum": "ETH-USD", "Solana": "SOL-USD", "Binance Coin": "BNB-USD", "Ripple": "XRP-USD"},
+    "Indices": {"NASDAQ-100": "^IXIC", "S&P 500": "^GSPC", "Dow Jones": "^DJI", "DAX": "^GDAXI", "IHSG": "^JKSE"},
+    "Stocks (AS)": {"NVIDIA": "NVDA", "Apple": "AAPL", "Tesla": "TSLA", "Microsoft": "MSFT", "Amazon": "AMZN"},
+    "Stocks (ID)": {"BBRI": "BBRI.JK", "BBCA": "BBCA.JK", "TLKM": "TLKM.JK", "ASII": "ASII.JK", "BMRI": "BMRI.JK"},
     "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver": "SI=F", "Crude Oil": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F"}
 }
 
@@ -355,18 +369,18 @@ instruments = {
 st.markdown("""
 <div class="main-title-container">
     <div class="main-logo-container">
-        <img src="https://i.ibb.co/sW1212c/Aero-Vulpis-Logo.png" alt="AeroVulpis Logo" class="custom-logo">
+        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png" alt="AeroVulpis Logo" class="custom-logo">
     </div>
     <h1 class="main-title">AEROVULPIS v3.3</h1>
-    <p style="text-align: center; color: #aaa; font-family: 'Rajdhani', sans-serif; margin-top: -10px;">ULTIMATE DIGITAL EDITION</p>
+    <p style="text-align: center; color: #aaa; font-family: 'Rajdhani', sans-serif; margin-top: -5px;">ULTIMATE DIGITAL EDITION</p>
 </div>
 """, unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
-    st.markdown("<div style='text-align:center;'><img src='https://i.ibb.co/sW1212c/Aero-Vulpis-Logo.png' alt='AeroVulpis Logo' style='width:100px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
-    st.markdown("<h2 class='digital-font' style='text-align:center;'>CONTROL CENTER</h2>", unsafe_allow_html=True)
-    st.markdown("<p class='rajdhani-font' style='text-align:center; color:#888;'>Digital Core v3.3 | Fahmi Edition</p>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:80px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
+    st.markdown("<h2 class='digital-font' style='text-align:center; font-size:18px;'>CONTROL CENTER</h2>", unsafe_allow_html=True)
+    st.markdown("<p class='rajdhani-font' style='text-align:center; color:#888; font-size:11px;'>Digital Core v3.3 | Fahmi Edition</p>", unsafe_allow_html=True)
 
     category = st.selectbox("Kategori Aset", list(instruments.keys()))
     asset_name = st.selectbox("Pilih Instrumen", list(instruments[category].keys()))
@@ -378,7 +392,10 @@ with st.sidebar:
         "1m (Live)": {"period": "1d", "interval": "1m"},
         "5m": {"period": "1d", "interval": "5m"},
         "15m": {"period": "1d", "interval": "15m"},
+        "30m": {"period": "5d", "interval": "30m"},
         "1h": {"period": "1mo", "interval": "1h"},
+        "3h": {"period": "1mo", "interval": "1h"},
+        "4h": {"period": "1mo", "interval": "1h"},
         "1D": {"period": "1y", "interval": "1d"},
         "1W": {"period": "2y", "interval": "1wk"}
     }
@@ -394,46 +411,32 @@ with st.sidebar:
         default_index=0,
         styles={
             "container": {"padding": "5!important", "background-color": "#0d1117"},
-            "icon": {"color": "var(--electric-blue)", "font-size": "20px"},
-            "nav-link": {"font-size": "16px", "text-align": "left", "margin": "0px", "--hover-color": "#0055ff"},
+            "icon": {"color": "var(--electric-blue)", "font-size": "16px"},
+            "nav-link": {"font-size": "13px", "text-align": "left", "margin": "0px", "--hover-color": "#0055ff"},
             "nav-link-selected": {"background-color": "var(--deep-blue)", "color": "white"},
         }
     )
 
 # ====================== FUNGSI MARKET NEWS ======================
 @st.cache_data(ttl=300) # Cache news for 5 minutes
-def get_news_data(query, max_articles=5):
+def get_news_data(query, max_articles=10):
     gnews_api_key = st.secrets.get("GNEWS_API_KEY") or os.getenv("GNEWS_API_KEY")
     if not gnews_api_key:
         return [], "⚠️ GNEWS_API_KEY tidak ditemukan. Fitur berita tidak aktif."
 
-    # Menggunakan bahasa Indonesia (id) dan negara Indonesia (id) untuk berita
     import urllib.parse
     encoded_query = urllib.parse.quote(query)
-    url = f"https://gnews.io/api/v4/search?q={encoded_query}&lang=id&country=id&max={max_articles}&token={gnews_api_key}"
+    url = f"https://gnews.io/api/v4/search?q={encoded_query}&lang=en&max={max_articles}&token={gnews_api_key}"
     
     try:
         response = requests.get(url)
-        response.raise_for_status() # Akan memunculkan HTTPError untuk status kode 4xx/5xx
+        response.raise_for_status()
         data = response.json()
         
         if data.get("totalArticles", 0) > 0:
             return data["articles"], None
         else:
-            return [], "Tidak ada berita terbaru ditemukan untuk query ini."
-    except requests.exceptions.HTTPError as http_err:
-        error_msg = f"HTTP error occurred: {http_err}"
-        if response.status_code == 403:
-            error_msg += ". Kemungkinan GNEWS_API_KEY tidak valid atau kuota habis."
-        elif response.status_code == 429:
-            error_msg += ". Terlalu banyak permintaan (Rate Limit). Coba lagi nanti."
-        return [], f"⚠️ Gagal mengambil berita: {error_msg}"
-    except requests.exceptions.ConnectionError as conn_err:
-        return [], f"⚠️ Gagal mengambil berita: Kesalahan koneksi internet: {conn_err}"
-    except requests.exceptions.Timeout as timeout_err:
-        return [], f"⚠️ Gagal mengambil berita: Permintaan timeout: {timeout_err}"
-    except requests.exceptions.RequestException as req_err:
-        return [], f"⚠️ Gagal mengambil berita: Kesalahan permintaan: {req_err}"
+            return [], "Tidak ada berita terbaru ditemukan untuk instrumen ini."
     except Exception as e:
         return [], f"⚠️ Gagal mengambil berita: {str(e)}"
 
@@ -444,43 +447,54 @@ if menu_selection == "Live Dashboard":
     df = get_historical_data(ticker_input, period, interval)
     
     if market and not df.empty:
+        if selected_tf_display in ["3h", "4h"]:
+            resample_rule = "3H" if selected_tf_display == "3h" else "4H"
+            df = df.resample(resample_rule).agg({
+                'Open': 'first',
+                'High': 'max',
+                'Low': 'min',
+                'Close': 'last',
+                'Volume': 'sum'
+            }).dropna()
+
         df = add_technical_indicators(df)
         
-        # Pastikan kolom yang dibutuhkan ada sebelum memanggil get_weighted_signal
         required_cols = ["RSI", "MACD", "Signal_Line", "SMA20", "SMA50", "SMA200", 
                          "BB_Upper", "BB_Lower", "Stoch_K", "Stoch_D", "ADX", "ATR", 
                          "Volume", "Vol_SMA", "EMA9"]
         if not all(col in df.columns for col in required_cols):
             st.warning("Data tidak cukup untuk menghitung semua indikator teknikal.")
-            score, signal, reasons = 50, "NETRAL", ["Data historis tidak lengkap untuk analisis mendalam."]
+            score, signal, reasons = 50, "NEUTRAL", ["Data historis tidak lengkap untuk analisis mendalam."]
         else:
             score, signal, reasons = get_weighted_signal(df)
         
         # Row 1: Metrics
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">HARGA LIVE</p><p class="digital-font" style="font-size:32px; margin:0;">{market["price"]:,.4f}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">HARGA LIVE</p><p class="digital-font" style="font-size:28px; margin:0;">{market["price"]:,.4f}</p></div>', unsafe_allow_html=True)
         with c2:
             color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">SINYAL</p><p class="digital-font" style="font-size:32px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">SINYAL</p><p class="digital-font" style="font-size:28px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
         with c3:
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">RSI (14)</p><p class="digital-font" style="font-size:32px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">RSI (14)</p><p class="digital-font" style="font-size:28px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>', unsafe_allow_html=True)
         with c4:
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">ATR (VOL)</p><p class="digital-font" style="font-size:32px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">ATR (VOL)</p><p class="digital-font" style="font-size:28px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
 
-        # Row 2: Dynamic Chart
+        # Row 2: Dynamic Line Chart
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         fig = go.Figure()
-        fig.add_trace(go.Candlestick(x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], name='Price'))
-        fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color='#00d4ff', width=1.5), name='SMA 50'))
-        fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color='#bc13fe', width=2), name='SMA 200'))
+        # Mengubah Candlestick menjadi Line Chart
+        fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))
+        fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color='#00d4ff', width=1.5, dash='dot'), name='SMA 50'))
+        fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color='#bc13fe', width=1.5, dash='dash'), name='SMA 200'))
         fig.update_layout(
             template="plotly_dark", 
-            height=650, 
+            height=450, # Diperkecil lagi
             xaxis_rangeslider_visible=False, 
             paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)', 
-            margin=dict(l=0, r=0, t=30, b=0)
+            margin=dict(l=0, r=0, t=20, b=0),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -488,10 +502,11 @@ if menu_selection == "Live Dashboard":
         # Row 3: Gauge & Analysis
         col_g, col_a = st.columns([1, 1])
         with col_g:
+            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             fig_gauge = go.Figure(go.Indicator(
                 mode = "gauge+number",
                 value = score,
-                title = {"text": "Technical Strength Index", "font": {"family": "Orbitron", "color": "#00d4ff", "size": 24}},
+                title = {"text": "Technical Strength Index", "font": {"family": "Orbitron", "color": "#00d4ff", "size": 18}},
                 gauge = {
                     "axis": {"range": [0, 100], "tickwidth": 2, "tickcolor": "#888"},
                     "bar": {"color": color},
@@ -507,35 +522,41 @@ if menu_selection == "Live Dashboard":
                     ],
                 }
             ))
-            fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={"color": "#e6edf3", "family": "Rajdhani"}, height=400)
+            fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={"color": "#e6edf3", "family": "Rajdhani"}, height=250, margin=dict(l=20, r=20, t=40, b=20))
             st.plotly_chart(fig_gauge, use_container_width=True)
+            
+            if st.button("🔄 REFRESH INDICATOR", use_container_width=True):
+                st.cache_data.clear()
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
         
         with col_a:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.subheader("🤖 AeroVulpis Analysis")
             for r in reasons:
                 st.write(f"✅ {r}")
-            if st.button("🤖 GENERATE DEEP AI ANALYSIS"):
+            if st.button("🤖 GENERATE DEEP AI ANALYSIS", use_container_width=True):
                 with st.spinner("AeroVulpis sedang merenungkan pasar..."):
                     context = f"Instrumen: {asset_name}, Harga: {market['price']}, RSI: {df['RSI'].iloc[-1]:.2f}, Sinyal: {signal}."
                     ai_anal = get_groq_response("Berikan analisis teknikal mendalam dan emosional untuk instrumen ini.", context)
                     st.info(ai_anal)
             st.markdown("</div>", unsafe_allow_html=True)
 
-        # Row 4: Refresh Button
-        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-        if st.button("🔄 REFRESH DIGITAL CORE"):
-            st.cache_data.clear()
-            st.rerun()
-        st.info("Sistem AeroVulpis melakukan sinkronisasi data setiap 60 detik secara otomatis.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
 elif menu_selection == "Signal Analysis":
     df = get_historical_data(ticker_input, period, interval)
     if not df.empty:
+        if selected_tf_display in ["3h", "4h"]:
+            resample_rule = "3H" if selected_tf_display == "3h" else "4H"
+            df = df.resample(resample_rule).agg({
+                'Open': 'first',
+                'High': 'max',
+                'Low': 'min',
+                'Close': 'last',
+                'Volume': 'sum'
+            }).dropna()
+
         df = add_technical_indicators(df)
         
-        # Pastikan kolom yang dibutuhkan ada sebelum memanggil get_weighted_signal
         required_cols = ["RSI", "MACD", "Signal_Line", "SMA20", "SMA50", "SMA200", 
                          "BB_Upper", "BB_Lower", "Stoch_K", "Stoch_D", "ADX", "ATR", 
                          "Volume", "Vol_SMA", "EMA9"]
@@ -543,8 +564,13 @@ elif menu_selection == "Signal Analysis":
             st.warning("Data tidak cukup untuk menghitung semua indikator teknikal.")
         else:
             latest = df.iloc[-1]
+            score, signal, reasons = get_weighted_signal(df)
+            
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.subheader("🛠️ 10-Indicator Technical Matrix")
+            
+            sig_color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
+            st.markdown(f"### Current Recommendation: <span style='color:{sig_color};'>{signal}</span>", unsafe_allow_html=True)
             
             cols = st.columns(5)
             indicators_list = [
@@ -564,7 +590,7 @@ elif menu_selection == "Signal Analysis":
             st.markdown("</div>", unsafe_allow_html=True)
 
 elif menu_selection == "Market History":
-    st.markdown(f'<h2 class="digital-font">📊 Market History ({selected_tf_display})</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">📊 Market History ({selected_tf_display})</h2>', unsafe_allow_html=True)
     market_data = get_market_data(ticker_input)
     if market_data:
         c1, c2, c3, c4 = st.columns(4)
@@ -575,34 +601,57 @@ elif menu_selection == "Market History":
         
     df_hist = get_historical_data(ticker_input, period=period, interval=interval)
     if not df_hist.empty:
+        if selected_tf_display in ["3h", "4h"]:
+            resample_rule = "3H" if selected_tf_display == "3h" else "4H"
+            df_hist = df_hist.resample(resample_rule).agg({
+                'Open': 'first',
+                'High': 'max',
+                'Low': 'min',
+                'Close': 'last',
+                'Volume': 'sum'
+            }).dropna()
+
         df_hist = df_hist.sort_index(ascending=False)
-        df_hist.index = df_hist.index.tz_localize(pytz.utc).tz_convert('Asia/Jakarta').strftime('%d %B %Y %H:%M')
+        if df_hist.index.tz is None:
+            df_hist.index = df_hist.index.tz_localize(pytz.utc).tz_convert('Asia/Jakarta')
+        else:
+            df_hist.index = df_hist.index.tz_convert('Asia/Jakarta')
+        
+        df_display = df_hist.copy()
+        df_display.index = df_display.index.strftime('%d %B %Y %H:%M')
+        
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.dataframe(df_hist[["Open", "High", "Low", "Close", "Volume"]].head(50), use_container_width=True)
+        st.dataframe(df_display[["Open", "High", "Low", "Close", "Volume"]].head(100), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 elif menu_selection == "Market News":
-    st.markdown('<h2 class="digital-font">📰 Market News</h2>', unsafe_allow_html=True)
-    news_query = f"{asset_name} {category} trading"
+    st.markdown('<h2 class="digital-font" style="font-size:24px;">📰 Market News</h2>', unsafe_allow_html=True)
+    news_query = f"{asset_name} market"
     articles, error_message = get_news_data(news_query, max_articles=10)
 
     if error_message:
         st.error(error_message)
     elif articles:
         for article in articles:
+            pub_date = article['publishedAt']
+            try:
+                formatted_date = datetime.strptime(pub_date, '%Y-%m-%dT%H:%M:%SZ').strftime('%d %B %Y %H:%M')
+            except:
+                formatted_date = pub_date
+                
             st.markdown(f"""
             <div class="news-card">
-                <h3 style="color:var(--electric-blue); margin-bottom:5px;">{article['title']}</h3>
-                <p style="font-size:14px; color:#ccc;">{article['description']}</p>
-                <p style="font-size:12px; color:#888;">Sumber: {article['source']['name']} | {datetime.strptime(article['publishedAt'], '%Y-%m-%dT%H:%M:%SZ').strftime('%d %B %Y %H:%M')}</p>
-                <a href="{article['url']}" target="_blank" style="color:var(--neon-green); text-decoration:none;">Baca Selengkapnya</a>
+                <h3 style="color:var(--electric-blue); margin-bottom:5px; font-size:16px;">{article['title']}</h3>
+                <p style="font-size:13px; color:#ccc;">{article['description'] or 'No description available.'}</p>
+                <p style="font-size:11px; color:#888;">Sumber: {article['source']['name']} | {formatted_date}</p>
+                <a href="{article['url']}" target="_blank" style="color:var(--neon-green); text-decoration:none; font-weight:bold; font-size:12px;">BACA SELENGKAPNYA →</a>
             </div>
             """, unsafe_allow_html=True)
     else:
         st.info("Tidak ada berita terbaru ditemukan untuk instrumen ini.")
 
 elif menu_selection == "Chatbot AI":
-    st.markdown('<h2 class="digital-font">🤖 AeroVulpis AI Assistant (Llama 3.3 70B)</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="digital-font" style="font-size:24px;">🤖 AeroVulpis AI Assistant</h2>', unsafe_allow_html=True)
     
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -617,16 +666,14 @@ elif menu_selection == "Chatbot AI":
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            # Ambil konteks harga terakhir untuk AI
             m_data = get_market_data(ticker_input)
             context_str = f"Instrumen: {ticker_display}, Harga: {m_data['price'] if m_data else 'N/A'}"
-            
             response = get_groq_response(prompt, context_str)
             st.markdown(response)
             st.session_state.messages.append({"role": "assistant", "content": response})
 
 elif menu_selection == "Risk Management":
-    st.markdown('<h2 class="digital-font">🛡️ Risk Management Protocol</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="digital-font" style="font-size:24px;">🛡️ Risk Management Protocol</h2>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
@@ -642,37 +689,26 @@ elif menu_selection == "Risk Management":
             pos_size = risk_amt / diff if diff > 0 else 0
             st.markdown(f"""
             <div class="glass-card" style="text-align:center;">
-                <p class="rajdhani-font">CALCULATED POSITION SIZE</p>
-                <h2 class="digital-font" style="color:#00d4ff;">{pos_size:,.2f} Units</h2>
-                <hr style="border-color:rgba(255,255,255,0.1);">
-                <p class="rajdhani-font">Risk Amount: <span style="color:#ff2a6d;">${risk_amt:,.2f}</span></p>
-                <p class="rajdhani-font">Reward (1:2): <span style="color:#00ff88;">${risk_amt*2:,.2f}</span></p>
+                <p class="rajdhani-font" style="font-size:14px;">CALCULATED POSITION SIZE</p>
+                <h2 class="digital-font" style="color:#00d4ff; font-size:24px;">{pos_size:,.2f} Units</h2>
+                <hr style="border-color:rgba(255,255,255,0.1); margin:10px 0;">
+                <p class="rajdhani-font" style="font-size:12px;">Risk Amount: <span style="color:#ff2a6d;">${risk_amt:,.2f}</span></p>
+                <p class="rajdhani-font" style="font-size:12px;">Reward (1:2): <span style="color:#00ff88;">${risk_amt*2:,.2f}</span></p>
             </div>
             """, unsafe_allow_html=True)
         else:
             st.info("Masukkan Entry Price dan Stop Loss untuk menghitung manajemen risiko.")
 
-elif menu_selection == "System Log":
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.subheader("📜 AeroVulpis System Log")
-    st.write("**v3.3 Ultimate Digital Edition (Current)**")
-    st.write("- Fixed GNews.io API integration and error handling.")
-    st.write("- Improved news display with more informative messages.")
-    st.write("- Added @st.cache_data for news fetching.")
-    st.write("- Enhanced UI/UX for a smoother experience.")
-    st.write("- Created by Fahmi.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
 # ====================== FOOTER ======================
-st.markdown("---")
 st.markdown("""
-<div style="text-align: center; padding: 20px; opacity: 0.8;">
-    <p class="rajdhani-font" style="font-style: italic; font-size: 18px; color: #ccc;">
+<div style="text-align: center; padding: 5px; opacity: 0.8;">
+    <hr style="border-color:rgba(255,255,255,0.1); margin:10px 0;">
+    <p class="rajdhani-font" style="font-style: italic; font-size: 14px; color: #ccc; margin:0;">
         "Disiplin adalah kunci, emosi adalah musuh. Tetap tenang dan percaya pada sistem."
     </p>
-    <p class="digital-font" style="font-size: 16px; color: #00ff88;">
+    <p class="digital-font" style="font-size: 12px; color: #00ff88; margin:0;">
         — Fahmi (Pencipta AeroVulpis)
     </p>
-    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v3.3 ULTIMATE • 2026</p>
+    <p style="font-size: 9px; color: #444; letter-spacing: 2px; margin:0;">DYNAMIHATCH IDENTITY • v3.3 ULTIMATE • 2026</p>
 </div>
 """, unsafe_allow_html=True)

@@ -11,6 +11,7 @@ import pytz
 import ta
 import time
 import requests # Import library requests
+from streamlit_option_menu import option_menu
 
 # Memuat variabel lingkungan dari file .env
 from dotenv import load_dotenv
@@ -22,7 +23,7 @@ st.set_page_config(layout="wide", page_title="AeroVulpis v3.3 Ultimate", page_ic
 # CSS untuk tampilan 3D Digital & Glassmorphism
 st.markdown("""
 <style>
-    @import url(\'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap\');
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
 
     :root {
         --neon-green: #00ff88;
@@ -86,7 +87,7 @@ st.markdown("""
     }
 
     .main-title {
-        font-family: \'Orbitron\', sans-serif;
+        font-family: 'Orbitron', sans-serif;
         font-size: 58px;
         font-weight: 700;
         background: linear-gradient(90deg, var(--electric-blue), var(--deep-blue));
@@ -97,20 +98,20 @@ st.markdown("""
     }
 
     .digital-font {
-        font-family: \'Orbitron\', sans-serif;
+        font-family: 'Orbitron', sans-serif;
         color: var(--neon-green);
         text-shadow: 0 0 10px var(--neon-green);
     }
 
     .rajdhani-font {
-        font-family: \'Rajdhani\', sans-serif;
+        font-family: 'Rajdhani', sans-serif;
     }
 
     .stButton>button {
         background: linear-gradient(145deg, #00d4ff, #0055ff) !important;
         border: none !important;
         color: white !important;
-        font-family: \'Orbitron\', sans-serif !important;
+        font-family: 'Orbitron', sans-serif !important;
         font-weight: 700 !important;
         padding: 15px 30px !important;
         border-radius: 10px !important;
@@ -256,6 +257,56 @@ def add_technical_indicators(df):
     
     return df
 
+def get_weighted_signal(df):
+    latest = df.iloc[-1]
+    score = 50
+    reasons = []
+    
+    # RSI Analysis
+    if latest["RSI"] < 30:
+        score += 15
+        reasons.append("RSI Oversold (Potensi Rebound)")
+    elif latest["RSI"] > 70:
+        score -= 15
+        reasons.append("RSI Overbought (Potensi Koreksi)")
+    
+    # MACD Analysis
+    if latest["MACD"] > latest["Signal_Line"]:
+        score += 10
+        reasons.append("MACD Bullish Crossover")
+    else:
+        score -= 10
+        reasons.append("MACD Bearish Crossover")
+        
+    # Trend Analysis (SMA)
+    if latest["Close"] > latest["SMA50"]:
+        score += 10
+        reasons.append("Harga di atas SMA 50 (Trend Bullish)")
+    else:
+        score -= 10
+        reasons.append("Harga di bawah SMA 50 (Trend Bearish)")
+        
+    if latest["Close"] > latest["SMA200"]:
+        score += 10
+        reasons.append("Harga di atas SMA 200 (Trend Jangka Panjang Bullish)")
+    else:
+        score -= 10
+        reasons.append("Harga di bawah SMA 200 (Trend Jangka Panjang Bearish)")
+
+    # Signal Determination
+    if score >= 70:
+        signal = "STRONG BUY"
+    elif score >= 60:
+        signal = "BUY"
+    elif score <= 30:
+        signal = "STRONG SELL"
+    elif score <= 40:
+        signal = "SELL"
+    else:
+        signal = "NEUTRAL"
+        
+    return score, signal, reasons
+
 # ====================== FUNGSI CHATBOT GROQ (v3.3 Ultimate) ======================
 def get_groq_response(question, context=""):
     if not client:
@@ -313,9 +364,9 @@ st.markdown("""
 
 # Sidebar
 with st.sidebar:
-    st.markdown("<div style=\'text-align:center;\'><img src=\'https://i.ibb.co/sW1212c/Aero-Vulpis-Logo.png\' alt=\'AeroVulpis Logo\' style=\'width:100px; filter:drop-shadow(0 0 8px var(--electric-blue));\'></div>", unsafe_allow_html=True)
-    st.markdown("<h2 class=\'digital-font\' style=\'text-align:center;\'>CONTROL CENTER</h2>", unsafe_allow_html=True)
-    st.markdown("<p class=\'rajdhani-font\' style=\'text-align:center; color:#888;\'>Digital Core v3.3 | Fahmi Edition</p>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center;'><img src='https://i.ibb.co/sW1212c/Aero-Vulpis-Logo.png' alt='AeroVulpis Logo' style='width:100px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
+    st.markdown("<h2 class='digital-font' style='text-align:center;'>CONTROL CENTER</h2>", unsafe_allow_html=True)
+    st.markdown("<p class='rajdhani-font' style='text-align:center; color:#888;'>Digital Core v3.3 | Fahmi Edition</p>", unsafe_allow_html=True)
 
     category = st.selectbox("Kategori Aset", list(instruments.keys()))
     asset_name = st.selectbox("Pilih Instrumen", list(instruments[category].keys()))
@@ -395,7 +446,7 @@ if menu_selection == "Live Dashboard":
         
         # Pastikan kolom yang dibutuhkan ada sebelum memanggil get_weighted_signal
         required_cols = ["RSI", "MACD", "Signal_Line", "SMA20", "SMA50", "SMA200", 
-                         "BB_High", "BB_Low", "Stoch_K", "Stoch_D", "ADX", "ATR", 
+                         "BB_Upper", "BB_Lower", "Stoch_K", "Stoch_D", "ADX", "ATR", 
                          "Volume", "Vol_SMA", "EMA9"]
         if not all(col in df.columns for col in required_cols):
             st.warning("Data tidak cukup untuk menghitung semua indikator teknikal.")
@@ -416,14 +467,19 @@ if menu_selection == "Live Dashboard":
             st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani;">ATR (VOL)</p><p class="digital-font" style="font-size:32px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
 
         # Row 2: Dynamic Chart
-        st.markdown("<div class=\'glass-card\'>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         fig = go.Figure()
-        fig.add_trace(go.Candlestick(x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], name=\'Price\'))
-        fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color=\'#00d4ff\', width=1.5), name=\'SMA 50\'))
-        fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color=\'#bc13fe\', width=2), name=\'SMA 200\'))
-        fig.update_layout(template="plotly_dark", height=650, xaxis_rangeslider_visible=False, paper_bgcolor=\'rgba(0,0,0,0)\
-', plot_bgcolor=\'rgba(0,0,0,0)\
-', margin=dict(l=0, r=0, t=30, b=0))
+        fig.add_trace(go.Candlestick(x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], name='Price'))
+        fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color='#00d4ff', width=1.5), name='SMA 50'))
+        fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color='#bc13fe', width=2), name='SMA 200'))
+        fig.update_layout(
+            template="plotly_dark", 
+            height=650, 
+            xaxis_rangeslider_visible=False, 
+            paper_bgcolor='rgba(0,0,0,0)', 
+            plot_bgcolor='rgba(0,0,0,0)', 
+            margin=dict(l=0, r=0, t=30, b=0)
+        )
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -453,18 +509,19 @@ if menu_selection == "Live Dashboard":
             st.plotly_chart(fig_gauge, use_container_width=True)
         
         with col_a:
-            st.markdown("<div class=\'glass-card\' style=\'height:400px; overflow-y:auto;\'>", unsafe_allow_html=True)
-            st.subheader("🤖 AeroVulpis Analysis")for r in reasons:
+            st.markdown("<div class='glass-card' style='height:400px; overflow-y:auto;'>", unsafe_allow_html=True)
+            st.subheader("🤖 AeroVulpis Analysis")
+            for r in reasons:
                 st.write(f"✅ {r}")
             if st.button("🤖 GENERATE DEEP AI ANALYSIS"):
                 with st.spinner("AeroVulpis sedang merenungkan pasar..."):
-                    context = f"Instrumen: {asset_name}, Harga: {market["price"]}, RSI: {df["RSI"].iloc[-1]:.2f}, Sinyal: {signal}."
+                    context = f"Instrumen: {asset_name}, Harga: {market['price']}, RSI: {df['RSI'].iloc[-1]:.2f}, Sinyal: {signal}."
                     ai_anal = get_groq_response("Berikan analisis teknikal mendalam dan emosional untuk instrumen ini.", context)
                     st.info(ai_anal)
             st.markdown("</div>", unsafe_allow_html=True)
 
         # Row 4: Refresh Button
-        st.markdown("<div class=\'glass-card\'>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         if st.button("🔄 REFRESH DIGITAL CORE"):
             st.cache_data.clear()
             st.rerun()
@@ -478,22 +535,22 @@ elif menu_selection == "Signal Analysis":
         
         # Pastikan kolom yang dibutuhkan ada sebelum memanggil get_weighted_signal
         required_cols = ["RSI", "MACD", "Signal_Line", "SMA20", "SMA50", "SMA200", 
-                         "BB_High", "BB_Low", "Stoch_K", "Stoch_D", "ADX", "ATR", 
+                         "BB_Upper", "BB_Lower", "Stoch_K", "Stoch_D", "ADX", "ATR", 
                          "Volume", "Vol_SMA", "EMA9"]
         if not all(col in df.columns for col in required_cols):
             st.warning("Data tidak cukup untuk menghitung semua indikator teknikal.")
         else:
             latest = df.iloc[-1]
-            st.markdown("<div class=\'glass-card\'>", unsafe_allow_html=True)
+            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.subheader("🛠️ 10-Indicator Technical Matrix")
             
             cols = st.columns(5)
             indicators_list = [
-                ("RSI (14)", f"{latest["RSI"]:.2f}"), ("MACD", f"{latest["MACD"]:.4f}"), 
-                ("SMA 20", f"{latest["SMA20"]:.2f}"), ("SMA 50", f"{latest["SMA50"]:.2f}"),
-                ("EMA 9", f"{latest["EMA9"]:.2f}"), ("SMA 200", f"{latest["SMA200"]:.2f}"), 
-                ("BB Upper", f"{latest["BB_Upper"]:.2f}"), ("BB Lower", f"{latest["BB_Lower"]:.2f}"),
-                ("Stoch K", f"{latest["Stoch_K"]:.2f}"), ("ADX", f"{latest["ADX"]:.2f}")
+                ("RSI (14)", f"{latest['RSI']:.2f}"), ("MACD", f"{latest['MACD']:.4f}"), 
+                ("SMA 20", f"{latest['SMA20']:.2f}"), ("SMA 50", f"{latest['SMA50']:.2f}"),
+                ("EMA 9", f"{latest['EMA9']:.2f}"), ("SMA 200", f"{latest['SMA200']:.2f}"), 
+                ("BB Upper", f"{latest['BB_Upper']:.2f}"), ("BB Lower", f"{latest['BB_Lower']:.2f}"),
+                ("Stoch K", f"{latest['Stoch_K']:.2f}"), ("ADX", f"{latest['ADX']:.2f}")
             ]
             
             for i, (name, val) in enumerate(indicators_list):
@@ -501,7 +558,7 @@ elif menu_selection == "Signal Analysis":
             
             st.markdown("---")
             st.write("**Volume Analysis:**")
-            st.metric("Current Volume", f"{latest["Volume"]:,}", f"{latest["Volume"] - latest["Vol_SMA"]:,.0f} vs Avg")
+            st.metric("Current Volume", f"{latest['Volume']:,}", f"{latest['Volume'] - latest['Vol_SMA']:,.0f} vs Avg")
             st.markdown("</div>", unsafe_allow_html=True)
 
 elif menu_selection == "Market History":
@@ -509,10 +566,10 @@ elif menu_selection == "Market History":
     market_data = get_market_data(ticker_input)
     if market_data:
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("OPEN", f"{market_data["open"]:,.4f}")
-        c2.metric("HIGH", f"{market_data["high"]:,.4f}")
-        c3.metric("LOW", f"{market_data["low"]:,.4f}")
-        c4.metric("CLOSE", f"{market_data["close"]:,.4f}")
+        c1.metric("OPEN", f"{market_data['open']:,.4f}")
+        c2.metric("HIGH", f"{market_data['high']:,.4f}")
+        c3.metric("LOW", f"{market_data['low']:,.4f}")
+        c4.metric("CLOSE", f"{market_data['close']:,.4f}")
         
     df_hist = get_historical_data(ticker_input, period=period, interval=interval)
     if not df_hist.empty:

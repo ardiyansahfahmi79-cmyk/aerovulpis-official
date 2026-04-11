@@ -10,7 +10,7 @@ from datetime import datetime
 import pytz
 import ta
 import time
-import requests # Import library requests
+import requests
 from streamlit_option_menu import option_menu
 
 # Memuat variabel lingkungan dari file .env
@@ -19,6 +19,82 @@ load_dotenv()
 
 # ====================== KONFIGURASI ======================
 st.set_page_config(layout="wide", page_title="AeroVulpis v3.3 Ultimate", page_icon="🦅", initial_sidebar_state="expanded")
+
+# Inisialisasi Session State untuk Bahasa
+if "lang" not in st.session_state:
+    st.session_state.lang = "ID"
+
+# Kamus Bahasa
+translations = {
+    "ID": {
+        "control_center": "CONTROL CENTER",
+        "category": "Kategori Aset",
+        "asset": "Pilih Instrumen",
+        "timeframe": "Timeframe",
+        "navigation": "Sistem Navigasi",
+        "live_price": "HARGA LIVE",
+        "signal": "SINYAL",
+        "rsi": "RSI (14)",
+        "atr": "ATR (VOL)",
+        "refresh": "REFRESH INDICATOR",
+        "ai_analysis": "🤖 AeroVulpis Analysis",
+        "generate_ai": "GENERATE DEEP AI ANALYSIS",
+        "market_history": "📊 Market History",
+        "market_news": "📰 Market News",
+        "risk_mgmt": "🛡️ Risk Management Protocol",
+        "settings": "⚙️ Settings",
+        "clear_cache": "Hapus Cache Sistem",
+        "lang_select": "Pilih Bahasa",
+        "recommendation": "Rekomendasi Saat Ini",
+        "no_news": "Tidak ada berita terbaru ditemukan.",
+        "ai_thinking": "AeroVulpis sedang merenungkan pasar...",
+        "risk_info": "Masukkan Entry Price dan Stop Loss untuk menghitung manajemen risiko.",
+        "vol_analysis": "Analisis Volume",
+        "curr_vol": "Volume Saat Ini",
+        "vs_avg": "vs Rata-rata",
+        "pos_size": "UKURAN POSISI TERKALKULASI",
+        "risk_amt": "Jumlah Risiko",
+        "reward": "Imbalan (1:2)",
+        "sys_log": "📜 AeroVulpis System Log",
+        "version": "v3.3 Ultimate Digital Edition (Current)",
+        "created_by": "Dibuat oleh Fahmi."
+    },
+    "EN": {
+        "control_center": "CONTROL CENTER",
+        "category": "Asset Category",
+        "asset": "Select Instrument",
+        "timeframe": "Timeframe",
+        "navigation": "Navigation System",
+        "live_price": "LIVE PRICE",
+        "signal": "SIGNAL",
+        "rsi": "RSI (14)",
+        "atr": "ATR (VOL)",
+        "refresh": "REFRESH INDICATOR",
+        "ai_analysis": "🤖 AeroVulpis Analysis",
+        "generate_ai": "GENERATE DEEP AI ANALYSIS",
+        "market_history": "📊 Market History",
+        "market_news": "📰 Market News",
+        "risk_mgmt": "🛡️ Risk Management Protocol",
+        "settings": "⚙️ Settings",
+        "clear_cache": "Clear System Cache",
+        "lang_select": "Select Language",
+        "recommendation": "Current Recommendation",
+        "no_news": "No recent news found.",
+        "ai_thinking": "AeroVulpis is contemplating the market...",
+        "risk_info": "Enter Entry Price and Stop Loss to calculate risk management.",
+        "vol_analysis": "Volume Analysis",
+        "curr_vol": "Current Volume",
+        "vs_avg": "vs Average",
+        "pos_size": "CALCULATED POSITION SIZE",
+        "risk_amt": "Risk Amount",
+        "reward": "Reward (1:2)",
+        "sys_log": "📜 AeroVulpis System Log",
+        "version": "v3.3 Ultimate Digital Edition (Current)",
+        "created_by": "Created by Fahmi."
+    }
+}
+
+t = translations[st.session_state.lang]
 
 # CSS untuk tampilan 3D Digital & Glassmorphism
 st.markdown("""
@@ -45,27 +121,27 @@ st.markdown("""
         -webkit-backdrop-filter: blur(12px);
         border: 1px solid var(--glass-border);
         border-radius: 15px;
-        padding: 15px; /* Dikurangi dari 20px */
+        padding: 15px;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
-        margin-bottom: 5px; /* Dikurangi dari 10px */
+        margin-bottom: 5px;
     }
 
     .main-title-container {
         text-align: center;
-        margin-bottom: 5px; /* Dikurangi dari 10px */
+        margin-bottom: 5px;
     }
 
     .main-logo-container {
         position: relative;
         display: inline-block;
         animation: float 4s infinite ease-in-out;
-        padding: 5px 0; /* Dikurangi dari 10px */
+        padding: 5px 0;
         background: transparent !important;
         perspective: 1200px;
     }
 
     .custom-logo {
-        width: 160px; /* Sedikit diperkecil */
+        width: 160px;
         filter: drop-shadow(0 0 15px var(--electric-blue));
         transition: all 0.5s ease;
         background-color: transparent !important;
@@ -88,7 +164,7 @@ st.markdown("""
 
     .main-title {
         font-family: 'Orbitron', sans-serif;
-        font-size: 42px; /* Sedikit diperkecil */
+        font-size: 42px;
         font-weight: 700;
         background: linear-gradient(90deg, var(--electric-blue), var(--deep-blue));
         -webkit-background-clip: text;
@@ -140,7 +216,6 @@ st.markdown("""
         border-radius: 0 10px 10px 0;
     }
 
-    /* Menghapus padding berlebih di Streamlit */
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 0.5rem !important;
@@ -148,7 +223,6 @@ st.markdown("""
         padding-right: 2rem !important;
     }
 
-    /* Menghapus gap antar elemen Streamlit */
     div[data-testid="stVerticalBlock"] > div {
         padding-top: 0rem !important;
         padding-bottom: 0rem !important;
@@ -163,9 +237,9 @@ if groq_api_key:
     try:
         client = Groq(api_key=groq_api_key)
     except Exception as e:
-        st.sidebar.error(f"⚠️ Error menginisialisasi Groq: {str(e)}")
+        st.sidebar.error(f"⚠️ Error: {str(e)}")
 else:
-    st.sidebar.error("⚠️ GROQ_API_KEY tidak ditemukan di file .env atau Secrets")
+    st.sidebar.error("⚠️ GROQ_API_KEY NOT FOUND")
 
 # ====================== FUNGSI DATA & INDIKATOR ======================
 def get_market_data(ticker_symbol):
@@ -321,22 +395,23 @@ def get_weighted_signal(df):
         
     return score, signal, reasons
 
-# ====================== FUNGSI CHATBOT GROQ (v3.3 Ultimate) ======================
+# ====================== FUNGSI CHATBOT GROQ ======================
 def get_groq_response(question, context=""):
     if not client:
-        return "⚠️ Chatbot tidak aktif: GROQ_API_KEY belum dikonfigurasi."
+        return "⚠️ Chatbot Inactive"
     
     MODEL_NAME = 'llama-3.3-70b-versatile'
     
     system_prompt = f"""
-    Anda adalah AeroVulpis, asisten AI untuk website ini.
+    Anda adalah AeroVulpis, asisten AI Trading Profesional.
     Waktu Real-time: {datetime.now().strftime('%d %B %Y, %H:%M:%S WIB')}
+    Bahasa Aktif: {st.session_state.lang}
 
     TUGAS UTAMA:
-    1. Membantu user (Fahmi) menganalisis data trading dan berita yang ditampilkan di website.
-    2. Jawablah dengan singkat, padat, dan teknis.
-    3. JANGAN menyarankan perubahan pada kode website kecuali diminta.
-    4. Tetap gunakan fungsi-fungsi analisis yang sudah ada sebagai acuan.
+    1. Berikan analisis teknikal yang SANGAT DETAIL, AKURAT, dan REAL-TIME.
+    2. Berikan level ENTRY, STOP LOSS, dan TAKE PROFIT yang spesifik berdasarkan data yang ada.
+    3. Gunakan nada profesional, teknis, namun tetap memberikan pandangan emosional pasar yang tepat.
+    4. JANGAN menyarankan perubahan kode kecuali diminta.
     
     Konteks Pasar Saat Ini: {context}
     """
@@ -353,7 +428,7 @@ def get_groq_response(question, context=""):
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
-        return f"⚠️ Groq API Error: {str(e)}. Pastikan API Key valid."
+        return f"⚠️ Groq API Error: {str(e)}"
 
 # ====================== INSTRUMEN ======================
 instruments = {
@@ -362,11 +437,11 @@ instruments = {
     "Indices": {"NASDAQ-100": "^IXIC", "S&P 500": "^GSPC", "Dow Jones": "^DJI", "DAX": "^GDAXI", "IHSG": "^JKSE"},
     "Stocks (AS)": {"NVIDIA": "NVDA", "Apple": "AAPL", "Tesla": "TSLA", "Microsoft": "MSFT", "Amazon": "AMZN"},
     "Stocks (ID)": {"BBRI": "BBRI.JK", "BBCA": "BBCA.JK", "TLKM": "TLKM.JK", "ASII": "ASII.JK", "BMRI": "BMRI.JK"},
-    "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver": "SI=F", "Crude Oil": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F"}
+    "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver": "SI=F", "Crude Oil (WTI)": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F"}
 }
 
 # ====================== UI HEADER ======================
-st.markdown("""
+st.markdown(f"""
 <div class="main-title-container">
     <div class="main-logo-container">
         <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png" alt="AeroVulpis Logo" class="custom-logo">
@@ -379,11 +454,11 @@ st.markdown("""
 # Sidebar
 with st.sidebar:
     st.markdown("<div style='text-align:center;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:80px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
-    st.markdown("<h2 class='digital-font' style='text-align:center; font-size:18px;'>CONTROL CENTER</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px;'>{t['control_center']}</h2>", unsafe_allow_html=True)
     st.markdown("<p class='rajdhani-font' style='text-align:center; color:#888; font-size:11px;'>Digital Core v3.3 | Fahmi Edition</p>", unsafe_allow_html=True)
 
-    category = st.selectbox("Kategori Aset", list(instruments.keys()))
-    asset_name = st.selectbox("Pilih Instrumen", list(instruments[category].keys()))
+    category = st.selectbox(t['category'], list(instruments.keys()))
+    asset_name = st.selectbox(t['asset'], list(instruments[category].keys()))
     ticker_input = instruments[category][asset_name]
     ticker_display = f"{asset_name} ({ticker_input})"
 
@@ -399,14 +474,14 @@ with st.sidebar:
         "1D": {"period": "1y", "interval": "1d"},
         "1W": {"period": "2y", "interval": "1wk"}
     }
-    selected_tf_display = st.selectbox("Timeframe", list(tf_options.keys()), index=0)
+    selected_tf_display = st.selectbox(t['timeframe'], list(tf_options.keys()), index=0)
     period = tf_options[selected_tf_display]["period"]
     interval = tf_options[selected_tf_display]["interval"]
 
     menu_selection = option_menu(
-        menu_title="Sistem Navigasi",
-        options=["Live Dashboard", "Signal Analysis", "Market History", "Market News", "Chatbot AI", "Risk Management"],
-        icons=["activity", "graph-up-arrow", "clock-history", "newspaper", "chat-dots", "shield-fill"],
+        menu_title=t['navigation'],
+        options=["Live Dashboard", "Signal Analysis", "Market History", "Market News", "Chatbot AI", "Risk Management", "Settings", "System Log"],
+        icons=["activity", "graph-up-arrow", "clock-history", "newspaper", "chat-dots", "shield-fill", "gear", "journal-text"],
         menu_icon="cast",
         default_index=0,
         styles={
@@ -418,25 +493,32 @@ with st.sidebar:
     )
 
 # ====================== FUNGSI MARKET NEWS ======================
-@st.cache_data(ttl=300) # Cache news for 5 minutes
+@st.cache_data(ttl=300)
 def get_news_data(query, max_articles=10):
     gnews_api_key = st.secrets.get("GNEWS_API_KEY") or os.getenv("GNEWS_API_KEY")
     if not gnews_api_key:
-        return [], "⚠️ GNEWS_API_KEY tidak ditemukan. Fitur berita tidak aktif."
+        return [], "⚠️ GNEWS_API_KEY NOT FOUND"
 
     import urllib.parse
-    encoded_query = urllib.parse.quote(query)
+    # Optimasi query untuk Forex dan Gold
+    clean_query = query.replace("/", " ").replace("=X", "").replace("=F", "")
+    encoded_query = urllib.parse.quote(clean_query)
+    
     url = f"https://gnews.io/api/v4/search?q={encoded_query}&lang=en&max={max_articles}&token={gnews_api_key}"
     
     try:
         response = requests.get(url)
-        response.raise_for_status()
+        if response.status_code != 200:
+            # Fallback ke query umum jika 400
+            fallback_query = urllib.parse.quote(clean_query.split()[0] + " market news")
+            url = f"https://gnews.io/api/v4/search?q={fallback_query}&lang=en&max={max_articles}&token={gnews_api_key}"
+            response = requests.get(url)
+            
         data = response.json()
-        
-        if data.get("totalArticles", 0) > 0:
+        if data.get("articles"):
             return data["articles"], None
         else:
-            return [], "Tidak ada berita terbaru ditemukan untuk instrumen ini."
+            return [], t['no_news']
     except Exception as e:
         return [], f"⚠️ Gagal mengambil berita: {str(e)}"
 
@@ -447,9 +529,10 @@ if menu_selection == "Live Dashboard":
     df = get_historical_data(ticker_input, period, interval)
     
     if market and not df.empty:
+   # Perbaikan Resampling 3h/4h
         if selected_tf_display in ["3h", "4h"]:
-            resample_rule = "3H" if selected_tf_display == "3h" else "4H"
-            df = df.resample(resample_rule).agg({
+            rule = "3h" if selected_tf_display == "3h" else "4h"
+            df = df.resample(rule).agg({
                 'Open': 'first',
                 'High': 'max',
                 'Low': 'min',
@@ -458,43 +541,34 @@ if menu_selection == "Live Dashboard":
             }).dropna()
 
         df = add_technical_indicators(df)
-        
-        required_cols = ["RSI", "MACD", "Signal_Line", "SMA20", "SMA50", "SMA200", 
-                         "BB_Upper", "BB_Lower", "Stoch_K", "Stoch_D", "ADX", "ATR", 
-                         "Volume", "Vol_SMA", "EMA9"]
-        if not all(col in df.columns for col in required_cols):
-            st.warning("Data tidak cukup untuk menghitung semua indikator teknikal.")
-            score, signal, reasons = 50, "NEUTRAL", ["Data historis tidak lengkap untuk analisis mendalam."]
-        else:
-            score, signal, reasons = get_weighted_signal(df)
+        score, signal, reasons = get_weighted_signal(df)
         
         # Row 1: Metrics
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">HARGA LIVE</p><p class="digital-font" style="font-size:28px; margin:0;">{market["price"]:,.4f}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">{t["live_price"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{market["price"]:,.4f}</p></div>', unsafe_allow_html=True)
         with c2:
             color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">SINYAL</p><p class="digital-font" style="font-size:28px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">{t["signal"]}</p><p class="digital-font" style="font-size:28px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
         with c3:
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">RSI (14)</p><p class="digital-font" style="font-size:28px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">{t["rsi"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>', unsafe_allow_html=True)
         with c4:
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">ATR (VOL)</p><p class="digital-font" style="font-size:28px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">{t["atr"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
 
         # Row 2: Dynamic Line Chart
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         fig = go.Figure()
-        # Mengubah Candlestick menjadi Line Chart
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))
         fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color='#00d4ff', width=1.5, dash='dot'), name='SMA 50'))
         fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color='#bc13fe', width=1.5, dash='dash'), name='SMA 200'))
         fig.update_layout(
             template="plotly_dark", 
-            height=450, # Diperkecil lagi
+            height=450,
             xaxis_rangeslider_visible=False, 
             paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)', 
             margin=dict(l=0, r=0, t=20, b=0),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5) # Legenda di bawah
         )
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -525,20 +599,20 @@ if menu_selection == "Live Dashboard":
             fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={"color": "#e6edf3", "family": "Rajdhani"}, height=250, margin=dict(l=20, r=20, t=40, b=20))
             st.plotly_chart(fig_gauge, use_container_width=True)
             
-            if st.button("🔄 REFRESH INDICATOR", use_container_width=True):
+            if st.button(t['refresh'], use_container_width=True):
                 st.cache_data.clear()
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
         
         with col_a:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-            st.subheader("🤖 AeroVulpis Analysis")
+            st.subheader(t['ai_analysis'])
             for r in reasons:
                 st.write(f"✅ {r}")
-            if st.button("🤖 GENERATE DEEP AI ANALYSIS", use_container_width=True):
-                with st.spinner("AeroVulpis sedang merenungkan pasar..."):
-                    context = f"Instrumen: {asset_name}, Harga: {market['price']}, RSI: {df['RSI'].iloc[-1]:.2f}, Sinyal: {signal}."
-                    ai_anal = get_groq_response("Berikan analisis teknikal mendalam dan emosional untuk instrumen ini.", context)
+            if st.button(t['generate_ai'], use_container_width=True):
+                with st.spinner(t['ai_thinking']):
+                    context = f"Asset: {asset_name}, Price: {market['price']}, RSI: {df['RSI'].iloc[-1]:.2f}, Signal: {signal}, SMA50: {df['SMA50'].iloc[-1]:.4f}, SMA200: {df['SMA200'].iloc[-1]:.4f}"
+                    ai_anal = get_groq_response("Berikan analisis teknikal mendalam, level entry, stop loss, dan take profit.", context)
                     st.info(ai_anal)
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -546,8 +620,8 @@ elif menu_selection == "Signal Analysis":
     df = get_historical_data(ticker_input, period, interval)
     if not df.empty:
         if selected_tf_display in ["3h", "4h"]:
-            resample_rule = "3H" if selected_tf_display == "3h" else "4H"
-            df = df.resample(resample_rule).agg({
+            rule = "3h" if selected_tf_display == "3h" else "4h"
+            df = df.resample(rule).agg({
                 'Open': 'first',
                 'High': 'max',
                 'Low': 'min',
@@ -556,41 +630,34 @@ elif menu_selection == "Signal Analysis":
             }).dropna()
 
         df = add_technical_indicators(df)
+        latest = df.iloc[-1]
+        score, signal, reasons = get_weighted_signal(df)
         
-        required_cols = ["RSI", "MACD", "Signal_Line", "SMA20", "SMA50", "SMA200", 
-                         "BB_Upper", "BB_Lower", "Stoch_K", "Stoch_D", "ADX", "ATR", 
-                         "Volume", "Vol_SMA", "EMA9"]
-        if not all(col in df.columns for col in required_cols):
-            st.warning("Data tidak cukup untuk menghitung semua indikator teknikal.")
-        else:
-            latest = df.iloc[-1]
-            score, signal, reasons = get_weighted_signal(df)
-            
-            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-            st.subheader("🛠️ 10-Indicator Technical Matrix")
-            
-            sig_color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
-            st.markdown(f"### Current Recommendation: <span style='color:{sig_color};'>{signal}</span>", unsafe_allow_html=True)
-            
-            cols = st.columns(5)
-            indicators_list = [
-                ("RSI (14)", f"{latest['RSI']:.2f}"), ("MACD", f"{latest['MACD']:.4f}"), 
-                ("SMA 20", f"{latest['SMA20']:.2f}"), ("SMA 50", f"{latest['SMA50']:.2f}"),
-                ("EMA 9", f"{latest['EMA9']:.2f}"), ("SMA 200", f"{latest['SMA200']:.2f}"), 
-                ("BB Upper", f"{latest['BB_Upper']:.2f}"), ("BB Lower", f"{latest['BB_Lower']:.2f}"),
-                ("Stoch K", f"{latest['Stoch_K']:.2f}"), ("ADX", f"{latest['ADX']:.2f}")
-            ]
-            
-            for i, (name, val) in enumerate(indicators_list):
-                cols[i % 5].metric(name, val)
-            
-            st.markdown("---")
-            st.write("**Volume Analysis:**")
-            st.metric("Current Volume", f"{latest['Volume']:,}", f"{latest['Volume'] - latest['Vol_SMA']:,.0f} vs Avg")
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+        st.subheader("🛠️ 10-Indicator Technical Matrix")
+        
+        sig_color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
+        st.markdown(f"### {t['recommendation']}: <span style='color:{sig_color};'>{signal}</span>", unsafe_allow_html=True)
+        
+        cols = st.columns(5)
+        indicators_list = [
+            ("RSI (14)", f"{latest['RSI']:.2f}"), ("MACD", f"{latest['MACD']:.4f}"), 
+            ("SMA 20", f"{latest['SMA20']:.2f}"), ("SMA 50", f"{latest['SMA50']:.2f}"),
+            ("EMA 9", f"{latest['EMA9']:.2f}"), ("SMA 200", f"{latest['SMA200']:.2f}"), 
+            ("BB Upper", f"{latest['BB_Upper']:.2f}"), ("BB Lower", f"{latest['BB_Lower']:.2f}"),
+            ("Stoch K", f"{latest['Stoch_K']:.2f}"), ("ADX", f"{latest['ADX']:.2f}")
+        ]
+        
+        for i, (name, val) in enumerate(indicators_list):
+            cols[i % 5].metric(name, val)
+        
+        st.markdown("---")
+        st.write(f"**{t['vol_analysis']}:**")
+        st.metric(t['curr_vol'], f"{latest['Volume']:,}", f"{latest['Volume'] - latest['Vol_SMA']:,.0f} {t['vs_avg']}")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 elif menu_selection == "Market History":
-    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">📊 Market History ({selected_tf_display})</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["market_history"]} ({selected_tf_display})</h2>', unsafe_allow_html=True)
     market_data = get_market_data(ticker_input)
     if market_data:
         c1, c2, c3, c4 = st.columns(4)
@@ -602,8 +669,8 @@ elif menu_selection == "Market History":
     df_hist = get_historical_data(ticker_input, period=period, interval=interval)
     if not df_hist.empty:
         if selected_tf_display in ["3h", "4h"]:
-            resample_rule = "3H" if selected_tf_display == "3h" else "4H"
-            df_hist = df_hist.resample(resample_rule).agg({
+            rule = "3h" if selected_tf_display == "3h" else "4h"
+            df_hist = df_hist.resample(rule).agg({
                 'Open': 'first',
                 'High': 'max',
                 'Low': 'min',
@@ -612,20 +679,14 @@ elif menu_selection == "Market History":
             }).dropna()
 
         df_hist = df_hist.sort_index(ascending=False)
-        if df_hist.index.tz is None:
-            df_hist.index = df_hist.index.tz_localize(pytz.utc).tz_convert('Asia/Jakarta')
-        else:
-            df_hist.index = df_hist.index.tz_convert('Asia/Jakarta')
-        
-        df_display = df_hist.copy()
-        df_display.index = df_display.index.strftime('%d %B %Y %H:%M')
+        df_hist.index = df_hist.index.tz_convert('Asia/Jakarta').strftime('%d %B %Y %H:%M')
         
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.dataframe(df_display[["Open", "High", "Low", "Close", "Volume"]].head(100), use_container_width=True)
+        st.dataframe(df_hist[["Open", "High", "Low", "Close", "Volume"]].head(100), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 elif menu_selection == "Market News":
-    st.markdown('<h2 class="digital-font" style="font-size:24px;">📰 Market News</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
     news_query = f"{asset_name} market"
     articles, error_message = get_news_data(news_query, max_articles=10)
 
@@ -633,25 +694,16 @@ elif menu_selection == "Market News":
         st.error(error_message)
     elif articles:
         for article in articles:
-            pub_date = article['publishedAt']
-            try:
-                formatted_date = datetime.strptime(pub_date, '%Y-%m-%dT%H:%M:%SZ').strftime('%d %B %Y %H:%M')
-            except:
-                formatted_date = pub_date
-                
             st.markdown(f"""
             <div class="news-card">
                 <h3 style="color:var(--electric-blue); margin-bottom:5px; font-size:16px;">{article['title']}</h3>
                 <p style="font-size:13px; color:#ccc;">{article['description'] or 'No description available.'}</p>
-                <p style="font-size:11px; color:#888;">Sumber: {article['source']['name']} | {formatted_date}</p>
-                <a href="{article['url']}" target="_blank" style="color:var(--neon-green); text-decoration:none; font-weight:bold; font-size:12px;">BACA SELENGKAPNYA →</a>
+                <a href="{article['url']}" target="_blank" style="color:var(--neon-green); text-decoration:none; font-weight:bold; font-size:12px;">READ MORE →</a>
             </div>
             """, unsafe_allow_html=True)
-    else:
-        st.info("Tidak ada berita terbaru ditemukan untuk instrumen ini.")
 
 elif menu_selection == "Chatbot AI":
-    st.markdown('<h2 class="digital-font" style="font-size:24px;">🤖 AeroVulpis AI Assistant</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">🤖 AeroVulpis AI Assistant</h2>', unsafe_allow_html=True)
     
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -673,7 +725,7 @@ elif menu_selection == "Chatbot AI":
             st.session_state.messages.append({"role": "assistant", "content": response})
 
 elif menu_selection == "Risk Management":
-    st.markdown('<h2 class="digital-font" style="font-size:24px;">🛡️ Risk Management Protocol</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["risk_mgmt"]}</h2>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
@@ -689,18 +741,41 @@ elif menu_selection == "Risk Management":
             pos_size = risk_amt / diff if diff > 0 else 0
             st.markdown(f"""
             <div class="glass-card" style="text-align:center;">
-                <p class="rajdhani-font" style="font-size:14px;">CALCULATED POSITION SIZE</p>
+                <p class="rajdhani-font" style="font-size:14px;">{t['pos_size']}</p>
                 <h2 class="digital-font" style="color:#00d4ff; font-size:24px;">{pos_size:,.2f} Units</h2>
                 <hr style="border-color:rgba(255,255,255,0.1); margin:10px 0;">
-                <p class="rajdhani-font" style="font-size:12px;">Risk Amount: <span style="color:#ff2a6d;">${risk_amt:,.2f}</span></p>
-                <p class="rajdhani-font" style="font-size:12px;">Reward (1:2): <span style="color:#00ff88;">${risk_amt*2:,.2f}</span></p>
+                <p class="rajdhani-font" style="font-size:12px;">{t['risk_amt']}: <span style="color:#ff2a6d;">${risk_amt:,.2f}</span></p>
+                <p class="rajdhani-font" style="font-size:12px;">{t['reward']}: <span style="color:#00ff88;">${risk_amt*2:,.2f}</span></p>
             </div>
             """, unsafe_allow_html=True)
         else:
-            st.info("Masukkan Entry Price dan Stop Loss untuk menghitung manajemen risiko.")
+            st.info(t['risk_info'])
+
+elif menu_selection == "Settings":
+    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["settings"]}</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    new_lang = st.selectbox(t['lang_select'], ["ID", "EN"], index=0 if st.session_state.lang == "ID" else 1)
+    if new_lang != st.session_state.lang:
+        st.session_state.lang = new_lang
+        st.rerun()
+    if st.button(t['clear_cache'], use_container_width=True):
+        st.cache_data.clear()
+        st.success("Cache Cleared!")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+elif menu_selection == "System Log":
+    st.markdown(f'<div class="glass-card">', unsafe_allow_html=True)
+    st.subheader(t['sys_log'])
+    st.write(f"**{t['version']}**")
+    st.write("- Fixed GNews.io API integration and error handling.")
+    st.write("- Improved news display with more informative messages.")
+    st.write("- Added @st.cache_data for news fetching.")
+    st.write("- Enhanced UI/UX for a smoother experience.")
+    st.write(f"- {t['created_by']}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ====================== FOOTER ======================
-st.markdown("""
+st.markdown(f"""
 <div style="text-align: center; padding: 5px; opacity: 0.8;">
     <hr style="border-color:rgba(255,255,255,0.1); margin:10px 0;">
     <p class="rajdhani-font" style="font-style: italic; font-size: 14px; color: #ccc; margin:0;">

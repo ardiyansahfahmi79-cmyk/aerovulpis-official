@@ -387,7 +387,7 @@ with st.sidebar:
     interval = tf_options[selected_tf_display]["interval"]
 
     menu_selection = option_menu(
-        menu_name="Sistem Navigasi",
+        menu_title="Sistem Navigasi",
         options=["Live Dashboard", "Signal Analysis", "Market History", "Market News", "Chatbot AI", "Risk Management"],
         icons=["activity", "graph-up-arrow", "clock-history", "newspaper", "chat-dots", "shield-fill"],
         menu_icon="cast",

@@ -408,7 +408,9 @@ def get_news_data(query, max_articles=5):
         return [], "⚠️ GNEWS_API_KEY tidak ditemukan. Fitur berita tidak aktif."
 
     # Menggunakan bahasa Indonesia (id) dan negara Indonesia (id) untuk berita
-    url = f"https://gnews.io/api/v4/search?q={query}&lang=id&country=id&max={max_articles}&token={gnews_api_key}"
+    import urllib.parse
+    encoded_query = urllib.parse.quote(query)
+    url = f"https://gnews.io/api/v4/search?q={encoded_query}&lang=id&country=id&max={max_articles}&token={gnews_api_key}"
     
     try:
         response = requests.get(url)
@@ -509,7 +511,7 @@ if menu_selection == "Live Dashboard":
             st.plotly_chart(fig_gauge, use_container_width=True)
         
         with col_a:
-            st.markdown("<div class='glass-card' style='height:400px; overflow-y:auto;'>", unsafe_allow_html=True)
+            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.subheader("🤖 AeroVulpis Analysis")
             for r in reasons:
                 st.write(f"✅ {r}")

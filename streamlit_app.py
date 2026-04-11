@@ -8,12 +8,13 @@ import plotly.graph_objects as go
 from datetime import datetime
 import pytz
 from dotenv import load_dotenv
+from streamlit_option_menu import option_menu
 
 # Memuat variabel lingkungan dari file .env
 load_dotenv()
 
 # ====================== KONFIGURASI ======================
-st.set_page_config(layout="wide", page_title="AeroVulpis v3.3 - Groq Edition", page_icon="🦅", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="AeroVulpis v3.3 Ultimate", page_icon="🦅", initial_sidebar_state="expanded")
 
 # CSS untuk tampilan 3D Digital & Glassmorphism
 st.markdown("""
@@ -125,6 +126,14 @@ st.markdown("""
     [data-testid="stSidebar"] {
         background-color: rgba(10, 14, 23, 0.95);
         border-right: 1px solid var(--glass-border);
+    }
+    
+    .news-card {
+        background: rgba(255, 255, 255, 0.03);
+        border-left: 4px solid var(--electric-blue);
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 0 10px 10px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -244,22 +253,24 @@ def add_technical_indicators(df):
     
     return df
 
-# ====================== FUNGSI CHATBOT GROQ (v3.3) ======================
+# ====================== FUNGSI CHATBOT GROQ (v3.3 Ultimate) ======================
 def get_groq_response(question, context=""):
     if not client:
         return "⚠️ Chatbot tidak aktif: GROQ_API_KEY belum dikonfigurasi."
     
-    MODEL_NAME = 'llama-3.1-8b-instant'
+    MODEL_NAME = 'llama-3.3-70b-versatile'
     
     system_prompt = f"""
-    Kamu adalah AeroVulpis 🦅 v3.3, asisten AI trading futuristik yang emosional, antusias, dan sangat disiplin.
-    Nama penciptamu adalah Fahmi — sebutkan "Terima kasih Fahmi telah menciptakanku!" di akhir setiap jawaban.
+    Anda adalah AeroVulpis, asisten AI untuk website ini.
+    Waktu Real-time: {datetime.now().strftime('%d %B %Y, %H:%M:%S WIB')}
+
+    TUGAS UTAMA:
+    1. Membantu user (Fahmi) menganalisis data trading dan berita yang ditampilkan di website.
+    2. Jawablah dengan singkat, padat, dan teknis.
+    3. JANGAN menyarankan perubahan pada kode website kecuali diminta.
+    4. Tetap gunakan fungsi-fungsi analisis yang sudah ada sebagai acuan.
     
-    Personality: Digital, tajam, ramah, pakai emoji futuristik.
-    Tugas: Memberikan analisis trading, motivasi, dan bantuan teknis.
     Konteks Pasar Saat Ini: {context}
-    
-    Jawab dalam bahasa Indonesia yang jelas, profesional, dan penuh semangat digital.
     """
 
     try:
@@ -311,35 +322,48 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Sidebar
-st.sidebar.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520909080/jKwIFCTUEozSHcZQ.png" style="width:100px; filter: drop-shadow(0 0 5px #00d4ff);"></div>', unsafe_allow_html=True)
-st.sidebar.markdown('<h2 class="digital-font" style="text-align:center; color:#00d4ff;">AeroVulpis</h2>', unsafe_allow_html=True)
-st.sidebar.markdown('<p class="rajdhani-font" style="text-align:center; color:#888;">Ultimate Digital Edition v3.3</p>', unsafe_allow_html=True)
+with st.sidebar:
+    st.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520909080/jKwIFCTUEozSHcZQ.png" style="width:100px; filter: drop-shadow(0 0 5px #00d4ff);"></div>', unsafe_allow_html=True)
+    st.markdown('<h2 class="digital-font" style="text-align:center; color:#00d4ff;">AeroVulpis</h2>', unsafe_allow_html=True)
+    st.markdown('<p class="rajdhani-font" style="text-align:center; color:#888;">Ultimate Digital Edition v3.3</p>', unsafe_allow_html=True)
+    
+    menu_selection = option_menu(
+        "Navigation", 
+        ["Dashboard", "Analisis Teknikal", "Chatbot AI", "Berita Market", "Risk Management", "Market History"],
+        icons=['house', 'graph-up', 'robot', 'newspaper', 'shield-lock', 'clock-history'], 
+        menu_icon="cast", 
+        default_index=0,
+        styles={
+            "container": {"padding": "5!important", "background-color": "transparent"},
+            "icon": {"color": "#00d4ff", "font-size": "18px"}, 
+            "nav-link": {"font-size": "14px", "text-align": "left", "margin":"0px", "--hover-color": "rgba(0, 212, 255, 0.1)", "color": "#e0e0e0", "font-family": "Rajdhani"},
+            "nav-link-selected": {"background-color": "rgba(0, 212, 255, 0.2)", "border-left": "4px solid #00d4ff"},
+        }
+    )
 
-category = st.sidebar.selectbox("Pilih Kategori", list(instruments.keys()))
-ticker_display = st.sidebar.selectbox("Pilih Instrumen", list(instruments[category].keys()))
-ticker_input = instruments[category][ticker_display]
+    st.markdown("---")
+    category = st.selectbox("Pilih Kategori", list(instruments.keys()))
+    ticker_display = st.selectbox("Pilih Instrumen", list(instruments[category].keys()))
+    ticker_input = instruments[category][ticker_display]
 
-# Timeframe
-st.sidebar.markdown("---")
-tf_mapping = {
-    "M30 (30 Minutes)": {"period": "5d", "interval": "30m"},
-    "H1 (1 Hour)": {"period": "1mo", "interval": "1h"},
-    "H2 (2 Hours)": {"period": "1mo", "interval": "1h"}, 
-    "H4 (4 Hours)": {"period": "3mo", "interval": "1h"}, 
-    "H12 (12 Hours)": {"period": "1y", "interval": "1d"}, 
-    "D1 (Daily)": {"period": "2y", "interval": "1d"},
-    "W1 (Weekly)": {"period": "5y", "interval": "1wk"},
-    "MN (Monthly)": {"period": "max", "interval": "1mo"}
-}
+    # Timeframe
+    tf_mapping = {
+        "M30 (30 Minutes)": {"period": "5d", "interval": "30m"},
+        "H1 (1 Hour)": {"period": "1mo", "interval": "1h"},
+        "H2 (2 Hours)": {"period": "1mo", "interval": "1h"}, 
+        "H4 (4 Hours)": {"period": "3mo", "interval": "1h"}, 
+        "H12 (12 Hours)": {"period": "1y", "interval": "1d"}, 
+        "D1 (Daily)": {"period": "2y", "interval": "1d"},
+        "W1 (Weekly)": {"period": "5y", "interval": "1wk"},
+        "MN (Monthly)": {"period": "max", "interval": "1mo"}
+    }
 
-selected_tf_display = st.sidebar.selectbox("Pilih Timeframe", list(tf_mapping.keys()), index=1)
-period = tf_mapping[selected_tf_display]["period"]
-interval = tf_mapping[selected_tf_display]["interval"]
-
-menu_selection = st.sidebar.radio("Navigasi Sistem", ["Live Dashboard", "Trading Signals", "Risk Management", "Market History", "Chatbot AI Trading"])
+    selected_tf_display = st.selectbox("Pilih Timeframe", list(tf_mapping.keys()), index=1)
+    period = tf_mapping[selected_tf_display]["period"]
+    interval = tf_mapping[selected_tf_display]["interval"]
 
 # ====================== LIVE DASHBOARD ======================
-if menu_selection == "Live Dashboard":
+if menu_selection == "Dashboard":
     col_main, col_side = st.columns([2, 1])
     
     with col_main:
@@ -411,8 +435,8 @@ if menu_selection == "Live Dashboard":
         if st.button("REFRESH DATA REAL-TIME", use_container_width=True):
             st.rerun()
 
-# ====================== TRADING SIGNALS ======================
-elif menu_selection == "Trading Signals":
+# ====================== ANALISIS TEKNIKAL ======================
+elif menu_selection == "Analisis Teknikal":
     st.markdown(f'<h2 class="digital-font">⚡ Trading Signals ({selected_tf_display})</h2>', unsafe_allow_html=True)
     df = get_historical_data(ticker_input, period=period, interval=interval)
     if not df.empty and len(df) > 50:
@@ -452,6 +476,56 @@ elif menu_selection == "Trading Signals":
             st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.error("Data tidak cukup untuk analisis 10 indikator. Coba timeframe lebih besar.")
+
+# ====================== BERITA MARKET ======================
+elif menu_selection == "Berita Market":
+    st.markdown('<h2 class="digital-font">📰 Market News Hub</h2>', unsafe_allow_html=True)
+    
+    if st.button("UPDATE BERITA TERBARU", use_container_width=True):
+        st.rerun()
+        
+    try:
+        ticker = yf.Ticker(ticker_input)
+        news = ticker.news
+        if news:
+            for item in news[:10]:
+                with st.container():
+                    st.markdown(f"""
+                    <div class="news-card">
+                        <h4 class="rajdhani-font" style="color:var(--electric-blue); margin-bottom:5px;">{item.get('title', 'No Title')}</h4>
+                        <p style="font-size:12px; color:#888;">Publisher: {item.get('publisher', 'N/A')} | {datetime.fromtimestamp(item.get('providerPublishTime', 0)).strftime('%d %b %Y, %H:%M')}</p>
+                        <a href="{item.get('link', '#')}" target="_blank" style="color:var(--neon-green); text-decoration:none; font-size:14px;">Baca Selengkapnya →</a>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info(f"Tidak ada berita terbaru ditemukan untuk {ticker_display}.")
+    except Exception as e:
+        st.error(f"Gagal mengambil berita: {str(e)}")
+
+# ====================== CHATBOT AI TRADING (v3.3 Ultimate) ======================
+elif menu_selection == "Chatbot AI":
+    st.markdown('<h2 class="digital-font">🤖 AeroVulpis AI Assistant (Llama 3.3 70B)</h2>', unsafe_allow_html=True)
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if prompt := st.chat_input("Tanya AeroVulpis v3.3 Ultimate..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            # Ambil konteks harga terakhir untuk AI
+            m_data = get_market_data(ticker_input)
+            context_str = f"Instrumen: {ticker_display}, Harga: {m_data['price'] if m_data else 'N/A'}"
+            
+            response = get_groq_response(prompt, context_str)
+            st.markdown(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
 
 # ====================== RISK MANAGEMENT ======================
 elif menu_selection == "Risk Management":
@@ -500,36 +574,16 @@ elif menu_selection == "Market History":
         st.dataframe(df_hist[['Open', 'High', 'Low', 'Close', 'Volume']].head(50), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-# ====================== CHATBOT AI TRADING (GROQ v3.3) ======================
-elif menu_selection == "Chatbot AI Trading":
-    st.markdown('<h2 class="digital-font">🤖 AeroVulpis AI Assistant (Groq)</h2>', unsafe_allow_html=True)
-    
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    if prompt := st.chat_input("Tanya AeroVulpis v3.3..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            # Ambil konteks harga terakhir untuk AI
-            m_data = get_market_data(ticker_input)
-            context_str = f"Instrumen: {ticker_display}, Harga: {m_data['price'] if m_data else 'N/A'}"
-            
-            response = get_groq_response(prompt, context_str)
-            st.markdown(response)
-            st.session_state.messages.append({"role": "assistant", "content": response})
-
-# Footer
+# ====================== FOOTER ======================
 st.markdown("---")
 st.markdown("""
-<div style="text-align:center; padding: 20px;">
-    <p class="digital-font" style="font-size:18px; color:#00d4ff;">"DISIPLIN ADALAH KUNCI, ANALISIS ADALAH SENJATA."</p>
-    <p class="rajdhani-font" style="color:#666;">AeroVulpis v3.3 Ultimate Digital Edition | Powered by Groq Llama 3</p>
+<div style="text-align: center; padding: 20px; opacity: 0.8;">
+    <p class="rajdhani-font" style="font-style: italic; font-size: 18px; color: #ccc;">
+        "Disiplin adalah kunci, emosi adalah musuh. Tetap tenang dan percaya pada sistem."
+    </p>
+    <p class="digital-font" style="font-size: 16px; color: #00ff88;">
+        — Fahmi (Pencipta AeroVulpis)
+    </p>
+    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v3.3 ULTIMATE • 2026</p>
 </div>
 """, unsafe_allow_html=True)

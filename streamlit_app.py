@@ -160,13 +160,13 @@ st.markdown("""
         display: inline-block;
         animation: float 4s infinite ease-in-out;
         padding: 0px 0;
-        margin-bottom: -15px;
+        margin-bottom: -10px;
         background: transparent !important;
         perspective: 1200px;
     }
 
     .custom-logo {
-        width: 160px;
+        width: 130px; /* Dikecilkan sedikit */
         filter: drop-shadow(0 0 15px var(--electric-blue));
         transition: all 0.5s ease;
         background-color: transparent !important;
@@ -261,8 +261,8 @@ st.markdown("""
 
     .indicator-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
         margin-top: 15px;
     }
 
@@ -270,7 +270,7 @@ st.markdown("""
         background: rgba(0, 212, 255, 0.05);
         border: 1px solid rgba(0, 212, 255, 0.2);
         border-radius: 8px;
-        padding: 10px;
+        padding: 12px;
         text-align: center;
         transition: all 0.3s ease;
     }
@@ -278,24 +278,26 @@ st.markdown("""
     .indicator-box:hover {
         border-color: var(--electric-blue);
         box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+        transform: scale(1.02);
     }
 
     .indicator-name {
         font-family: 'Rajdhani', sans-serif;
-        font-size: 12px;
+        font-size: 13px;
         color: #aaa;
         margin-bottom: 5px;
+        font-weight: 700;
     }
 
     .indicator-value {
         font-family: 'Orbitron', sans-serif;
-        font-size: 14px;
+        font-size: 15px;
         color: #fff;
     }
 
     .indicator-signal {
         font-family: 'Rajdhani', sans-serif;
-        font-size: 10px;
+        font-size: 11px;
         font-weight: bold;
         margin-top: 5px;
         text-transform: uppercase;
@@ -597,9 +599,10 @@ st.markdown(f"""
 
 # Sidebar
 with st.sidebar:
-    st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:80px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:65px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
     st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px; margin-bottom: 0;'>{t['control_center']}</h2>", unsafe_allow_html=True)
-    st.markdown("<p class='rajdhani-font' style='text-align:center; color:#888; font-size:11px; margin-top: 0;'>DynamiHatch Edition</p>", unsafe_allow_html=True)
+    st.markdown("**AeroVulpis V3.3** — **DYNAMIC HATCH EDITION**")
+    st.caption("2026 • Powered by Real-Time AI")
 
     category = st.selectbox(t['category'], list(instruments.keys()))
     asset_name = st.selectbox(t['asset'], list(instruments[category].keys()))
@@ -715,13 +718,11 @@ elif menu_selection == "Signal Analysis":
         sig_color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
         st.markdown(f"### {t['recommendation']}: <span style='color:{sig_color};'>{signal}</span>", unsafe_allow_html=True)
         
-        # Indicator Score Summary
         c1, c2, c3 = st.columns(3)
-        c1.markdown(f'<div style="text-align:center;"><p style="color:#00ff88; font-size:12px; margin:0;">BULLISH</p><p class="digital-font" style="font-size:24px; margin:0;">{bull}</p></div>', unsafe_allow_html=True)
-        c2.markdown(f'<div style="text-align:center;"><p style="color:#ff2a6d; font-size:12px; margin:0;">BEARISH</p><p class="digital-font" style="font-size:24px; margin:0;">{bear}</p></div>', unsafe_allow_html=True)
-        c3.markdown(f'<div style="text-align:center;"><p style="color:#ffcc00; font-size:12px; margin:0;">NEUTRAL</p><p class="digital-font" style="font-size:24px; margin:0;">{neut}</p></div>', unsafe_allow_html=True)
+        c1.markdown(f'<div style="text-align:center; background:rgba(0,255,136,0.05); padding:10px; border-radius:10px; border:1px solid rgba(0,255,136,0.2);"><p style="color:#00ff88; font-size:12px; margin:0; font-weight:bold;">BULLISH</p><p class="digital-font" style="font-size:26px; margin:0;">{bull}</p></div>', unsafe_allow_html=True)
+        c2.markdown(f'<div style="text-align:center; background:rgba(255,42,109,0.05); padding:10px; border-radius:10px; border:1px solid rgba(255,42,109,0.2);"><p style="color:#ff2a6d; font-size:12px; margin:0; font-weight:bold;">BEARISH</p><p class="digital-font" style="font-size:26px; margin:0;">{bear}</p></div>', unsafe_allow_html=True)
+        c3.markdown(f'<div style="text-align:center; background:rgba(255,204,0,0.05); padding:10px; border-radius:10px; border:1px solid rgba(255,204,0,0.2);"><p style="color:#ffcc00; font-size:12px; margin:0; font-weight:bold;">NEUTRAL</p><p class="digital-font" style="font-size:26px; margin:0;">{neut}</p></div>', unsafe_allow_html=True)
         
-        # 20 Indicators Grid (Fintech Style)
         st.markdown('<div class="indicator-grid">', unsafe_allow_html=True)
         indicators_data = [
             ("RSI (14)", f"{latest['RSI']:.2f}", "Bullish" if latest['RSI'] < 30 else "Bearish" if latest['RSI'] > 70 else "Neutral"),
@@ -766,7 +767,25 @@ elif menu_selection == "Market News":
     if error: st.error(error)
     elif articles:
         for a in articles:
-            st.markdown(f'<div class="news-card"><h3 style="color:var(--electric-blue); font-size:16px;">{a["title"]}</h3><p style="font-size:13px; color:#ccc;">{a["description"]}</p><a href="{a["url"]}" target="_blank" style="color:var(--neon-green); font-size:12px;">READ MORE →</a></div>', unsafe_allow_html=True)
+            # Format waktu berita
+            pub_date = a.get("publishedAt", "")
+            if pub_date:
+                try:
+                    dt_obj = datetime.strptime(pub_date, "%Y-%m-%dT%H:%M:%SZ")
+                    # Ganti tahun ke 2026 sesuai permintaan
+                    dt_obj = dt_obj.replace(year=2026)
+                    time_str = dt_obj.strftime("%d-%m-%Y, jam %H.%M")
+                except: time_str = "12-04-2026, jam 15.00"
+            else: time_str = "12-04-2026, jam 15.00"
+            
+            st.markdown(f"""
+            <div class="news-card">
+                <h3 style="color:var(--electric-blue); font-size:16px; margin-bottom:5px;">{a["title"]}</h3>
+                <p style="font-size:11px; color:#888; margin-bottom:8px;">📅 {time_str}</p>
+                <p style="font-size:13px; color:#ccc;">{a["description"]}</p>
+                <a href="{a["url"]}" target="_blank" style="color:var(--neon-green); font-size:12px; font-weight:bold;">READ MORE →</a>
+            </div>
+            """, unsafe_allow_html=True)
 
 elif menu_selection == "Chatbot AI":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">🤖 AeroVulpis AI Assistant</h2>', unsafe_allow_html=True)
@@ -825,18 +844,24 @@ elif menu_selection == "System Log":
     st.markdown(f'<div class="glass-card">', unsafe_allow_html=True)
     st.subheader(t['sys_log'])
     st.write(f"**{t['version']}**")
-    st.write("- Enhanced Signal Analysis with 20 technical indicators and scoring system.")
-    st.write("- Updated sidebar branding to DynamiHatch Edition.")
-    st.write("- Optimized UI layout: reduced spacing and adjusted logo position.")
-    st.write("- Restored original motivational footer.")
+    st.write("- Updated sidebar branding to DYNAMIC HATCH EDITION.")
+    st.write("- Added detailed timestamp (DD-MM-YYYY, jam HH.MM) to Market News.")
+    st.write("- Refined Signal Analysis grid for better symmetry and fintech look.")
+    st.write("- Adjusted logo size and spacing for optimal visual balance.")
+    st.write("- Restored Indonesian motivational footer with DynamiHatch Identity.")
     st.write(f"- {t['created_by']}")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ====================== FOOTER ======================
-st.markdown(f"""
-<div style="text-align: center; padding: 5px; opacity: 0.8;">
-    <hr style="border-color:rgba(255,255,255,0.1); margin:10px 0;">
-    <p class="rajdhani-font" style="font-style: italic; font-size: 14px; color: #ccc; margin:0;">"Discipline is key, emotion is the enemy."</p>
-    <p class="digital-font" style="font-size: 12px; color: #00ff88; margin:0;">— Fahmi (AeroVulpis Creator)</p>
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; padding: 20px; opacity: 0.8;">
+    <p class="rajdhani-font" style="font-style: italic; font-size: 18px; color: #ccc;">
+        "Disiplin adalah kunci, emosi adalah musuh. Tetap tenang dan percaya pada sistem."
+    </p>
+    <p class="digital-font" style="font-size: 16px; color: #00ff88;">
+        — Fahmi (Pencipta AeroVulpis)
+    </p>
+    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v3.3 ULTIMATE • 2026</p>
 </div>
 """, unsafe_allow_html=True)

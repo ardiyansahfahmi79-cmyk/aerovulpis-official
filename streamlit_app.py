@@ -137,7 +137,6 @@ st.markdown("""
     .session-card {
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
         padding: 15px;
         margin-bottom: 10px;
         transition: all 0.3s ease;
@@ -158,14 +157,15 @@ st.markdown("""
         position: relative;
         display: inline-block;
         animation: float 4s infinite ease-in-out;
-        padding: 20px 0; /* Ditambah padding agar logo tidak terpotong */
-        margin-bottom: -10px;
+        padding: 10px 0; /* Padding dikecilkan */
+        margin-bottom: -15px; /* Margin diperbesar agar judul lebih dekat */
         background: transparent !important;
         perspective: 1200px;
+        overflow: visible !important; /* Mencegah logo terpotong */
     }
 
     .custom-logo {
-        width: 90px; /* Dikecilkan lagi agar lebih rapi */
+        width: 100px; /* Ukuran disesuaikan agar proporsional */
         filter: drop-shadow(0 0 15px var(--electric-blue));
         transition: all 0.5s ease;
         background-color: transparent !important;
@@ -188,7 +188,7 @@ st.markdown("""
 
     .main-title {
         font-family: 'Orbitron', sans-serif;
-        font-size: 32px; /* Dikecilkan dari 42px */
+        font-size: 32px;
         font-weight: 700;
         background: linear-gradient(90deg, var(--electric-blue), var(--deep-blue));
         -webkit-background-clip: text;
@@ -247,7 +247,6 @@ st.markdown("""
     }
 
     .block-container {
-        padding-top: 0.5rem !important;
         padding-bottom: 0.5rem !important;
         padding-left: 2rem !important;
         padding-right: 2rem !important;
@@ -303,6 +302,7 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
 # Konfigurasi Groq API
 groq_api_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
 client = None
@@ -511,7 +511,8 @@ def get_groq_response(question, context=""):
         return chat_completion.choices[0].message.content
     except Exception as e:
         return f"⚠️ Error: {str(e)}"
-        # ====================== MARKET SESSIONS LOGIC ======================
+
+# ====================== MARKET SESSIONS LOGIC ======================
 def market_session_status():
     tz = pytz.timezone('Asia/Jakarta')
     now = datetime.now(tz)
@@ -546,7 +547,7 @@ def market_session_status():
         st.markdown(f"""
         <div class="session-card">
             <div style="display:flex; justify-content:between; align-items:center;">
-                <span style="font-family:Orbitron; font-weight:bold; color:{sess['color']}; flex:1;">{sess['name']}</span>
+     <span style="font-family:Orbitron; font-weight:bold; color:{sess['color']}; flex:1;">{sess['name']}</span>
                 <span style="font-family:Rajdhani; font-weight:bold; color:{'#00ff88' if is_active else '#ff2a6d'};">{status_text}</span>
             </div>
             <div style="font-family:Rajdhani; font-size:12px; color:#888; margin-bottom:5px;">{sess['start'].strftime('%H:%M')} - {sess['end'].strftime('%H:%M')} WIB</div>
@@ -634,7 +635,7 @@ with st.sidebar:
             "nav-link": {"font-size": "13px", "text-align": "left", "margin": "0px", "--hover-color": "#0055ff"},
             "nav-link-selected": {"background-color": "var(--deep-blue)", "color": "white"},
         }
-                        )
+)
     # ====================== FUNGSI MARKET NEWS ======================
 @st.cache_data(ttl=300)
 def get_news_data(query, max_articles=10):
@@ -766,12 +767,10 @@ elif menu_selection == "Market News":
     if error: st.error(error)
     elif articles:
         for a in articles:
-            # Format waktu berita
             pub_date = a.get("publishedAt", "")
             if pub_date:
                 try:
                     dt_obj = datetime.strptime(pub_date, "%Y-%m-%dT%H:%M:%SZ")
-                    # Ganti tahun ke 2026 sesuai permintaan
                     dt_obj = dt_obj.replace(year=2026)
                     time_str = dt_obj.strftime("%d-%m-%Y, jam %H.%M")
                 except: time_str = "12-04-2026, jam 15.00"
@@ -819,8 +818,8 @@ elif menu_selection == "Risk Management":
             st.markdown(f"""
             <div class="glass-card" style="text-align:center;">
                 <p class="rajdhani-font" style="font-size:14px;">{t['pos_size']}</p>
-                <h2 class="digital-font" style="color:#00d4ff; font-size:24px;">{pos_size:,.2f} Units</h2>
-                <hr style="border-color:rgba(255,255,255,0.1); margin:10px 0;">
+                <h2 class="digital-font" style="color:#00d4ff;">{pos_size:,.2f} Units</h2>
+                <hr style="border-color:rgba(255,255,255,0.1);">
                 <p class="rajdhani-font" style="font-size:12px;">{t['risk_amt']}: <span style="color:#ff2a6d;">${risk_amt:,.2f}</span></p>
                 <p class="rajdhani-font" style="font-size:12px;">{t['reward']}: <span style="color:#00ff88;">${risk_amt*2:,.2f}</span></p>
             </div>

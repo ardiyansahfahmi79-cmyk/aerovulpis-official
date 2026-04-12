@@ -166,7 +166,7 @@ st.markdown("""
     }
 
     .custom-logo {
-        width: 130px; /* Dikecilkan sedikit */
+        width: 110px; /* Dikecilkan sedikit */
         filter: drop-shadow(0 0 15px var(--electric-blue));
         transition: all 0.5s ease;
         background-color: transparent !important;
@@ -599,9 +599,9 @@ st.markdown(f"""
 
 # Sidebar
 with st.sidebar:
-    st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:65px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:55px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)},{find:
     st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px; margin-bottom: 0;'>{t['control_center']}</h2>", unsafe_allow_html=True)
-    st.markdown("**AeroVulpis V3.3** — **DYNAMIC HATCH EDITION**")
+    st.markdown("**AeroVulpis V3.3** — **DYNAMIHATCH**")},{find:
     st.caption("2026 • Powered by Real-Time AI")
 
     category = st.selectbox(t['category'], list(instruments.keys()))
@@ -697,7 +697,7 @@ if menu_selection == "Live Dashboard":
         with col_a:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.subheader(t['ai_analysis'])
-            for r in reasons: st.write(f"✅ {r}")
+            for r in reasons: st.write(f"💠 {r}")
             if st.button(t['generate_ai'], use_container_width=True):
                 with st.spinner(t['ai_thinking']):
                     context = f"Asset: {asset_name}, Price: {market['price']}, RSI: {df['RSI'].iloc[-1]:.2f}, Signal: {signal}, SMA50: {df['SMA50'].iloc[-1]:.4f}, SMA200: {df['SMA200'].iloc[-1]:.4f}"
@@ -763,6 +763,9 @@ elif menu_selection == "Market Sessions":
 
 elif menu_selection == "Market News":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
+    if st.button("Update Berita Terbaru", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
     articles, error = get_news_data(f"{asset_name} market", 10)
     if error: st.error(error)
     elif articles:

@@ -6,7 +6,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, time as dt_time
 import pytz
 import ta
 import time
@@ -39,7 +39,7 @@ translations = {
         "refresh": "REFRESH INDICATOR",
         "ai_analysis": "🤖 AeroVulpis Analysis",
         "generate_ai": "GENERATE DEEP AI ANALYSIS",
-        "market_history": "📊 Market History",
+        "market_sessions": "🌐 Market Sessions",
         "market_news": "📰 Market News",
         "risk_mgmt": "🛡️ Risk Management Protocol",
         "settings": "⚙️ Settings",
@@ -72,7 +72,7 @@ translations = {
         "refresh": "REFRESH INDICATOR",
         "ai_analysis": "🤖 AeroVulpis Analysis",
         "generate_ai": "GENERATE DEEP AI ANALYSIS",
-        "market_history": "📊 Market History",
+        "market_sessions": "🌐 Market Sessions",
         "market_news": "📰 Market News",
         "risk_mgmt": "🛡️ Risk Management Protocol",
         "settings": "⚙️ Settings",
@@ -126,6 +126,29 @@ st.markdown("""
         margin-bottom: 5px;
     }
 
+    .session-container {
+        border: 2px solid var(--electric-blue);
+        border-radius: 15px;
+        padding: 20px;
+        background: rgba(0, 212, 255, 0.02);
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+        margin-bottom: 20px;
+    }
+
+    .session-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
+        transition: all 0.3s ease;
+    }
+
+    .session-card:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: var(--electric-blue);
+    }
+
     .main-title-container {
         text-align: center;
         margin-bottom: 5px;
@@ -177,6 +200,11 @@ st.markdown("""
         font-family: 'Orbitron', sans-serif;
         color: var(--neon-green);
         text-shadow: 0 0 10px var(--neon-green);
+    }
+
+    .cyan-neon {
+        color: var(--electric-blue);
+        text-shadow: 0 0 10px var(--electric-blue);
     }
 
     .rajdhani-font {
@@ -286,48 +314,32 @@ def get_historical_data(ticker_symbol, period="1mo", interval="1h"):
 
 def add_technical_indicators(df):
     if len(df) < 50: return df
-    
-    # 1. SMA 20, 50, 200
     df["SMA20"] = df["Close"].rolling(window=20).mean()
     df["SMA50"] = df["Close"].rolling(window=50).mean()
     df["SMA200"] = df["Close"].rolling(window=min(len(df), 200)).mean()
-    
-    # 2. EMA 9
     df["EMA9"] = df["Close"].ewm(span=9, adjust=False).mean()
-    
-    # 3. RSI 14
     delta = df["Close"].diff()
     gain = delta.where(delta > 0, 0).rolling(window=14).mean()
     loss = -delta.where(delta < 0, 0).rolling(window=14).mean()
     rs = gain / loss.replace(0, 0.001)
     df["RSI"] = 100 - (100 / (1 + rs))
-    
-    # 4. MACD
     exp1 = df["Close"].ewm(span=12, adjust=False).mean()
     exp2 = df["Close"].ewm(span=26, adjust=False).mean()
     df["MACD"] = exp1 - exp2
     df["Signal_Line"] = df["MACD"].ewm(span=9, adjust=False).mean()
-    
-    # 5. Bollinger Bands
     df["BB_Mid"] = df["Close"].rolling(window=20).mean()
     df["BB_Std"] = df["Close"].rolling(window=20).std()
     df["BB_Upper"] = df["BB_Mid"] + (df["BB_Std"] * 2)
     df["BB_Lower"] = df["BB_Mid"] - (df["BB_Std"] * 2)
-    
-    # 6. Stochastic Oscillator
     low_14 = df["Low"].rolling(window=14).min()
     high_14 = df["High"].rolling(window=14).max()
     df["Stoch_K"] = 100 * ((df["Close"] - low_14) / (high_14 - low_14).replace(0, 0.001))
     df["Stoch_D"] = df["Stoch_K"].rolling(window=3).mean()
-    
-    # 7. ATR (Average True Range)
     high_low = df["High"] - df["Low"]
     high_cp = np.abs(df["High"] - df["Close"].shift())
     low_cp = np.abs(df["Low"] - df["Close"].shift())
     df["TR"] = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
     df["ATR"] = df["TR"].rolling(window=14).mean()
-    
-    # 8. ADX (Average Directional Index) - Simplified
     df["UpMove"] = df["High"] - df["High"].shift()
     df["DownMove"] = df["Low"].shift() - df["Low"]
     df["+DM"] = np.where((df["UpMove"] > df["DownMove"]) & (df["UpMove"] > 0), df["UpMove"], 0)
@@ -336,99 +348,134 @@ def add_technical_indicators(df):
     df["-DI"] = 100 * (df["-DM"].rolling(14).mean() / df["ATR"].replace(0, 0.001))
     df["DX"] = 100 * np.abs(df["+DI"] - df["-DI"]) / (df["+DI"] + df["-DI"]).replace(0, 0.001)
     df["ADX"] = df["DX"].rolling(14).mean()
-    
-    # 9. Volume Analysis
     df["Vol_SMA"] = df["Volume"].rolling(window=20).mean()
-    
-    # 10. Ichimoku Cloud (Base Line Only for Signal)
     df["Base_Line"] = (df["High"].rolling(window=26).max() + df["Low"].rolling(window=26).min()) / 2
-    
     return df
 
 def get_weighted_signal(df):
     latest = df.iloc[-1]
     score = 50
     reasons = []
-    
-    # RSI Analysis
-    if latest["RSI"] < 30:
-        score += 15
-        reasons.append("RSI Oversold (Potensi Rebound)")
-    elif latest["RSI"] > 70:
-        score -= 15
-        reasons.append("RSI Overbought (Potensi Koreksi)")
-    
-    # MACD Analysis
-    if latest["MACD"] > latest["Signal_Line"]:
-        score += 10
-        reasons.append("MACD Bullish Crossover")
-    else:
-        score -= 10
-        reasons.append("MACD Bearish Crossover")
-        
-    # Trend Analysis (SMA)
-    if latest["Close"] > latest["SMA50"]:
-        score += 10
-        reasons.append("Harga di atas SMA 50 (Trend Bullish)")
-    else:
-        score -= 10
-        reasons.append("Harga di bawah SMA 50 (Trend Bearish)")
-        
-    if latest["Close"] > latest["SMA200"]:
-        score += 10
-        reasons.append("Harga di atas SMA 200 (Trend Jangka Panjang Bullish)")
-    else:
-        score -= 10
-        reasons.append("Harga di bawah SMA 200 (Trend Jangka Panjang Bearish)")
-
-    # Signal Determination
-    if score >= 70:
-        signal = "STRONG BUY"
-    elif score >= 60:
-        signal = "BUY"
-    elif score <= 30:
-        signal = "STRONG SELL"
-    elif score <= 40:
-        signal = "SELL"
-    else:
-        signal = "NEUTRAL"
-        
+    if latest["RSI"] < 30: score += 15; reasons.append("RSI Oversold")
+    elif latest["RSI"] > 70: score -= 15; reasons.append("RSI Overbought")
+    if latest["MACD"] > latest["Signal_Line"]: score += 10; reasons.append("MACD Bullish")
+    else: score -= 10; reasons.append("MACD Bearish")
+    if latest["Close"] > latest["SMA50"]: score += 10; reasons.append("Above SMA 50")
+    else: score -= 10; reasons.append("Below SMA 50")
+    if latest["Close"] > latest["SMA200"]: score += 10; reasons.append("Above SMA 200")
+    else: score -= 10; reasons.append("Below SMA 200")
+    if score >= 70: signal = "STRONG BUY"
+    elif score >= 60: signal = "BUY"
+    elif score <= 30: signal = "STRONG SELL"
+    elif score <= 40: signal = "SELL"
+    else: signal = "NEUTRAL"
     return score, signal, reasons
 
 # ====================== FUNGSI CHATBOT GROQ ======================
 def get_groq_response(question, context=""):
-    if not client:
-        return "⚠️ Chatbot Inactive"
-    
+    if not client: return "⚠️ Chatbot Inactive"
     MODEL_NAME = 'llama-3.3-70b-versatile'
-    
     system_prompt = f"""
     Anda adalah AeroVulpis, asisten AI Trading Profesional.
-    Waktu Real-time: {datetime.now().strftime('%d %B %Y, %H:%M:%S WIB')}
-    Bahasa Aktif: {st.session_state.lang}
+    Waktu: {datetime.now().strftime('%d %B %Y, %H:%M:%S WIB')}
+    Bahasa: {st.session_state.lang}
 
-    TUGAS UTAMA:
-    1. Berikan analisis teknikal yang SANGAT DETAIL, AKURAT, dan REAL-TIME.
-    2. Berikan level ENTRY, STOP LOSS, dan TAKE PROFIT yang spesifik berdasarkan data yang ada.
-    3. Gunakan nada profesional, teknis, namun tetap memberikan pandangan emosional pasar yang tepat.
-    4. JANGAN menyarankan perubahan kode kecuali diminta.
-    
-    Konteks Pasar Saat Ini: {context}
+    TUGAS:
+    1. Berikan analisis teknikal yang SANGAT DETAIL dan AKURAT.
+    2. Berikan level ENTRY, STOP LOSS, dan TAKE PROFIT yang spesifik berdasarkan data.
+    3. Gunakan nada profesional dan emosional yang tepat (bullish/bearish).
+    4. Konteks: {context}
     """
-    
     try:
         chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": question}
-            ],
-            model=MODEL_NAME,
-            temperature=0.7,
-            max_tokens=1024,
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": question}],
+            model=MODEL_NAME, temperature=0.7, max_tokens=1024,
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
-        return f"⚠️ Groq API Error: {str(e)}"
+        return f"⚠️ Error: {str(e)}"
+
+# ====================== MARKET SESSIONS LOGIC ======================
+def market_session_status():
+    tz = pytz.timezone('Asia/Jakarta')
+    now = datetime.now(tz)
+    current_time = now.time()
+    
+    sessions = [
+        {"name": "Asian Session (Tokyo)", "start": dt_time(6, 0), "end": dt_time(15, 0), "color": "#00ff88"},
+        {"name": "European Session (London)", "start": dt_time(14, 0), "end": dt_time(23, 0), "color": "#00d4ff"},
+        {"name": "American Session (New York)", "start": dt_time(19, 0), "end": dt_time(4, 0), "color": "#ff2a6d"}
+    ]
+    
+    st.markdown('<div class="session-container">', unsafe_allow_html=True)
+    st.markdown('<h2 class="cyan-neon" style="text-align:center; font-family:Orbitron; font-size:24px; margin-bottom:20px;">MARKET SESSIONS STATUS</h2>', unsafe_allow_html=True)
+    
+    active_sessions = []
+    
+    for sess in sessions:
+        is_active = False
+        if sess["start"] < sess["end"]:
+            is_active = sess["start"] <= current_time <= sess["end"]
+        else: # Crosses midnight
+            is_active = current_time >= sess["start"] or current_time <= sess["end"]
+            
+        status_text = "🟢 Active" if is_active else "🔴 Closed"
+        if is_active: active_sessions.append(sess["name"])
+        
+        # Calculate progress (simplified)
+        progress = 0
+        if is_active:
+            now_minutes = now.hour * 60 + now.minute
+            start_minutes = sess["start"].hour * 60 + sess["start"].minute
+            end_minutes = sess["end"].hour * 60 + sess["end"].minute
+            if end_minutes < start_minutes: end_minutes += 24 * 60
+            if now_minutes < start_minutes and sess["start"] > sess["end"]: now_minutes += 24 * 60
+            
+            total_duration = end_minutes - start_minutes
+            elapsed = now_minutes - start_minutes
+            progress = min(100, max(0, int((elapsed / total_duration) * 100)))
+        
+        st.markdown(f"""
+        <div class="session-card">
+            <div style="display:flex; justify-content:between; align-items:center;">
+                <span style="font-family:Orbitron; font-weight:bold; color:{sess['color']}; flex:1;">{sess['name']}</span>
+                <span style="font-family:Rajdhani; font-weight:bold; color:{'#00ff88' if is_active else '#ff2a6d'};">{status_text}</span>
+            </div>
+            <div style="font-family:Rajdhani; font-size:12px; color:#888; margin-bottom:5px;">{sess['start'].strftime('%H:%M')} - {sess['end'].strftime('%H:%M')} WIB</div>
+            <div style="background:rgba(255,255,255,0.1); height:6px; border-radius:3px; overflow:hidden;">
+                <div style="background:{sess['color'] if is_active else '#444'}; width:{progress if is_active else 0}%; height:100%; transition:width 0.5s ease;"></div>
+            </div>
+            <div style="font-family:Rajdhani; font-size:11px; color:#aaa; margin-top:5px;">
+                { "Currently ACTIVE" if is_active else "Next session" }
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Golden Time & Strategy Logic
+    is_golden = (dt_time(19, 0) <= current_time <= dt_time(23, 0))
+    
+    if is_golden:
+        st.markdown('<div style="text-align:center; padding:10px; background:rgba(0,212,255,0.1); border:1px solid var(--electric-blue); border-radius:10px; margin-top:10px; animation: pulse 2s infinite;">'
+                    '<h3 class="cyan-neon" style="margin:0; font-size:18px;">GOLDEN TIME: High Volatility! 🚀</h3></div>', unsafe_allow_html=True)
+    
+    strategy_text = "Waiting for Market Open..."
+    if "Asian Session (Tokyo)" in active_sessions and len(active_sessions) == 1:
+        strategy_text = "Calm Market: Range Trading Mode. Focus on Liquidity Sweeps."
+    elif is_golden:
+        strategy_text = "High Volatility: Look for Order Block Mitigations & FVG entries."
+    elif "European Session (London)" in active_sessions:
+        strategy_text = "Trend Following: Watch for London Breakout patterns."
+    elif "American Session (New York)" in active_sessions:
+        strategy_text = "Market Reversals: Watch for NY Open manipulation."
+
+    st.markdown(f"""
+    <div style="margin-top:20px; padding:15px; border:1px solid var(--electric-blue); border-radius:10px; background:rgba(0,212,255,0.05); text-align:center;">
+        <p class="cyan-neon" style="font-family:Orbitron; font-size:14px; margin-bottom:5px;">CURRENT RECOMMENDED STRATEGY: (SMC Focus)</p>
+        <p class="rajdhani-font" style="font-size:16px; color:#fff; margin:0;">{strategy_text}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ====================== INSTRUMEN ======================
 instruments = {
@@ -440,7 +487,7 @@ instruments = {
     "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver": "SI=F", "Crude Oil (WTI)": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F"}
 }
 
-# ====================== UI HEADER ======================
+# ====================== UI HEADER =====================
 st.markdown(f"""
 <div class="main-title-container">
     <div class="main-logo-container">
@@ -480,8 +527,8 @@ with st.sidebar:
 
     menu_selection = option_menu(
         menu_title=t['navigation'],
-        options=["Live Dashboard", "Signal Analysis", "Market History", "Market News", "Chatbot AI", "Risk Management", "Settings", "System Log"],
-        icons=["activity", "graph-up-arrow", "clock-history", "newspaper", "chat-dots", "shield-fill", "gear", "journal-text"],
+        options=["Live Dashboard", "Signal Analysis", "Market Sessions", "Market News", "Chatbot AI", "Risk Management", "Settings", "System Log"],
+        icons=["activity", "graph-up-arrow", "globe", "newspaper", "chat-dots", "shield-fill", "gear", "journal-text"],
         menu_icon="cast",
         default_index=0,
         styles={
@@ -496,31 +543,22 @@ with st.sidebar:
 @st.cache_data(ttl=300)
 def get_news_data(query, max_articles=10):
     gnews_api_key = st.secrets.get("GNEWS_API_KEY") or os.getenv("GNEWS_API_KEY")
-    if not gnews_api_key:
-        return [], "⚠️ GNEWS_API_KEY NOT FOUND"
-
-    import urllib.parse
-    # Optimasi query untuk Forex dan Gold
+    if not gnews_api_key: return [], "⚠️ API KEY MISSING"
     clean_query = query.replace("/", " ").replace("=X", "").replace("=F", "")
+    import urllib.parse
     encoded_query = urllib.parse.quote(clean_query)
-    
     url = f"https://gnews.io/api/v4/search?q={encoded_query}&lang=en&max={max_articles}&token={gnews_api_key}"
-    
     try:
         response = requests.get(url)
         if response.status_code != 200:
-            # Fallback ke query umum jika 400
             fallback_query = urllib.parse.quote(clean_query.split()[0] + " market news")
             url = f"https://gnews.io/api/v4/search?q={fallback_query}&lang=en&max={max_articles}&token={gnews_api_key}"
             response = requests.get(url)
-            
         data = response.json()
-        if data.get("articles"):
-            return data["articles"], None
-        else:
-            return [], t['no_news']
+        if data.get("articles"): return data["articles"], None
+        return [], t['no_news']
     except Exception as e:
-        return [], f"⚠️ Gagal mengambil berita: {str(e)}"
+        return [], f"⚠️ Error: {str(e)}"
 
 # ====================== LOGIKA HALAMAN ======================
 
@@ -529,76 +567,46 @@ if menu_selection == "Live Dashboard":
     df = get_historical_data(ticker_input, period, interval)
     
     if market and not df.empty:
-   # Perbaikan Resampling 3h/4h
         if selected_tf_display in ["3h", "4h"]:
             rule = "3h" if selected_tf_display == "3h" else "4h"
-            df = df.resample(rule).agg({
-                'Open': 'first',
-                'High': 'max',
-                'Low': 'min',
-                'Close': 'last',
-                'Volume': 'sum'
-            }).dropna()
+            df = df.resample(rule).agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
 
         df = add_technical_indicators(df)
         score, signal, reasons = get_weighted_signal(df)
         
-        # Row 1: Metrics
         c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">{t["live_price"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{market["price"]:,.4f}</p></div>', unsafe_allow_html=True)
+        with c1: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["live_price"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{market["price"]:,.4f}</p></div>', unsafe_allow_html=True)
         with c2:
             color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">{t["signal"]}</p><p class="digital-font" style="font-size:28px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
-        with c3:
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">{t["rsi"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>', unsafe_allow_html=True)
-        with c4:
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-family:Rajdhani; font-size:12px;">{t["atr"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["signal"]}</p><p class="digital-font" style="font-size:28px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
+        with c3: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["rsi"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>', unsafe_allow_html=True)
+        with c4: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["atr"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
 
-        # Row 2: Dynamic Line Chart
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))
         fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color='#00d4ff', width=1.5, dash='dot'), name='SMA 50'))
         fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color='#bc13fe', width=1.5, dash='dash'), name='SMA 200'))
         fig.update_layout(
-            template="plotly_dark", 
-            height=450,
-            xaxis_rangeslider_visible=False, 
-            paper_bgcolor='rgba(0,0,0,0)', 
-            plot_bgcolor='rgba(0,0,0,0)', 
+            template="plotly_dark", height=450, xaxis_rangeslider_visible=False, 
+            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
             margin=dict(l=0, r=0, t=20, b=0),
-            legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5) # Legenda di bawah
+            legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5)
         )
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # Row 3: Gauge & Analysis
         col_g, col_a = st.columns([1, 1])
         with col_g:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             fig_gauge = go.Figure(go.Indicator(
-                mode = "gauge+number",
-                value = score,
-                title = {"text": "Technical Strength Index", "font": {"family": "Orbitron", "color": "#00d4ff", "size": 18}},
-                gauge = {
-                    "axis": {"range": [0, 100], "tickwidth": 2, "tickcolor": "#888"},
-                    "bar": {"color": color},
-                    "bgcolor": "rgba(0,0,0,0)",
-                    "borderwidth": 3,
-                    "bordercolor": "#444",
-                    "steps": [
-                        {"range": [0, 25], "color": "rgba(255, 42, 109, 0.3)"},
-                        {"range": [25, 40], "color": "rgba(255, 42, 109, 0.1)"},
-                        {"range": [40, 60], "color": "rgba(255, 204, 0, 0.1)"},
-                        {"range": [60, 75], "color": "rgba(0, 255, 136, 0.1)"},
-                        {"range": [75, 100], "color": "rgba(0, 255, 136, 0.3)"}
-                    ],
-                }
+                mode = "gauge+number", value = score,
+                title = {"text": "Technical Strength", "font": {"family": "Orbitron", "color": "#00d4ff", "size": 18}},
+                gauge = {"axis": {"range": [0, 100]}, "bar": {"color": color}, "bgcolor": "rgba(0,0,0,0)",
+                         "steps": [{"range": [0, 40], "color": "rgba(255, 42, 109, 0.2)"}, {"range": [60, 100], "color": "rgba(0, 255, 136, 0.2)"}]}
             ))
-            fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={"color": "#e6edf3", "family": "Rajdhani"}, height=250, margin=dict(l=20, r=20, t=40, b=20))
+            fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={"color": "#e6edf3"}, height=250, margin=dict(l=20, r=20, t=40, b=20))
             st.plotly_chart(fig_gauge, use_container_width=True)
-            
             if st.button(t['refresh'], use_container_width=True):
                 st.cache_data.clear()
                 st.rerun()
@@ -607,8 +615,7 @@ if menu_selection == "Live Dashboard":
         with col_a:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.subheader(t['ai_analysis'])
-            for r in reasons:
-                st.write(f"✅ {r}")
+            for r in reasons: st.write(f"✅ {r}")
             if st.button(t['generate_ai'], use_container_width=True):
                 with st.spinner(t['ai_thinking']):
                     context = f"Asset: {asset_name}, Price: {market['price']}, RSI: {df['RSI'].iloc[-1]:.2f}, Signal: {signal}, SMA50: {df['SMA50'].iloc[-1]:.4f}, SMA200: {df['SMA200'].iloc[-1]:.4f}"
@@ -621,102 +628,40 @@ elif menu_selection == "Signal Analysis":
     if not df.empty:
         if selected_tf_display in ["3h", "4h"]:
             rule = "3h" if selected_tf_display == "3h" else "4h"
-            df = df.resample(rule).agg({
-                'Open': 'first',
-                'High': 'max',
-                'Low': 'min',
-                'Close': 'last',
-                'Volume': 'sum'
-            }).dropna()
-
+            df = df.resample(rule).agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
         df = add_technical_indicators(df)
         latest = df.iloc[-1]
         score, signal, reasons = get_weighted_signal(df)
-        
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-        st.subheader("🛠️ 10-Indicator Technical Matrix")
-        
         sig_color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
         st.markdown(f"### {t['recommendation']}: <span style='color:{sig_color};'>{signal}</span>", unsafe_allow_html=True)
-        
         cols = st.columns(5)
-        indicators_list = [
-            ("RSI (14)", f"{latest['RSI']:.2f}"), ("MACD", f"{latest['MACD']:.4f}"), 
-            ("SMA 20", f"{latest['SMA20']:.2f}"), ("SMA 50", f"{latest['SMA50']:.2f}"),
-            ("EMA 9", f"{latest['EMA9']:.2f}"), ("SMA 200", f"{latest['SMA200']:.2f}"), 
-            ("BB Upper", f"{latest['BB_Upper']:.2f}"), ("BB Lower", f"{latest['BB_Lower']:.2f}"),
-            ("Stoch K", f"{latest['Stoch_K']:.2f}"), ("ADX", f"{latest['ADX']:.2f}")
-        ]
-        
-        for i, (name, val) in enumerate(indicators_list):
-            cols[i % 5].metric(name, val)
-        
+        indicators = [("RSI", f"{latest['RSI']:.2f}"), ("MACD", f"{latest['MACD']:.4f}"), ("SMA 50", f"{latest['SMA50']:.2f}"), ("SMA 200", f"{latest['SMA200']:.2f}"), ("ADX", f"{latest['ADX']:.2f}")]
+        for i, (name, val) in enumerate(indicators): cols[i].metric(name, val)
         st.markdown("---")
         st.write(f"**{t['vol_analysis']}:**")
         st.metric(t['curr_vol'], f"{latest['Volume']:,}", f"{latest['Volume'] - latest['Vol_SMA']:,.0f} {t['vs_avg']}")
         st.markdown("</div>", unsafe_allow_html=True)
 
-elif menu_selection == "Market History":
-    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["market_history"]} ({selected_tf_display})</h2>', unsafe_allow_html=True)
-    market_data = get_market_data(ticker_input)
-    if market_data:
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("OPEN", f"{market_data['open']:,.4f}")
-        c2.metric("HIGH", f"{market_data['high']:,.4f}")
-        c3.metric("LOW", f"{market_data['low']:,.4f}")
-        c4.metric("CLOSE", f"{market_data['close']:,.4f}")
-        
-    df_hist = get_historical_data(ticker_input, period=period, interval=interval)
-    if not df_hist.empty:
-        if selected_tf_display in ["3h", "4h"]:
-            rule = "3h" if selected_tf_display == "3h" else "4h"
-            df_hist = df_hist.resample(rule).agg({
-                'Open': 'first',
-                'High': 'max',
-                'Low': 'min',
-                'Close': 'last',
-                'Volume': 'sum'
-            }).dropna()
-
-        df_hist = df_hist.sort_index(ascending=False)
-        df_hist.index = df_hist.index.tz_convert('Asia/Jakarta').strftime('%d %B %Y %H:%M')
-        
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.dataframe(df_hist[["Open", "High", "Low", "Close", "Volume"]].head(100), use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+elif menu_selection == "Market Sessions":
+    market_session_status()
 
 elif menu_selection == "Market News":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
-    news_query = f"{asset_name} market"
-    articles, error_message = get_news_data(news_query, max_articles=10)
-
-    if error_message:
-        st.error(error_message)
+    articles, error = get_news_data(f"{asset_name} market", 10)
+    if error: st.error(error)
     elif articles:
-        for article in articles:
-            st.markdown(f"""
-            <div class="news-card">
-                <h3 style="color:var(--electric-blue); margin-bottom:5px; font-size:16px;">{article['title']}</h3>
-                <p style="font-size:13px; color:#ccc;">{article['description'] or 'No description available.'}</p>
-                <a href="{article['url']}" target="_blank" style="color:var(--neon-green); text-decoration:none; font-weight:bold; font-size:12px;">READ MORE →</a>
-            </div>
-            """, unsafe_allow_html=True)
+        for a in articles:
+            st.markdown(f'<div class="news-card"><h3 style="color:var(--electric-blue); font-size:16px;">{a["title"]}</h3><p style="font-size:13px; color:#ccc;">{a["description"]}</p><a href="{a["url"]}" target="_blank" style="color:var(--neon-green); font-size:12px;">READ MORE →</a></div>', unsafe_allow_html=True)
 
 elif menu_selection == "Chatbot AI":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">🤖 AeroVulpis AI Assistant</h2>', unsafe_allow_html=True)
-    
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
+    if "messages" not in st.session_state: st.session_state.messages = []
     for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
+        with st.chat_message(message["role"]): st.markdown(message["content"])
     if prompt := st.chat_input("Tanya AeroVulpis v3.3 Ultimate..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
+        with st.chat_message("user"): st.markdown(prompt)
         with st.chat_message("assistant"):
             m_data = get_market_data(ticker_input)
             context_str = f"Instrumen: {ticker_display}, Harga: {m_data['price'] if m_data else 'N/A'}"
@@ -748,8 +693,7 @@ elif menu_selection == "Risk Management":
                 <p class="rajdhani-font" style="font-size:12px;">{t['reward']}: <span style="color:#00ff88;">${risk_amt*2:,.2f}</span></p>
             </div>
             """, unsafe_allow_html=True)
-        else:
-            st.info(t['risk_info'])
+        else: st.info(t['risk_info'])
 
 elif menu_selection == "Settings":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["settings"]}</h2>', unsafe_allow_html=True)
@@ -767,10 +711,10 @@ elif menu_selection == "System Log":
     st.markdown(f'<div class="glass-card">', unsafe_allow_html=True)
     st.subheader(t['sys_log'])
     st.write(f"**{t['version']}**")
-    st.write("- Fixed GNews.io API integration and error handling.")
-    st.write("- Improved news display with more informative messages.")
-    st.write("- Added @st.cache_data for news fetching.")
-    st.write("- Enhanced UI/UX for a smoother experience.")
+    st.write("- Replaced Market History with Market Sessions Status.")
+    st.write("- Added real-time session tracking for Tokyo, London, and New York.")
+    st.write("- Integrated Golden Time (Overlap) and SMC-based strategy recommendations.")
+    st.write("- Enhanced UI with neon glow effects and professional dashboard layout.")
     st.write(f"- {t['created_by']}")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -778,12 +722,7 @@ elif menu_selection == "System Log":
 st.markdown(f"""
 <div style="text-align: center; padding: 5px; opacity: 0.8;">
     <hr style="border-color:rgba(255,255,255,0.1); margin:10px 0;">
-    <p class="rajdhani-font" style="font-style: italic; font-size: 14px; color: #ccc; margin:0;">
-        "Disiplin adalah kunci, emosi adalah musuh. Tetap tenang dan percaya pada sistem."
-    </p>
-    <p class="digital-font" style="font-size: 12px; color: #00ff88; margin:0;">
-        — Fahmi (Pencipta AeroVulpis)
-    </p>
-    <p style="font-size: 9px; color: #444; letter-spacing: 2px; margin:0;">DYNAMIHATCH IDENTITY • v3.3 ULTIMATE • 2026</p>
+    <p class="rajdhani-font" style="font-style: italic; font-size: 14px; color: #ccc; margin:0;">"Discipline is key, emotion is the enemy."</p>
+    <p class="digital-font" style="font-size: 12px; color: #00ff88; margin:0;">— Fahmi (AeroVulpis Creator)</p>
 </div>
 """, unsafe_allow_html=True)

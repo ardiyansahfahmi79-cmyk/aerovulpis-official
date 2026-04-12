@@ -151,14 +151,16 @@ st.markdown("""
 
     .main-title-container {
         text-align: center;
-        margin-bottom: 5px;
+        margin-bottom: 0px;
+        padding-bottom: 0px;
     }
 
     .main-logo-container {
         position: relative;
         display: inline-block;
         animation: float 4s infinite ease-in-out;
-        padding: 5px 0;
+        padding: 0px 0;
+        margin-bottom: -15px;
         background: transparent !important;
         perspective: 1200px;
     }
@@ -194,6 +196,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
         margin: 0;
+        padding: 0;
     }
 
     .digital-font {
@@ -245,7 +248,7 @@ st.markdown("""
     }
 
     .block-container {
-        padding-top: 1rem !important;
+        padding-top: 0.5rem !important;
         padding-bottom: 0.5rem !important;
         padding-left: 2rem !important;
         padding-right: 2rem !important;
@@ -254,6 +257,48 @@ st.markdown("""
     div[data-testid="stVerticalBlock"] > div {
         padding-top: 0rem !important;
         padding-bottom: 0rem !important;
+    }
+
+    .indicator-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .indicator-box {
+        background: rgba(0, 212, 255, 0.05);
+        border: 1px solid rgba(0, 212, 255, 0.2);
+        border-radius: 8px;
+        padding: 10px;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+
+    .indicator-box:hover {
+        border-color: var(--electric-blue);
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    }
+
+    .indicator-name {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 12px;
+        color: #aaa;
+        margin-bottom: 5px;
+    }
+
+    .indicator-value {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 14px;
+        color: #fff;
+    }
+
+    .indicator-signal {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 10px;
+        font-weight: bold;
+        margin-top: 5px;
+        text-transform: uppercase;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -314,32 +359,46 @@ def get_historical_data(ticker_symbol, period="1mo", interval="1h"):
 
 def add_technical_indicators(df):
     if len(df) < 50: return df
+    # Basic
     df["SMA20"] = df["Close"].rolling(window=20).mean()
     df["SMA50"] = df["Close"].rolling(window=50).mean()
     df["SMA200"] = df["Close"].rolling(window=min(len(df), 200)).mean()
     df["EMA9"] = df["Close"].ewm(span=9, adjust=False).mean()
+    df["EMA21"] = df["Close"].ewm(span=21, adjust=False).mean()
+    
+    # RSI
     delta = df["Close"].diff()
     gain = delta.where(delta > 0, 0).rolling(window=14).mean()
     loss = -delta.where(delta < 0, 0).rolling(window=14).mean()
     rs = gain / loss.replace(0, 0.001)
     df["RSI"] = 100 - (100 / (1 + rs))
+    
+    # MACD
     exp1 = df["Close"].ewm(span=12, adjust=False).mean()
     exp2 = df["Close"].ewm(span=26, adjust=False).mean()
     df["MACD"] = exp1 - exp2
     df["Signal_Line"] = df["MACD"].ewm(span=9, adjust=False).mean()
+    
+    # BB
     df["BB_Mid"] = df["Close"].rolling(window=20).mean()
     df["BB_Std"] = df["Close"].rolling(window=20).std()
     df["BB_Upper"] = df["BB_Mid"] + (df["BB_Std"] * 2)
     df["BB_Lower"] = df["BB_Mid"] - (df["BB_Std"] * 2)
+    
+    # Stoch
     low_14 = df["Low"].rolling(window=14).min()
     high_14 = df["High"].rolling(window=14).max()
     df["Stoch_K"] = 100 * ((df["Close"] - low_14) / (high_14 - low_14).replace(0, 0.001))
     df["Stoch_D"] = df["Stoch_K"].rolling(window=3).mean()
+    
+    # ATR
     high_low = df["High"] - df["Low"]
     high_cp = np.abs(df["High"] - df["Close"].shift())
     low_cp = np.abs(df["Low"] - df["Close"].shift())
     df["TR"] = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
     df["ATR"] = df["TR"].rolling(window=14).mean()
+    
+    # ADX
     df["UpMove"] = df["High"] - df["High"].shift()
     df["DownMove"] = df["Low"].shift() - df["Low"]
     df["+DM"] = np.where((df["UpMove"] > df["DownMove"]) & (df["UpMove"] > 0), df["UpMove"], 0)
@@ -348,28 +407,86 @@ def add_technical_indicators(df):
     df["-DI"] = 100 * (df["-DM"].rolling(14).mean() / df["ATR"].replace(0, 0.001))
     df["DX"] = 100 * np.abs(df["+DI"] - df["-DI"]) / (df["+DI"] + df["-DI"]).replace(0, 0.001)
     df["ADX"] = df["DX"].rolling(14).mean()
+    
+    # Additional 10 Indicators
+    df["CCI"] = ta.trend.cci(df["High"], df["Low"], df["Close"], window=20)
+    df["WPR"] = ta.momentum.williams_r(df["High"], df["Low"], df["Close"], lbp=14)
+    df["MFI"] = ta.volume.money_flow_index(df["High"], df["Low"], df["Close"], df["Volume"], window=14)
+    df["TRIX"] = ta.trend.trix(df["Close"], window=15)
+    df["ROC"] = ta.momentum.roc(df["Close"], window=12)
+    df["AO"] = ta.momentum.awesome_oscillator(df["High"], df["Low"], window1=5, window2=34)
+    df["KAMA"] = ta.momentum.kama(df["Close"], window=10, pow1=2, pow2=30)
+    df["Ichimoku_A"] = ta.trend.ichimoku_a(df["High"], df["Low"], window1=9, window2=26)
+    df["Ichimoku_B"] = ta.trend.ichimoku_b(df["High"], df["Low"], window2=26, window3=52)
+    df["Parabolic_SAR"] = ta.trend.psar_up(df["High"], df["Low"], df["Close"]).fillna(ta.trend.psar_down(df["High"], df["Low"], df["Close"]))
     df["Vol_SMA"] = df["Volume"].rolling(window=20).mean()
     df["Base_Line"] = (df["High"].rolling(window=26).max() + df["Low"].rolling(window=26).min()) / 2
     return df
 
 def get_weighted_signal(df):
     latest = df.iloc[-1]
-    score = 50
+    bullish_count = 0
+    bearish_count = 0
+    neutral_count = 0
     reasons = []
-    if latest["RSI"] < 30: score += 15; reasons.append("RSI Oversold")
-    elif latest["RSI"] > 70: score -= 15; reasons.append("RSI Overbought")
-    if latest["MACD"] > latest["Signal_Line"]: score += 10; reasons.append("MACD Bullish")
-    else: score -= 10; reasons.append("MACD Bearish")
-    if latest["Close"] > latest["SMA50"]: score += 10; reasons.append("Above SMA 50")
-    else: score -= 10; reasons.append("Below SMA 50")
-    if latest["Close"] > latest["SMA200"]: score += 10; reasons.append("Above SMA 200")
-    else: score -= 10; reasons.append("Below SMA 200")
+    
+    # 1. RSI
+    if latest["RSI"] < 30: bullish_count += 1; reasons.append("RSI Oversold")
+    elif latest["RSI"] > 70: bearish_count += 1; reasons.append("RSI Overbought")
+    else: neutral_count += 1
+    
+    # 2. MACD
+    if latest["MACD"] > latest["Signal_Line"]: bullish_count += 1; reasons.append("MACD Bullish")
+    else: bearish_count += 1; reasons.append("MACD Bearish")
+    
+    # 3. SMA 50
+    if latest["Close"] > latest["SMA50"]: bullish_count += 1; reasons.append("Above SMA 50")
+    else: bearish_count += 1; reasons.append("Below SMA 50")
+    
+    # 4. SMA 200
+    if latest["Close"] > latest["SMA200"]: bullish_count += 1; reasons.append("Above SMA 200")
+    else: bearish_count += 1; reasons.append("Below SMA 200")
+    
+    # 5. CCI
+    if latest["CCI"] < -100: bullish_count += 1
+    elif latest["CCI"] > 100: bearish_count += 1
+    else: neutral_count += 1
+    
+    # 6. WPR
+    if latest["WPR"] < -80: bullish_count += 1
+    elif latest["WPR"] > -20: bearish_count += 1
+    else: neutral_count += 1
+    
+    # 7. MFI
+    if latest["MFI"] < 20: bullish_count += 1
+    elif latest["MFI"] > 80: bearish_count += 1
+    else: neutral_count += 1
+    
+    # 8. EMA Cross
+    if latest["EMA9"] > latest["EMA21"]: bullish_count += 1
+    else: bearish_count += 1
+    
+    # 9. BB Position
+    if latest["Close"] < latest["BB_Lower"]: bullish_count += 1
+    elif latest["Close"] > latest["BB_Upper"]: bearish_count += 1
+    else: neutral_count += 1
+    
+    # 10. ADX Trend
+    if latest["ADX"] > 25:
+        if latest["+DI"] > latest["-DI"]: bullish_count += 1
+        else: bearish_count += 1
+    else: neutral_count += 1
+
+    total = bullish_count + bearish_count + neutral_count
+    score = (bullish_count / total) * 100
+    
     if score >= 70: signal = "STRONG BUY"
     elif score >= 60: signal = "BUY"
     elif score <= 30: signal = "STRONG SELL"
     elif score <= 40: signal = "SELL"
     else: signal = "NEUTRAL"
-    return score, signal, reasons
+    
+    return score, signal, reasons, bullish_count, bearish_count, neutral_count
 
 # ====================== FUNGSI CHATBOT GROQ ======================
 def get_groq_response(question, context=""):
@@ -411,18 +528,12 @@ def market_session_status():
     st.markdown('<h2 class="cyan-neon" style="text-align:center; font-family:Orbitron; font-size:24px; margin-bottom:20px;">MARKET SESSIONS STATUS</h2>', unsafe_allow_html=True)
     
     active_sessions = []
-    
     for sess in sessions:
         is_active = False
-        if sess["start"] < sess["end"]:
-            is_active = sess["start"] <= current_time <= sess["end"]
-        else: # Crosses midnight
-            is_active = current_time >= sess["start"] or current_time <= sess["end"]
-            
+        if sess["start"] < sess["end"]: is_active = sess["start"] <= current_time <= sess["end"]
+        else: is_active = current_time >= sess["start"] or current_time <= sess["end"]
         status_text = "🟢 Active" if is_active else "🔴 Closed"
         if is_active: active_sessions.append(sess["name"])
-        
-        # Calculate progress (simplified)
         progress = 0
         if is_active:
             now_minutes = now.hour * 60 + now.minute
@@ -430,11 +541,9 @@ def market_session_status():
             end_minutes = sess["end"].hour * 60 + sess["end"].minute
             if end_minutes < start_minutes: end_minutes += 24 * 60
             if now_minutes < start_minutes and sess["start"] > sess["end"]: now_minutes += 24 * 60
-            
             total_duration = end_minutes - start_minutes
             elapsed = now_minutes - start_minutes
             progress = min(100, max(0, int((elapsed / total_duration) * 100)))
-        
         st.markdown(f"""
         <div class="session-card">
             <div style="display:flex; justify-content:between; align-items:center;">
@@ -445,36 +554,24 @@ def market_session_status():
             <div style="background:rgba(255,255,255,0.1); height:6px; border-radius:3px; overflow:hidden;">
                 <div style="background:{sess['color'] if is_active else '#444'}; width:{progress if is_active else 0}%; height:100%; transition:width 0.5s ease;"></div>
             </div>
-            <div style="font-family:Rajdhani; font-size:11px; color:#aaa; margin-top:5px;">
-                { "Currently ACTIVE" if is_active else "Next session" }
-            </div>
+            <div style="font-family:Rajdhani; font-size:11px; color:#aaa; margin-top:5px;">{ "Currently ACTIVE" if is_active else "Next session" }</div>
         </div>
         """, unsafe_allow_html=True)
-
-    # Golden Time & Strategy Logic
     is_golden = (dt_time(19, 0) <= current_time <= dt_time(23, 0))
-    
     if is_golden:
         st.markdown('<div style="text-align:center; padding:10px; background:rgba(0,212,255,0.1); border:1px solid var(--electric-blue); border-radius:10px; margin-top:10px; animation: pulse 2s infinite;">'
                     '<h3 class="cyan-neon" style="margin:0; font-size:18px;">GOLDEN TIME: High Volatility! 🚀</h3></div>', unsafe_allow_html=True)
-    
     strategy_text = "Waiting for Market Open..."
-    if "Asian Session (Tokyo)" in active_sessions and len(active_sessions) == 1:
-        strategy_text = "Calm Market: Range Trading Mode. Focus on Liquidity Sweeps."
-    elif is_golden:
-        strategy_text = "High Volatility: Look for Order Block Mitigations & FVG entries."
-    elif "European Session (London)" in active_sessions:
-        strategy_text = "Trend Following: Watch for London Breakout patterns."
-    elif "American Session (New York)" in active_sessions:
-        strategy_text = "Market Reversals: Watch for NY Open manipulation."
-
+    if "Asian Session (Tokyo)" in active_sessions and len(active_sessions) == 1: strategy_text = "Calm Market: Range Trading Mode. Focus on Liquidity Sweeps."
+    elif is_golden: strategy_text = "High Volatility: Look for Order Block Mitigations & FVG entries."
+    elif "European Session (London)" in active_sessions: strategy_text = "Trend Following: Watch for London Breakout patterns."
+    elif "American Session (New York)" in active_sessions: strategy_text = "Market Reversals: Watch for NY Open manipulation."
     st.markdown(f"""
     <div style="margin-top:20px; padding:15px; border:1px solid var(--electric-blue); border-radius:10px; background:rgba(0,212,255,0.05); text-align:center;">
         <p class="cyan-neon" style="font-family:Orbitron; font-size:14px; margin-bottom:5px;">CURRENT RECOMMENDED STRATEGY: (SMC Focus)</p>
         <p class="rajdhani-font" style="font-size:16px; color:#fff; margin:0;">{strategy_text}</p>
     </div>
     """, unsafe_allow_html=True)
-    
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ====================== INSTRUMEN ======================
@@ -487,22 +584,22 @@ instruments = {
     "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver": "SI=F", "Crude Oil (WTI)": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F"}
 }
 
-# ====================== UI HEADER =====================
+# ====================== UI HEADER ======================
 st.markdown(f"""
 <div class="main-title-container">
     <div class="main-logo-container">
         <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png" alt="AeroVulpis Logo" class="custom-logo">
     </div>
     <h1 class="main-title">AEROVULPIS v3.3</h1>
-    <p style="text-align: center; color: #aaa; font-family: 'Rajdhani', sans-serif; margin-top: -5px;">ULTIMATE DIGITAL EDITION</p>
+    <p style="text-align: center; color: #aaa; font-family: 'Rajdhani', sans-serif; margin-top: -5px; padding: 0;">ULTIMATE DIGITAL EDITION</p>
 </div>
 """, unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
-    st.markdown("<div style='text-align:center;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:80px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
-    st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px;'>{t['control_center']}</h2>", unsafe_allow_html=True)
-    st.markdown("<p class='rajdhani-font' style='text-align:center; color:#888; font-size:11px;'>Digital Core v3.3 | Fahmi Edition</p>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:80px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
+    st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px; margin-bottom: 0;'>{t['control_center']}</h2>", unsafe_allow_html=True)
+    st.markdown("<p class='rajdhani-font' style='text-align:center; color:#888; font-size:11px; margin-top: 0;'>DynamiHatch Edition</p>", unsafe_allow_html=True)
 
     category = st.selectbox(t['category'], list(instruments.keys()))
     asset_name = st.selectbox(t['asset'], list(instruments[category].keys()))
@@ -565,15 +662,12 @@ def get_news_data(query, max_articles=10):
 if menu_selection == "Live Dashboard":
     market = get_market_data(ticker_input)
     df = get_historical_data(ticker_input, period, interval)
-    
     if market and not df.empty:
         if selected_tf_display in ["3h", "4h"]:
             rule = "3h" if selected_tf_display == "3h" else "4h"
             df = df.resample(rule).agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
-
         df = add_technical_indicators(df)
-        score, signal, reasons = get_weighted_signal(df)
-        
+        score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
         c1, c2, c3, c4 = st.columns(4)
         with c1: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["live_price"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{market["price"]:,.4f}</p></div>', unsafe_allow_html=True)
         with c2:
@@ -581,37 +675,22 @@ if menu_selection == "Live Dashboard":
             st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["signal"]}</p><p class="digital-font" style="font-size:28px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
         with c3: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["rsi"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>', unsafe_allow_html=True)
         with c4: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["atr"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
-
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))
         fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color='#00d4ff', width=1.5, dash='dot'), name='SMA 50'))
         fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color='#bc13fe', width=1.5, dash='dash'), name='SMA 200'))
-        fig.update_layout(
-            template="plotly_dark", height=450, xaxis_rangeslider_visible=False, 
-            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
-            margin=dict(l=0, r=0, t=20, b=0),
-            legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5)
-        )
+        fig.update_layout(template="plotly_dark", height=450, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=20, b=0), legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5))
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
-
         col_g, col_a = st.columns([1, 1])
         with col_g:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-            fig_gauge = go.Figure(go.Indicator(
-                mode = "gauge+number", value = score,
-                title = {"text": "Technical Strength", "font": {"family": "Orbitron", "color": "#00d4ff", "size": 18}},
-                gauge = {"axis": {"range": [0, 100]}, "bar": {"color": color}, "bgcolor": "rgba(0,0,0,0)",
-                         "steps": [{"range": [0, 40], "color": "rgba(255, 42, 109, 0.2)"}, {"range": [60, 100], "color": "rgba(0, 255, 136, 0.2)"}]}
-            ))
+            fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = score, title = {"text": "Technical Strength", "font": {"family": "Orbitron", "color": "#00d4ff", "size": 18}}, gauge = {"axis": {"range": [0, 100]}, "bar": {"color": color}, "bgcolor": "rgba(0,0,0,0)", "steps": [{"range": [0, 40], "color": "rgba(255, 42, 109, 0.2)"}, {"range": [60, 100], "color": "rgba(0, 255, 136, 0.2)"}]}))
             fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={"color": "#e6edf3"}, height=250, margin=dict(l=20, r=20, t=40, b=20))
             st.plotly_chart(fig_gauge, use_container_width=True)
-            if st.button(t['refresh'], use_container_width=True):
-                st.cache_data.clear()
-                st.rerun()
+            if st.button(t['refresh'], use_container_width=True): st.cache_data.clear(); st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
-        
         with col_a:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
             st.subheader(t['ai_analysis'])
@@ -631,16 +710,51 @@ elif menu_selection == "Signal Analysis":
             df = df.resample(rule).agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
         df = add_technical_indicators(df)
         latest = df.iloc[-1]
-        score, signal, reasons = get_weighted_signal(df)
+        score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         sig_color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
         st.markdown(f"### {t['recommendation']}: <span style='color:{sig_color};'>{signal}</span>", unsafe_allow_html=True)
-        cols = st.columns(5)
-        indicators = [("RSI", f"{latest['RSI']:.2f}"), ("MACD", f"{latest['MACD']:.4f}"), ("SMA 50", f"{latest['SMA50']:.2f}"), ("SMA 200", f"{latest['SMA200']:.2f}"), ("ADX", f"{latest['ADX']:.2f}")]
-        for i, (name, val) in enumerate(indicators): cols[i].metric(name, val)
-        st.markdown("---")
-        st.write(f"**{t['vol_analysis']}:**")
-        st.metric(t['curr_vol'], f"{latest['Volume']:,}", f"{latest['Volume'] - latest['Vol_SMA']:,.0f} {t['vs_avg']}")
+        
+        # Indicator Score Summary
+        c1, c2, c3 = st.columns(3)
+        c1.markdown(f'<div style="text-align:center;"><p style="color:#00ff88; font-size:12px; margin:0;">BULLISH</p><p class="digital-font" style="font-size:24px; margin:0;">{bull}</p></div>', unsafe_allow_html=True)
+        c2.markdown(f'<div style="text-align:center;"><p style="color:#ff2a6d; font-size:12px; margin:0;">BEARISH</p><p class="digital-font" style="font-size:24px; margin:0;">{bear}</p></div>', unsafe_allow_html=True)
+        c3.markdown(f'<div style="text-align:center;"><p style="color:#ffcc00; font-size:12px; margin:0;">NEUTRAL</p><p class="digital-font" style="font-size:24px; margin:0;">{neut}</p></div>', unsafe_allow_html=True)
+        
+        # 20 Indicators Grid (Fintech Style)
+        st.markdown('<div class="indicator-grid">', unsafe_allow_html=True)
+        indicators_data = [
+            ("RSI (14)", f"{latest['RSI']:.2f}", "Bullish" if latest['RSI'] < 30 else "Bearish" if latest['RSI'] > 70 else "Neutral"),
+            ("MACD", f"{latest['MACD']:.4f}", "Bullish" if latest['MACD'] > latest['Signal_Line'] else "Bearish"),
+            ("SMA 50", f"{latest['SMA50']:.2f}", "Bullish" if latest['Close'] > latest['SMA50'] else "Bearish"),
+            ("SMA 200", f"{latest['SMA200']:.2f}", "Bullish" if latest['Close'] > latest['SMA200'] else "Bearish"),
+            ("CCI (20)", f"{latest['CCI']:.2f}", "Bullish" if latest['CCI'] < -100 else "Bearish" if latest['CCI'] > 100 else "Neutral"),
+            ("WPR (14)", f"{latest['WPR']:.2f}", "Bullish" if latest['WPR'] < -80 else "Bearish" if latest['WPR'] > -20 else "Neutral"),
+            ("MFI (14)", f"{latest['MFI']:.2f}", "Bullish" if latest['MFI'] < 20 else "Bearish" if latest['MFI'] > 80 else "Neutral"),
+            ("EMA 9/21", "Cross", "Bullish" if latest['EMA9'] > latest['EMA21'] else "Bearish"),
+            ("ADX (14)", f"{latest['ADX']:.2f}", "Strong Trend" if latest['ADX'] > 25 else "Weak Trend"),
+            ("Stoch K", f"{latest['Stoch_K']:.2f}", "Bullish" if latest['Stoch_K'] < 20 else "Bearish" if latest['Stoch_K'] > 80 else "Neutral"),
+            ("ATR (14)", f"{latest['ATR']:.4f}", "High Vol" if latest['ATR'] > df['ATR'].mean() else "Low Vol"),
+            ("ROC (12)", f"{latest['ROC']:.2f}", "Bullish" if latest['ROC'] > 0 else "Bearish"),
+            ("TRIX (15)", f"{latest['TRIX']:.4f}", "Bullish" if latest['TRIX'] > 0 else "Bearish"),
+            ("AO (5/34)", f"{latest['AO']:.4f}", "Bullish" if latest['AO'] > 0 else "Bearish"),
+            ("KAMA (10)", f"{latest['KAMA']:.2f}", "Bullish" if latest['Close'] > latest['KAMA'] else "Bearish"),
+            ("Ichimoku A", f"{latest['Ichimoku_A']:.2f}", "Bullish" if latest['Close'] > latest['Ichimoku_A'] else "Bearish"),
+            ("Ichimoku B", f"{latest['Ichimoku_B']:.2f}", "Bullish" if latest['Close'] > latest['Ichimoku_B'] else "Bearish"),
+            ("PSAR", f"{latest['Parabolic_SAR']:.2f}", "Bullish" if latest['Close'] > latest['Parabolic_SAR'] else "Bearish"),
+            ("BB Upper", f"{latest['BB_Upper']:.2f}", "Overbought" if latest['Close'] > latest['BB_Upper'] else "Normal"),
+            ("BB Lower", f"{latest['BB_Lower']:.2f}", "Oversold" if latest['Close'] < latest['BB_Lower'] else "Normal")
+        ]
+        for name, val, sig in indicators_data:
+            sig_col = "#00ff88" if "Bullish" in sig or "Strong" in sig or "Oversold" in sig else "#ff2a6d" if "Bearish" in sig or "Overbought" in sig else "#ffcc00"
+            st.markdown(f"""
+            <div class="indicator-box">
+                <div class="indicator-name">{name}</div>
+                <div class="indicator-value">{val}</div>
+                <div class="indicator-signal" style="color:{sig_col};">{sig}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
 elif menu_selection == "Market Sessions":
@@ -711,10 +825,10 @@ elif menu_selection == "System Log":
     st.markdown(f'<div class="glass-card">', unsafe_allow_html=True)
     st.subheader(t['sys_log'])
     st.write(f"**{t['version']}**")
-    st.write("- Replaced Market History with Market Sessions Status.")
-    st.write("- Added real-time session tracking for Tokyo, London, and New York.")
-    st.write("- Integrated Golden Time (Overlap) and SMC-based strategy recommendations.")
-    st.write("- Enhanced UI with neon glow effects and professional dashboard layout.")
+    st.write("- Enhanced Signal Analysis with 20 technical indicators and scoring system.")
+    st.write("- Updated sidebar branding to DynamiHatch Edition.")
+    st.write("- Optimized UI layout: reduced spacing and adjusted logo position.")
+    st.write("- Restored original motivational footer.")
     st.write(f"- {t['created_by']}")
     st.markdown('</div>', unsafe_allow_html=True)
 

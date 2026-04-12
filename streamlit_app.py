@@ -1,4 +1,3 @@
-
 import streamlit as st
 from groq import Groq
 import os
@@ -159,14 +158,14 @@ st.markdown("""
         position: relative;
         display: inline-block;
         animation: float 4s infinite ease-in-out;
-        padding: 0px 0;
+        padding: 20px 0; /* Ditambah padding agar logo tidak terpotong */
         margin-bottom: -10px;
         background: transparent !important;
         perspective: 1200px;
     }
 
     .custom-logo {
-        width: 110px; /* Dikecilkan sedikit */
+        width: 90px; /* Dikecilkan lagi agar lebih rapi */
         filter: drop-shadow(0 0 15px var(--electric-blue));
         transition: all 0.5s ease;
         background-color: transparent !important;
@@ -189,7 +188,7 @@ st.markdown("""
 
     .main-title {
         font-family: 'Orbitron', sans-serif;
-        font-size: 42px;
+        font-size: 32px; /* Dikecilkan dari 42px */
         font-weight: 700;
         background: linear-gradient(90deg, var(--electric-blue), var(--deep-blue));
         -webkit-background-clip: text;
@@ -304,7 +303,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
 # Konfigurasi Groq API
 groq_api_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
 client = None
@@ -513,8 +511,7 @@ def get_groq_response(question, context=""):
         return chat_completion.choices[0].message.content
     except Exception as e:
         return f"⚠️ Error: {str(e)}"
-
-# ====================== MARKET SESSIONS LOGIC ======================
+        # ====================== MARKET SESSIONS LOGIC ======================
 def market_session_status():
     tz = pytz.timezone('Asia/Jakarta')
     now = datetime.now(tz)
@@ -637,9 +634,8 @@ with st.sidebar:
             "nav-link": {"font-size": "13px", "text-align": "left", "margin": "0px", "--hover-color": "#0055ff"},
             "nav-link-selected": {"background-color": "var(--deep-blue)", "color": "white"},
         }
-    )
-
-# ====================== FUNGSI MARKET NEWS ======================
+                        )
+    # ====================== FUNGSI MARKET NEWS ======================
 @st.cache_data(ttl=300)
 def get_news_data(query, max_articles=10):
     gnews_api_key = st.secrets.get("GNEWS_API_KEY") or os.getenv("GNEWS_API_KEY")
@@ -672,12 +668,12 @@ if menu_selection == "Live Dashboard":
         df = add_technical_indicators(df)
         score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
         c1, c2, c3, c4 = st.columns(4)
-        with c1: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["live_price"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{market["price"]:,.4f}</p></div>', unsafe_allow_html=True)
+        with c1: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["live_price"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{market["price"]:,.4f}</p></div>', unsafe_allow_html=True)
         with c2:
             color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["signal"]}</p><p class="digital-font" style="font-size:28px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
-        with c3: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["rsi"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>', unsafe_allow_html=True)
-        with c4: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:12px;">{t["atr"]}</p><p class="digital-font" style="font-size:28px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["signal"]}</p><p class="digital-font" style="font-size:20px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
+        with c3: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["rsi"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>', unsafe_allow_html=True)
+        with c4: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["atr"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))

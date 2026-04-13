@@ -5,10 +5,11 @@ def economic_calendar_widget():
     Menampilkan Economic Radar Real-time menggunakan Iframe TradingView
     dengan gaya visual Cyber Tech Blue yang konsisten dengan AeroVulpis.
     
-    PERBAIKAN TATA LETAK:
-    - Judul "ECONOMIC RADAR" berukuran 6px di paling atas.
-    - Logo Radar dan Status "LIVE CONNECTION" diletakkan di bawah judul secara rapi.
-    - Menghapus radar-info-bar (Actual/Forecast/Previous).
+    PERBAIKAN DETAIL ESTETIKA:
+    - Memberikan padding-top (5px) agar judul tidak menempel ke border kotak atas.
+    - Judul "ECONOMIC RADAR" berukuran 6px (rata tengah).
+    - Jarak (gap) antar elemen diatur presisi agar tidak berhimpitan.
+    - Logo Radar dan Status diletakkan di bawah judul secara simetris.
     """
     
     # CSS Khusus untuk Widget Economic Radar
@@ -19,7 +20,7 @@ def economic_calendar_widget():
         .economic-radar-container {
             border: 2px solid #00d4ff;
             border-radius: 12px;
-            padding: 8px;
+            padding: 12px 8px 8px 8px; /* Padding atas ditambah (12px) agar teks bernapas */
             background: rgba(0, 212, 255, 0.02);
             box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
             margin-bottom: 10px;
@@ -31,30 +32,32 @@ def economic_calendar_widget():
         .radar-header-stack {
             display: flex;
             flex-direction: column;
-            align-items: center; /* Rata tengah */
-            margin-bottom: 8px;
+            align-items: center; 
+            margin-bottom: 12px; /* Jarak ke widget iframe di bawahnya */
             width: 100%;
-            gap: 4px;
+            gap: 6px; /* Jarak antara judul dan baris logo/status */
         }
         
         .radar-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 6px; /* Sesuai permintaan: 6px */
+            font-size: 6px; 
             font-weight: 700;
             color: #00d4ff;
             text-shadow: 0 0 4px rgba(0, 212, 255, 0.8);
             margin: 0;
+            padding: 0;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px; /* Sedikit renggang agar elegan */
             white-space: nowrap;
             text-align: center;
+            line-height: 1;
         }
         
         .radar-subtitle-row {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 5px;
+            gap: 6px;
         }
 
         .radar-logo {
@@ -94,11 +97,11 @@ def economic_calendar_widget():
         
         .status-indicator {
             font-family: 'Rajdhani', sans-serif;
-            font-size: 5.5px; /* Sedikit lebih kecil agar proporsional */
+            font-size: 5.5px;
             color: #00ff88;
             letter-spacing: 0.3px;
             background: rgba(0, 255, 136, 0.05);
-            padding: 1px 3px;
+            padding: 1.5px 4px;
             border-radius: 2px;
             border: 0.5px solid rgba(0, 255, 136, 0.2);
             display: flex;
@@ -112,7 +115,7 @@ def economic_calendar_widget():
             background-color: #00ff88;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 2px;
+            margin-right: 3px;
             box-shadow: 0 0 2px #00ff88;
             animation: pulse-green 2s infinite;
         }
@@ -131,8 +134,8 @@ def economic_calendar_widget():
         .impact-legend {
             display: flex;
             justify-content: center;
-            gap: 6px;
-            margin-top: 6px;
+            gap: 8px;
+            margin-top: 8px;
             font-family: 'Rajdhani', sans-serif;
             font-size: 6px;
             flex-wrap: wrap;
@@ -155,7 +158,7 @@ def economic_calendar_widget():
     </style>
     """, unsafe_allow_html=True)
 
-    # Container Utama dengan Tata Letak Baru
+    # Container Utama dengan Padding Atas yang diperbaiki
     st.markdown("""
     <div class="economic-radar-container">
         <div class="radar-header-stack">

@@ -12,10 +12,10 @@ def economic_calendar_widget():
         .economic-calendar-container {
             border: 2px solid #00d4ff;
             border-radius: 15px;
-            padding: 20px;
+            padding: 15px;
             background: rgba(0, 212, 255, 0.02);
             box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             position: relative;
             overflow: hidden;
         }
@@ -24,12 +24,12 @@ def economic_calendar_widget():
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
         
         .calendar-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
             color: #00d4ff;
             text-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
@@ -39,11 +39,11 @@ def economic_calendar_widget():
         
         .status-indicator {
             font-family: 'Rajdhani', sans-serif;
-            font-size: 10px;
+            font-size: 9px;
             color: #00ff88;
             letter-spacing: 1px;
             background: rgba(0, 255, 136, 0.1);
-            padding: 4px 8px;
+            padding: 3px 6px;
             border-radius: 5px;
             border: 1px solid rgba(0, 255, 136, 0.3);
             display: flex;
@@ -51,12 +51,12 @@ def economic_calendar_widget():
         }
         
         .status-dot {
-            height: 6px;
-            width: 6px;
+            height: 5px;
+            width: 5px;
             background-color: #00ff88;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 6px;
+            margin-right: 5px;
             box-shadow: 0 0 8px #00ff88;
             animation: pulse-green 2s infinite;
         }
@@ -69,23 +69,24 @@ def economic_calendar_widget():
 
         /* Styling Iframe agar lebih menyatu */
         .tradingview-widget-container iframe {
-            border-radius: 10px !important;
-            filter: hue-rotate(180deg) invert(0.9) brightness(0.9) contrast(1.2); /* Penyesuaian warna agar lebih 'Cyber Blue' */
+            border-radius: 8px !important;
+            /* Filter dikurangi agar data angka (Actual/Forecast) lebih jelas terbaca */
+            filter: hue-rotate(180deg) brightness(0.9) contrast(1.1); 
         }
         
         /* Legenda Dampak */
         .impact-legend {
             display: flex;
-            gap: 15px;
-            margin-top: 15px;
+            gap: 12px;
+            margin-top: 10px;
             font-family: 'Rajdhani', sans-serif;
-            font-size: 12px;
+            font-size: 11px;
         }
         
         .legend-item {
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
         }
         
         .dot-high { color: #ff2a6d; }
@@ -101,13 +102,14 @@ def economic_calendar_widget():
             <h2 class="calendar-title">KALENDER EKONOMI</h2>
             <div class="status-indicator">
                 <span class="status-dot"></span>
-                STATUS: KONEKSI AKTIF • REAL-TIME
+                STATUS: AKTIF • REAL-TIME
             </div>
         </div>
     """, unsafe_allow_html=True)
 
     # TradingView Economic Calendar Widget (Iframe)
-    # Kita menggunakan HTML komponen Streamlit untuk merender widget TradingView
+    # Tinggi dikurangi menjadi 450 agar tidak terlalu memakan layar
+    # importanceFilter disesuaikan agar menampilkan data yang lebih relevan
     tradingview_html = """
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
@@ -116,7 +118,7 @@ def economic_calendar_widget():
       "colorTheme": "dark",
       "isTransparent": true,
       "width": "100%",
-      "height": "600",
+      "height": "450",
       "locale": "en",
       "importanceFilter": "-1,0,1",
       "currencyFilter": "USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD"
@@ -126,17 +128,17 @@ def economic_calendar_widget():
     """
     
     try:
-        st.components.v1.html(tradingview_html, height=600)
+        # Menggunakan height=450 agar sesuai dengan konfigurasi widget
+        st.components.v1.html(tradingview_html, height=450)
     except Exception as e:
         st.error(f"Gagal memuat kalender ekonomi: {str(e)}")
-        st.info("Pastikan koneksi internet Anda stabil untuk memuat data real-time.")
 
     # Legenda Dampak & Penutup Container
     st.markdown("""
         <div class="impact-legend">
-            <div class="legend-item"><span class="dot-high">🔴</span> Dampak Tinggi (High)</div>
-            <div class="legend-item"><span class="dot-med">🟡</span> Dampak Sedang (Medium)</div>
-            <div class="legend-item"><span class="dot-low">🟢</span> Dampak Rendah (Low)</div>
+            <div class="legend-item"><span class="dot-high">🔴</span> High</div>
+            <div class="legend-item"><span class="dot-med">🟡</span> Medium</div>
+            <div class="legend-item"><span class="dot-low">🟢</span> Low</div>
         </div>
     </div>
     """, unsafe_allow_html=True)

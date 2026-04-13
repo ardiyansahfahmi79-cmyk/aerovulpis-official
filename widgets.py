@@ -1,13 +1,13 @@
 import streamlit as st
 
 def economic_calendar_widget():
-    \"\"\"
+    """
     Menampilkan Kalender Ekonomi Real-time menggunakan Iframe TradingView
     dengan gaya visual Cyber Tech Blue yang konsisten dengan AeroVulpis.
-    \"\"\"
+    """
     
     # CSS Khusus untuk Widget Kalender Ekonomi
-    st.markdown(\"\"\"
+    st.markdown("""
     <style>
         .economic-calendar-container {
             border: 2px solid #00d4ff;
@@ -92,51 +92,51 @@ def economic_calendar_widget():
         .dot-med { color: #ffcc00; }
         .dot-low { color: #00ff88; }
     </style>
-    \"\"\", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     # Container Utama
-    st.markdown(\"\"\"
-    <div class=\"economic-calendar-container\">
-        <div class=\"calendar-header\">
-            <h2 class=\"calendar-title\">KALENDER EKONOMI</h2>
-            <div class=\"status-indicator\">
-                <span class=\"status-dot\"></span>
+    st.markdown("""
+    <div class="economic-calendar-container">
+        <div class="calendar-header">
+            <h2 class="calendar-title">KALENDER EKONOMI</h2>
+            <div class="status-indicator">
+                <span class="status-dot"></span>
                 STATUS: KONEKSI AKTIF • REAL-TIME
             </div>
         </div>
-    \"\"\", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     # TradingView Economic Calendar Widget (Iframe)
     # Kita menggunakan HTML komponen Streamlit untuk merender widget TradingView
-    tradingview_html = \"\"\"
-    <div class=\"tradingview-widget-container\">
-      <div class=\"tradingview-widget-container__widget\"></div>
-      <script type=\"text/javascript\" src=\"https://s3.tradingview.com/external-embedding/embed-widget-events.js\" async>
+    tradingview_html = """
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
       {
-      \"colorTheme\": \"dark\",
-      \"isTransparent\": true,
-      \"width\": \"100%\",
-      \"height\": \"600\",
-      \"locale\": \"en\",
-      \"importanceFilter\": \"-1,0,1\",
-      \"currencyFilter\": \"USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD\"
+      "colorTheme": "dark",
+      "isTransparent": true,
+      "width": "100%",
+      "height": "600",
+      "locale": "en",
+      "importanceFilter": "-1,0,1",
+      "currencyFilter": "USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD"
     }
       </script>
     </div>
-    \"\"\"
+    """
     
     try:
         st.components.v1.html(tradingview_html, height=600)
     except Exception as e:
-        st.error(f\"Gagal memuat kalender ekonomi: {str(e)}\")
-        st.info(\"Pastikan koneksi internet Anda stabil untuk memuat data real-time.\")
+        st.error(f"Gagal memuat kalender ekonomi: {str(e)}")
+        st.info("Pastikan koneksi internet Anda stabil untuk memuat data real-time.")
 
     # Legenda Dampak & Penutup Container
-    st.markdown(\"\"\"
-        <div class=\"impact-legend\">
-            <div class=\"legend-item\"><span class=\"dot-high\">🔴</span> Dampak Tinggi (High)</div>
-            <div class=\"legend-item\"><span class=\"dot-med\">🟡</span> Dampak Sedang (Medium)</div>
-            <div class=\"legend-item\"><span class=\"dot-low\">🟢</span> Dampak Rendah (Low)</div>
+    st.markdown("""
+        <div class="impact-legend">
+            <div class="legend-item"><span class="dot-high">🔴</span> Dampak Tinggi (High)</div>
+            <div class="legend-item"><span class="dot-med">🟡</span> Dampak Sedang (Medium)</div>
+            <div class="legend-item"><span class="dot-low">🟢</span> Dampak Rendah (Low)</div>
         </div>
     </div>
-    \"\"\", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)

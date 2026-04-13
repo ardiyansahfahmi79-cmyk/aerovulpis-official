@@ -636,7 +636,8 @@ with st.sidebar:
             "nav-link": {"font-size": "13px", "text-align": "left", "margin": "0px", "--hover-color": "#0055ff"},
             "nav-link-selected": {"background-color": "var(--deep-blue)", "color": "white"},
         }
-)
+    )
+
 # ====================== FUNGSI MARKET NEWS ======================
 @st.cache_data(ttl=300)
 def get_news_data(query, max_articles=10):
@@ -853,6 +854,7 @@ elif menu_selection == "System Log":
     st.write("- Restored Indonesian motivational footer with DynamiHatch Identity.")
     st.write(f"- {t['created_by']}")
     st.markdown('</div>', unsafe_allow_html=True)
+
 # ====================== FOOTER ======================
 st.markdown("---")
 st.markdown("""

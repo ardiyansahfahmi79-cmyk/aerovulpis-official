@@ -498,11 +498,12 @@ def get_groq_response(question, context=""):
     Waktu: {datetime.now().strftime('%d %B %Y, %H:%M:%S WIB')}
     Bahasa: {st.session_state.lang}
 
-    TUGAS:
-    1. Berikan analisis teknikal yang SANGAT DETAIL dan AKURAT.
+    TUGAS UTAMA:
+    1. Membantu user (Fahmi) menganalisis data trading dan berita yang ditampilkan di website.
     2. Berikan level ENTRY, STOP LOSS, dan TAKE PROFIT yang spesifik berdasarkan data.
-    3. Gunakan nada profesional dan emosional yang tepat (bullish/bearish).
-    4. Konteks: {context}
+    3. Jawablah dengan singkat, padat, dan teknis.
+    4. JANGAN menyarankan perubahan pada kode website kecuali diminta.
+    5. Konteks: {context}
     """
     try:
         chat_completion = client.chat.completions.create(
@@ -636,8 +637,9 @@ with st.sidebar:
             "nav-link": {"font-size": "13px", "text-align": "left", "margin": "0px", "--hover-color": "#0055ff"},
             "nav-link-selected": {"background-color": "var(--deep-blue)", "color": "white"},
         }
-        )
-    # ====================== FUNGSI MARKET NEWS ======================
+    )
+
+# ====================== FUNGSI MARKET NEWS ======================
 @st.cache_data(ttl=300)
 def get_news_data(query, max_articles=10):
     gnews_api_key = st.secrets.get("GNEWS_API_KEY") or os.getenv("GNEWS_API_KEY")
@@ -681,7 +683,7 @@ if menu_selection == "Live Dashboard":
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))
         fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color='#00d4ff', width=1.5, dash='dot'), name='SMA 50'))
         fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color='#bc13fe', width=1.5, dash='dash'), name='SMA 200'))
-        fig.update_layout(template="plotly_dark", height=450, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=20, b=0), legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5))
+        fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=10, b=10), height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
         col_g, col_a = st.columns([1, 1])

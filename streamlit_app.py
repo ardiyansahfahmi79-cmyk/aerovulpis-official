@@ -575,8 +575,7 @@ def market_session_status():
     </div>
     """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-
-# ====================== INSTRUMEN ======================
+        # ====================== INSTRUMEN ======================
 instruments = {
     "Forex": {"EUR/USD": "EURUSD=X", "GBP/USD": "GBPUSD=X", "USD/JPY": "USDJPY=X", "AUD/USD": "AUDUSD=X", "USD/CHF": "USDCHF=X"},
     "Crypto": {"Bitcoin": "BTC-USD", "Ethereum": "ETH-USD", "Solana": "SOL-USD", "Binance Coin": "BNB-USD", "Ripple": "XRP-USD"},
@@ -611,7 +610,6 @@ with st.sidebar:
 
     st.markdown("---")
     tf_options = {
-        "1m (Live)": {"period": "1d", "interval": "1m"},
         "5m": {"period": "1d", "interval": "5m"},
         "15m": {"period": "1d", "interval": "15m"},
         "30m": {"period": "5d", "interval": "30m"},
@@ -855,8 +853,7 @@ elif menu_selection == "System Log":
     st.write("- Restored Indonesian motivational footer with DynamiHatch Identity.")
     st.write(f"- {t['created_by']}")
     st.markdown('</div>', unsafe_allow_html=True)
-
-# ====================== FOOTER ======================
+        # ====================== FOOTER ======================
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; padding: 20px; opacity: 0.8;">

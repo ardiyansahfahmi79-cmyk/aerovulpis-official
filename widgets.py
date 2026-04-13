@@ -5,10 +5,10 @@ def economic_calendar_widget():
     Menampilkan Economic Radar Real-time menggunakan Iframe TradingView
     dengan gaya visual Cyber Tech Blue yang konsisten dengan AeroVulpis.
     
-    PERBAIKAN TOTAL:
-    - MENGHAPUS PERMANEN radar-info-bar (Actual, Forecast, Previous).
-    - MERAPIKAN JUDUL agar tidak terpotong (font-size 13px).
-    - MEMPERTAHANKAN styling neon dan animasi radar sweep.
+    PERBAIKAN:
+    - Mengecilkan font judul menjadi 12px agar tidak terpotong.
+    - Mengatur letter-spacing agar lebih rapat.
+    - Menghapus radar-info-bar (Actual, Forecast, Previous).
     """
     
     # CSS Khusus untuk Widget Economic Radar
@@ -19,7 +19,7 @@ def economic_calendar_widget():
         .economic-radar-container {
             border: 2px solid #00d4ff;
             border-radius: 15px;
-            padding: 12px;
+            padding: 10px;
             background: rgba(0, 212, 255, 0.02);
             box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
             margin-bottom: 10px;
@@ -31,21 +31,21 @@ def economic_calendar_widget():
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             flex-wrap: nowrap;
-            gap: 8px;
+            gap: 5px;
         }
         
         .radar-title-wrapper {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
             overflow: hidden;
         }
 
         .radar-logo {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             position: relative;
             display: flex;
             align-items: center;
@@ -80,13 +80,13 @@ def economic_calendar_widget():
         
         .radar-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 13px; /* Ukuran font dikecilkan agar rapi */
+            font-size: 12px; /* Dikecilkan lagi agar tidak terpotong */
             font-weight: 700;
             color: #00d4ff;
             text-shadow: 0 0 8px rgba(0, 212, 255, 0.8);
             margin: 0;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.2px; /* Lebih rapat agar aman */
             white-space: nowrap;
         }
         
@@ -94,9 +94,9 @@ def economic_calendar_widget():
             font-family: 'Rajdhani', sans-serif;
             font-size: 8px;
             color: #00ff88;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
             background: rgba(0, 255, 136, 0.1);
-            padding: 2px 6px;
+            padding: 2px 4px;
             border-radius: 3px;
             border: 1px solid rgba(0, 255, 136, 0.3);
             display: flex;
@@ -122,7 +122,6 @@ def economic_calendar_widget():
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
 
-        /* Iframe TradingView Styling */
         .tradingview-widget-container iframe {
             border-radius: 10px !important;
             filter: hue-rotate(180deg) brightness(0.95) contrast(1.1); 
@@ -131,10 +130,10 @@ def economic_calendar_widget():
         .impact-legend {
             display: flex;
             justify-content: center;
-            gap: 12px;
+            gap: 10px;
             margin-top: 10px;
             font-family: 'Rajdhani', sans-serif;
-            font-size: 9px;
+            font-size: 8px;
             flex-wrap: wrap;
         }
         
@@ -146,7 +145,7 @@ def economic_calendar_widget():
         }
         
         .star-icon {
-            font-size: 9px;
+            font-size: 8px;
         }
         
         .high-impact { color: #ff2a6d; text-shadow: 0 0 5px rgba(255, 42, 109, 0.5); }
@@ -155,7 +154,7 @@ def economic_calendar_widget():
 
         @media (max-width: 480px) {
             .radar-title {
-                font-size: 12px;
+                font-size: 11px;
             }
             .status-indicator {
                 font-size: 7px;
@@ -164,7 +163,7 @@ def economic_calendar_widget():
     </style>
     """, unsafe_allow_html=True)
 
-    # Container Utama (TANPA radar-info-bar)
+    # Container Utama
     st.markdown("""
     <div class="economic-radar-container">
         <div class="radar-header">

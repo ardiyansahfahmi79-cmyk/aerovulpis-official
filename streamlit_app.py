@@ -1,5 +1,6 @@
 import streamlit as st
 from groq import Groq
+from widgets import economic_calendar_widget
 import os
 import yfinance as yf
 import pandas as pd
@@ -547,7 +548,7 @@ def market_session_status():
         st.markdown(f"""
         <div class="session-card">
             <div style="display:flex; justify-content:between; align-items:center;">
-     <span style="font-family:Orbitron; font-weight:bold; color:{sess['color']}; flex:1;">{sess['name']}</span>
+                <span style="font-family:Orbitron; font-weight:bold; color:{sess['color']}; flex:1;">{sess['name']}</span>
                 <span style="font-family:Rajdhani; font-weight:bold; color:{'#00ff88' if is_active else '#ff2a6d'};">{status_text}</span>
             </div>
             <div style="font-family:Rajdhani; font-size:12px; color:#888; margin-bottom:5px;">{sess['start'].strftime('%H:%M')} - {sess['end'].strftime('%H:%M')} WIB</div>
@@ -625,8 +626,8 @@ with st.sidebar:
 
     menu_selection = option_menu(
         menu_title=t['navigation'],
-        options=["Live Dashboard", "Signal Analysis", "Market Sessions", "Market News", "Chatbot AI", "Risk Management", "Settings", "System Log"],
-        icons=["activity", "graph-up-arrow", "globe", "newspaper", "chat-dots", "shield-fill", "gear", "journal-text"],
+        options=["Live Dashboard", "Signal Analysis", "Market Sessions", "Market News", "Economic Calendar", "Chatbot AI", "Risk Management", "Settings", "System Log"],
+        icons=["activity", "graph-up-arrow", "globe", "newspaper", "calendar-event", "chat-dots", "shield-fill", "gear", "journal-text"],
         menu_icon="cast",
         default_index=0,
         styles={
@@ -635,7 +636,7 @@ with st.sidebar:
             "nav-link": {"font-size": "13px", "text-align": "left", "margin": "0px", "--hover-color": "#0055ff"},
             "nav-link-selected": {"background-color": "var(--deep-blue)", "color": "white"},
         }
-)
+        )
     # ====================== FUNGSI MARKET NEWS ======================
 @st.cache_data(ttl=300)
 def get_news_data(query, max_articles=10):
@@ -784,6 +785,9 @@ elif menu_selection == "Market News":
                 <a href="{a["url"]}" target="_blank" style="color:var(--neon-green); font-size:12px; font-weight:bold;">READ MORE →</a>
             </div>
             """, unsafe_allow_html=True)
+
+elif menu_selection == "Economic Calendar":
+    economic_calendar_widget()
 
 elif menu_selection == "Chatbot AI":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">🤖 AeroVulpis AI Assistant</h2>', unsafe_allow_html=True)

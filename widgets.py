@@ -5,10 +5,10 @@ def economic_calendar_widget():
     Menampilkan Economic Radar Real-time menggunakan Iframe TradingView
     dengan gaya visual Cyber Tech Blue yang konsisten dengan AeroVulpis.
     
-    PERBAIKAN:
-    - Menghapus radar-info-bar (Actual, Forecast, Previous) agar tampilan bersih.
-    - Merapikan judul agar tidak terpotong dan font sedikit lebih kecil (13px).
-    - Mempertahankan semua styling neon dan animasi radar sweep.
+    PERBAIKAN TOTAL:
+    - MENGHAPUS PERMANEN radar-info-bar (Actual, Forecast, Previous).
+    - MERAPIKAN JUDUL agar tidak terpotong (font-size 13px).
+    - MEMPERTAHANKAN styling neon dan animasi radar sweep.
     """
     
     # CSS Khusus untuk Widget Economic Radar
@@ -164,7 +164,7 @@ def economic_calendar_widget():
     </style>
     """, unsafe_allow_html=True)
 
-    # Container Utama (Tanpa radar-info-bar)
+    # Container Utama (TANPA radar-info-bar)
     st.markdown("""
     <div class="economic-radar-container">
         <div class="radar-header">

@@ -14,7 +14,7 @@ def economic_calendar_widget():
         .economic-radar-container {
             border: 2px solid #00d4ff;
             border-radius: 15px;
-            padding: 15px;
+            padding: 12px;
             background: rgba(0, 212, 255, 0.02);
             box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
             margin-bottom: 10px;
@@ -26,39 +26,40 @@ def economic_calendar_widget():
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: nowrap; /* Mencegah pembungkusan baris agar tidak terpotong vertikal */
+            gap: 8px;
         }
         
         .radar-title-wrapper {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
         .radar-logo {
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
 
         .radar-circle {
             position: absolute;
             width: 100%;
             height: 100%;
-            border: 2px solid #00d4ff;
+            border: 1.5px solid #00d4ff;
             border-radius: 50%;
-            opacity: 0.5;
+            opacity: 0.6;
         }
 
         .radar-sweep {
             position: absolute;
             width: 50%;
-            height: 2px;
+            height: 1.5px;
             background: linear-gradient(to right, transparent, #00d4ff);
             top: 50%;
             left: 50%;
@@ -73,43 +74,45 @@ def economic_calendar_widget():
         
         .radar-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 18px;
+            font-size: 16px; /* Ukuran font dikecilkan agar lebih rapi */
             font-weight: 700;
             color: #00d4ff;
-            text-shadow: 0 0 15px rgba(0, 212, 255, 0.8);
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.8);
             margin: 0;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
+            white-space: nowrap; /* Mencegah teks turun ke bawah */
         }
         
         .status-indicator {
             font-family: 'Rajdhani', sans-serif;
-            font-size: 10px;
+            font-size: 9px;
             color: #00ff88;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             background: rgba(0, 255, 136, 0.1);
-            padding: 4px 8px;
-            border-radius: 5px;
+            padding: 3px 6px;
+            border-radius: 4px;
             border: 1px solid rgba(0, 255, 136, 0.3);
             display: flex;
             align-items: center;
-            box-shadow: 0 0 10px rgba(0, 255, 136, 0.1);
+            white-space: nowrap;
+            flex-shrink: 0;
         }
         
         .status-dot {
-            height: 6px;
-            width: 6px;
+            height: 5px;
+            width: 5px;
             background-color: #00ff88;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 6px;
-            box-shadow: 0 0 8px #00ff88;
+            margin-right: 5px;
+            box-shadow: 0 0 6px #00ff88;
             animation: pulse-green 2s infinite;
         }
         
         @keyframes pulse-green {
             0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(0, 255, 136, 0); }
+            70% { transform: scale(1); box-shadow: 0 0 0 5px rgba(0, 255, 136, 0); }
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
 
@@ -126,8 +129,8 @@ def economic_calendar_widget():
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(0, 212, 255, 0.1);
             border-radius: 8px;
-            padding: 8px;
-            margin-bottom: 15px;
+            padding: 6px;
+            margin-bottom: 12px;
             font-family: 'Rajdhani', sans-serif;
         }
 
@@ -136,14 +139,14 @@ def economic_calendar_widget():
         }
 
         .info-label {
-            font-size: 9px;
+            font-size: 8px;
             color: #888;
             text-transform: uppercase;
             display: block;
         }
 
         .info-value {
-            font-size: 12px;
+            font-size: 11px;
             color: #00d4ff;
             font-weight: 700;
         }
@@ -152,22 +155,22 @@ def economic_calendar_widget():
         .impact-legend {
             display: flex;
             justify-content: center;
-            gap: 20px;
-            margin-top: 15px;
+            gap: 15px;
+            margin-top: 12px;
             font-family: 'Rajdhani', sans-serif;
-            font-size: 11px;
+            font-size: 10px;
             flex-wrap: wrap;
         }
         
         .legend-item {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             color: #aaa;
         }
         
         .star-icon {
-            font-size: 12px;
+            font-size: 10px;
         }
         
         .high-impact { color: #ff2a6d; text-shadow: 0 0 5px rgba(255, 42, 109, 0.5); }
@@ -175,17 +178,16 @@ def economic_calendar_widget():
         .low-impact { color: #00ff88; }
 
         /* Responsivitas untuk HP */
-        @media (max-width: 600px) {
-            .radar-header {
-                flex-direction: row;
-                justify-content: space-between;
-            }
+        @media (max-width: 480px) {
             .radar-title {
-                font-size: 16px;
+                font-size: 14px;
             }
             .status-indicator {
                 font-size: 8px;
-                padding: 2px 5px;
+            }
+            .radar-logo {
+                width: 18px;
+                height: 18px;
             }
         }
     </style>

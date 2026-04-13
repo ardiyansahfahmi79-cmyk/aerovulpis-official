@@ -20,7 +20,7 @@ def economic_calendar_widget():
         .economic-radar-container {
             border: 2px solid #00d4ff;
             border-radius: 12px;
-            padding: 20px; /* Padding disesuaikan agar teks lebih seimbang dan tidak menempel border */
+            padding: 30px; /* Padding ditingkatkan untuk memastikan jarak yang cukup dari border */
             background: rgba(0, 212, 255, 0.02);
             box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
             margin-bottom: 10px;
@@ -45,10 +45,10 @@ def economic_calendar_widget():
             color: #00d4ff;
             text-shadow: 0 0 4px rgba(0, 212, 255, 0.8);
             margin: 0;
-            padding: 0;
+            padding: 0 10px; /* Menambahkan padding horizontal untuk judul */
             text-transform: uppercase;
             letter-spacing: 0.8px; /* Sedikit renggang agar elegan */
-            white-space: nowrap;
+            /* white-space: nowrap; */ /* Dihapus untuk memungkinkan wrapping jika diperlukan */
             text-align: center;
             line-height: 1;
         }
@@ -106,7 +106,7 @@ def economic_calendar_widget():
             border: 0.5px solid rgba(0, 255, 136, 0.2);
             display: flex;
             align-items: center;
-            white-space: nowrap;
+            /* white-space: nowrap; */ /* Dihapus untuk memungkinkan wrapping jika diperlukan */
         }
         
         .status-dot {

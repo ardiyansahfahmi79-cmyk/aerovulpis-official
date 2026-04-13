@@ -5,10 +5,10 @@ def economic_calendar_widget():
     Menampilkan Economic Radar Real-time menggunakan Iframe TradingView
     dengan gaya visual Cyber Tech Blue yang konsisten dengan AeroVulpis.
     
-    PERBAIKAN:
-    - Mengecilkan font judul menjadi 12px agar tidak terpotong.
-    - Mengatur letter-spacing agar lebih rapat.
-    - Menghapus radar-info-bar (Actual, Forecast, Previous).
+    PERBAIKAN TOTAL:
+    - Mengecilkan font judul menjadi 8px agar sangat aman dan memberikan ruang lega.
+    - Menyesuaikan ukuran logo dan status indicator agar proporsional (micro-scale).
+    - Mempertahankan semua styling neon dan animasi radar sweep.
     """
     
     # CSS Khusus untuk Widget Economic Radar
@@ -18,10 +18,10 @@ def economic_calendar_widget():
 
         .economic-radar-container {
             border: 2px solid #00d4ff;
-            border-radius: 15px;
-            padding: 10px;
+            border-radius: 12px;
+            padding: 8px;
             background: rgba(0, 212, 255, 0.02);
-            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
             margin-bottom: 10px;
             position: relative;
             overflow: hidden;
@@ -31,21 +31,23 @@ def economic_calendar_widget():
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             flex-wrap: nowrap;
-            gap: 5px;
+            gap: 4px;
+            width: 100%;
         }
         
         .radar-title-wrapper {
             display: flex;
             align-items: center;
-            gap: 5px;
-            overflow: hidden;
+            gap: 4px;
+            flex-shrink: 1;
+            min-width: 0;
         }
 
         .radar-logo {
-            width: 16px;
-            height: 16px;
+            width: 12px;
+            height: 12px;
             position: relative;
             display: flex;
             align-items: center;
@@ -57,7 +59,7 @@ def economic_calendar_widget():
             position: absolute;
             width: 100%;
             height: 100%;
-            border: 1.2px solid #00d4ff;
+            border: 1px solid #00d4ff;
             border-radius: 50%;
             opacity: 0.6;
         }
@@ -65,7 +67,7 @@ def economic_calendar_widget():
         .radar-sweep {
             position: absolute;
             width: 50%;
-            height: 1.2px;
+            height: 1px;
             background: linear-gradient(to right, transparent, #00d4ff);
             top: 50%;
             left: 50%;
@@ -80,25 +82,26 @@ def economic_calendar_widget():
         
         .radar-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 12px; /* Dikecilkan lagi agar tidak terpotong */
+            font-size: 8px; /* Dikecilkan sesuai permintaan menjadi 8px */
             font-weight: 700;
             color: #00d4ff;
-            text-shadow: 0 0 8px rgba(0, 212, 255, 0.8);
+            text-shadow: 0 0 5px rgba(0, 212, 255, 0.8);
             margin: 0;
             text-transform: uppercase;
-            letter-spacing: 0.2px; /* Lebih rapat agar aman */
+            letter-spacing: 0.2px;
             white-space: nowrap;
+            overflow: hidden;
         }
         
         .status-indicator {
             font-family: 'Rajdhani', sans-serif;
-            font-size: 8px;
+            font-size: 7px;
             color: #00ff88;
-            letter-spacing: 0.3px;
-            background: rgba(0, 255, 136, 0.1);
-            padding: 2px 4px;
+            letter-spacing: 0.2px;
+            background: rgba(0, 255, 136, 0.05);
+            padding: 1px 4px;
             border-radius: 3px;
-            border: 1px solid rgba(0, 255, 136, 0.3);
+            border: 1px solid rgba(0, 255, 136, 0.2);
             display: flex;
             align-items: center;
             white-space: nowrap;
@@ -106,19 +109,19 @@ def economic_calendar_widget():
         }
         
         .status-dot {
-            height: 4px;
-            width: 4px;
+            height: 3px;
+            width: 3px;
             background-color: #00ff88;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 4px;
-            box-shadow: 0 0 5px #00ff88;
+            margin-right: 3px;
+            box-shadow: 0 0 3px #00ff88;
             animation: pulse-green 2s infinite;
         }
         
         @keyframes pulse-green {
             0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(0, 255, 136, 0); }
+            70% { transform: scale(1); box-shadow: 0 0 0 3px rgba(0, 255, 136, 0); }
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
 
@@ -130,34 +133,34 @@ def economic_calendar_widget():
         .impact-legend {
             display: flex;
             justify-content: center;
-            gap: 10px;
-            margin-top: 10px;
+            gap: 8px;
+            margin-top: 8px;
             font-family: 'Rajdhani', sans-serif;
-            font-size: 8px;
+            font-size: 7px;
             flex-wrap: wrap;
         }
         
         .legend-item {
             display: flex;
             align-items: center;
-            gap: 3px;
+            gap: 2px;
             color: #aaa;
         }
         
         .star-icon {
-            font-size: 8px;
+            font-size: 7px;
         }
         
-        .high-impact { color: #ff2a6d; text-shadow: 0 0 5px rgba(255, 42, 109, 0.5); }
+        .high-impact { color: #ff2a6d; text-shadow: 0 0 3px rgba(255, 42, 109, 0.5); }
         .med-impact { color: #ffcc00; }
         .low-impact { color: #00ff88; }
 
         @media (max-width: 480px) {
             .radar-title {
-                font-size: 11px;
+                font-size: 7px;
             }
             .status-indicator {
-                font-size: 7px;
+                font-size: 6px;
             }
         }
     </style>

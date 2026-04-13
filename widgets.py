@@ -4,6 +4,11 @@ def economic_calendar_widget():
     """
     Menampilkan Economic Radar Real-time menggunakan Iframe TradingView
     dengan gaya visual Cyber Tech Blue yang konsisten dengan AeroVulpis.
+    
+    PERBAIKAN:
+    - Menghapus radar-info-bar (Actual, Forecast, Previous) agar tampilan bersih.
+    - Merapikan judul agar tidak terpotong dan font sedikit lebih kecil (13px).
+    - Mempertahankan semua styling neon dan animasi radar sweep.
     """
     
     # CSS Khusus untuk Widget Economic Radar
@@ -14,7 +19,7 @@ def economic_calendar_widget():
         .economic-radar-container {
             border: 2px solid #00d4ff;
             border-radius: 15px;
-            padding: 10px;
+            padding: 12px;
             background: rgba(0, 212, 255, 0.02);
             box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
             margin-bottom: 10px;
@@ -26,15 +31,16 @@ def economic_calendar_widget():
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             flex-wrap: nowrap;
-            gap: 5px;
+            gap: 8px;
         }
         
         .radar-title-wrapper {
             display: flex;
             align-items: center;
             gap: 6px;
+            overflow: hidden;
         }
 
         .radar-logo {
@@ -74,7 +80,7 @@ def economic_calendar_widget():
         
         .radar-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 14px;
+            font-size: 13px; /* Ukuran font dikecilkan agar rapi */
             font-weight: 700;
             color: #00d4ff;
             text-shadow: 0 0 8px rgba(0, 212, 255, 0.8);
@@ -90,7 +96,7 @@ def economic_calendar_widget():
             color: #00ff88;
             letter-spacing: 0.5px;
             background: rgba(0, 255, 136, 0.1);
-            padding: 2px 5px;
+            padding: 2px 6px;
             border-radius: 3px;
             border: 1px solid rgba(0, 255, 136, 0.3);
             display: flex;
@@ -116,37 +122,10 @@ def economic_calendar_widget():
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
 
+        /* Iframe TradingView Styling */
         .tradingview-widget-container iframe {
             border-radius: 10px !important;
             filter: hue-rotate(180deg) brightness(0.95) contrast(1.1); 
-        }
-        
-        .radar-info-bar {
-            display: flex;
-            justify-content: space-around;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(0, 212, 255, 0.1);
-            border-radius: 8px;
-            padding: 5px;
-            margin-bottom: 10px;
-            font-family: 'Rajdhani', sans-serif;
-        }
-
-        .info-item {
-            text-align: center;
-        }
-
-        .info-label {
-            font-size: 7px;
-            color: #888;
-            text-transform: uppercase;
-            display: block;
-        }
-
-        .info-value {
-            font-size: 10px;
-            color: #00d4ff;
-            font-weight: 700;
         }
         
         .impact-legend {
@@ -176,7 +155,7 @@ def economic_calendar_widget():
 
         @media (max-width: 480px) {
             .radar-title {
-                font-size: 13px;
+                font-size: 12px;
             }
             .status-indicator {
                 font-size: 7px;
@@ -185,7 +164,7 @@ def economic_calendar_widget():
     </style>
     """, unsafe_allow_html=True)
 
-    # Container Utama
+    # Container Utama (Tanpa radar-info-bar)
     st.markdown("""
     <div class="economic-radar-container">
         <div class="radar-header">
@@ -199,21 +178,6 @@ def economic_calendar_widget():
             <div class="status-indicator">
                 <span class="status-dot"></span>
                 LIVE CONNECTION
-            </div>
-        </div>
-        
-        <div class="radar-info-bar">
-            <div class="info-item">
-                <span class="info-label">Actual</span>
-                <span class="info-value">REAL-TIME</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Forecast</span>
-                <span class="info-value">ESTIMATED</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Previous</span>
-                <span class="info-value">HISTORICAL</span>
             </div>
         </div>
     """, unsafe_allow_html=True)

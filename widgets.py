@@ -5,10 +5,10 @@ def economic_calendar_widget():
     Menampilkan Economic Radar Real-time menggunakan Iframe TradingView
     dengan gaya visual Cyber Tech Blue yang konsisten dengan AeroVulpis.
     
-    PERBAIKAN TOTAL:
-    - Mengecilkan font judul menjadi 8px agar sangat aman dan memberikan ruang lega.
-    - Menyesuaikan ukuran logo dan status indicator agar proporsional (micro-scale).
-    - Mempertahankan semua styling neon dan animasi radar sweep.
+    PERBAIKAN TATA LETAK:
+    - Judul "ECONOMIC RADAR" berukuran 6px di paling atas.
+    - Logo Radar dan Status "LIVE CONNECTION" diletakkan di bawah judul secara rapi.
+    - Menghapus radar-info-bar (Actual/Forecast/Previous).
     """
     
     # CSS Khusus untuk Widget Economic Radar
@@ -27,27 +27,39 @@ def economic_calendar_widget():
             overflow: hidden;
         }
         
-        .radar-header {
+        /* Layout Vertikal: Judul di atas, Logo & Status di bawahnya */
+        .radar-header-stack {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            align-items: center; /* Rata tengah */
             margin-bottom: 8px;
-            flex-wrap: nowrap;
-            gap: 4px;
             width: 100%;
+            gap: 4px;
         }
         
-        .radar-title-wrapper {
+        .radar-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 6px; /* Sesuai permintaan: 6px */
+            font-weight: 700;
+            color: #00d4ff;
+            text-shadow: 0 0 4px rgba(0, 212, 255, 0.8);
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            text-align: center;
+        }
+        
+        .radar-subtitle-row {
             display: flex;
             align-items: center;
-            gap: 4px;
-            flex-shrink: 1;
-            min-width: 0;
+            justify-content: center;
+            gap: 5px;
         }
 
         .radar-logo {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             position: relative;
             display: flex;
             align-items: center;
@@ -59,7 +71,7 @@ def economic_calendar_widget():
             position: absolute;
             width: 100%;
             height: 100%;
-            border: 1px solid #00d4ff;
+            border: 0.8px solid #00d4ff;
             border-radius: 50%;
             opacity: 0.6;
         }
@@ -67,7 +79,7 @@ def economic_calendar_widget():
         .radar-sweep {
             position: absolute;
             width: 50%;
-            height: 1px;
+            height: 0.8px;
             background: linear-gradient(to right, transparent, #00d4ff);
             top: 50%;
             left: 50%;
@@ -80,63 +92,49 @@ def economic_calendar_widget():
             to { transform: rotate(360deg); }
         }
         
-        .radar-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 8px; /* Dikecilkan sesuai permintaan menjadi 8px */
-            font-weight: 700;
-            color: #00d4ff;
-            text-shadow: 0 0 5px rgba(0, 212, 255, 0.8);
-            margin: 0;
-            text-transform: uppercase;
-            letter-spacing: 0.2px;
-            white-space: nowrap;
-            overflow: hidden;
-        }
-        
         .status-indicator {
             font-family: 'Rajdhani', sans-serif;
-            font-size: 7px;
+            font-size: 5.5px; /* Sedikit lebih kecil agar proporsional */
             color: #00ff88;
-            letter-spacing: 0.2px;
+            letter-spacing: 0.3px;
             background: rgba(0, 255, 136, 0.05);
-            padding: 1px 4px;
-            border-radius: 3px;
-            border: 1px solid rgba(0, 255, 136, 0.2);
+            padding: 1px 3px;
+            border-radius: 2px;
+            border: 0.5px solid rgba(0, 255, 136, 0.2);
             display: flex;
             align-items: center;
             white-space: nowrap;
-            flex-shrink: 0;
         }
         
         .status-dot {
-            height: 3px;
-            width: 3px;
+            height: 2.5px;
+            width: 2.5px;
             background-color: #00ff88;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 3px;
-            box-shadow: 0 0 3px #00ff88;
+            margin-right: 2px;
+            box-shadow: 0 0 2px #00ff88;
             animation: pulse-green 2s infinite;
         }
         
         @keyframes pulse-green {
             0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 3px rgba(0, 255, 136, 0); }
+            70% { transform: scale(1); box-shadow: 0 0 0 2px rgba(0, 255, 136, 0); }
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
 
         .tradingview-widget-container iframe {
-            border-radius: 10px !important;
+            border-radius: 8px !important;
             filter: hue-rotate(180deg) brightness(0.95) contrast(1.1); 
         }
         
         .impact-legend {
             display: flex;
             justify-content: center;
-            gap: 8px;
-            margin-top: 8px;
+            gap: 6px;
+            margin-top: 6px;
             font-family: 'Rajdhani', sans-serif;
-            font-size: 7px;
+            font-size: 6px;
             flex-wrap: wrap;
         }
         
@@ -148,38 +146,29 @@ def economic_calendar_widget():
         }
         
         .star-icon {
-            font-size: 7px;
+            font-size: 6px;
         }
         
         .high-impact { color: #ff2a6d; text-shadow: 0 0 3px rgba(255, 42, 109, 0.5); }
         .med-impact { color: #ffcc00; }
         .low-impact { color: #00ff88; }
-
-        @media (max-width: 480px) {
-            .radar-title {
-                font-size: 7px;
-            }
-            .status-indicator {
-                font-size: 6px;
-            }
-        }
     </style>
     """, unsafe_allow_html=True)
 
-    # Container Utama
+    # Container Utama dengan Tata Letak Baru
     st.markdown("""
     <div class="economic-radar-container">
-        <div class="radar-header">
-            <div class="radar-title-wrapper">
+        <div class="radar-header-stack">
+            <h2 class="radar-title">ECONOMIC RADAR</h2>
+            <div class="radar-subtitle-row">
                 <div class="radar-logo">
                     <div class="radar-circle"></div>
                     <div class="radar-sweep"></div>
                 </div>
-                <h2 class="radar-title">ECONOMIC RADAR</h2>
-            </div>
-            <div class="status-indicator">
-                <span class="status-dot"></span>
-                LIVE CONNECTION
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    LIVE CONNECTION
+                </div>
             </div>
         </div>
     """, unsafe_allow_html=True)

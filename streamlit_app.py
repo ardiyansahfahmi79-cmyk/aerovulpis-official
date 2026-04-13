@@ -585,6 +585,7 @@ instruments = {
     "Stocks (ID)": {"BBRI": "BBRI.JK", "BBCA": "BBCA.JK", "TLKM": "TLKM.JK", "ASII": "ASII.JK", "BMRI": "BMRI.JK"},
     "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver": "SI=F", "Crude Oil (WTI)": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F"}
 }
+
 # ====================== UI HEADER ======================
 st.markdown(f"""
 <div class="main-title-container">
@@ -635,8 +636,7 @@ with st.sidebar:
             "nav-link": {"font-size": "13px", "text-align": "left", "margin": "0px", "--hover-color": "#0055ff"},
             "nav-link-selected": {"background-color": "var(--deep-blue)", "color": "white"},
         }
-    )
-
+)
 # ====================== FUNGSI MARKET NEWS ======================
 @st.cache_data(ttl=300)
 def get_news_data(query, max_articles=10):
@@ -657,6 +657,7 @@ def get_news_data(query, max_articles=10):
         return [], t['no_news']
     except Exception as e:
         return [], f"⚠️ Error: {str(e)}"
+
 # ====================== LOGIKA HALAMAN ======================
 
 if menu_selection == "Live Dashboard":
@@ -680,7 +681,7 @@ if menu_selection == "Live Dashboard":
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))
         fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color='#00d4ff', width=1.5, dash='dot'), name='SMA 50'))
         fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color='#bc13fe', width=1.5, dash='dash'), name='SMA 200'))
-        fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=10, b=10), height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=10, b=10), height=350, showlegend=True, legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5))
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
         col_g, col_a = st.columns([1, 1])
@@ -852,7 +853,6 @@ elif menu_selection == "System Log":
     st.write("- Restored Indonesian motivational footer with DynamiHatch Identity.")
     st.write(f"- {t['created_by']}")
     st.markdown('</div>', unsafe_allow_html=True)
-
 # ====================== FOOTER ======================
 st.markdown("---")
 st.markdown("""

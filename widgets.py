@@ -2,14 +2,16 @@ import streamlit as st
 
 def economic_calendar_widget():
     """
-    Menampilkan Kalender Ekonomi Real-time menggunakan Iframe TradingView
+    Menampilkan Economic Radar Real-time menggunakan Iframe TradingView
     dengan gaya visual Cyber Tech Blue yang konsisten dengan AeroVulpis.
     """
     
-    # CSS Khusus untuk Widget Kalender Ekonomi
+    # CSS Khusus untuk Widget Economic Radar
     st.markdown("""
     <style>
-        .economic-calendar-container {
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
+
+        .economic-radar-container {
             border: 2px solid #00d4ff;
             border-radius: 15px;
             padding: 15px;
@@ -20,96 +22,209 @@ def economic_calendar_widget():
             overflow: hidden;
         }
         
-        .calendar-header {
+        .radar-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         
-        .calendar-title {
+        .radar-title-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .radar-logo {
+            width: 24px;
+            height: 24px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .radar-circle {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 2px solid #00d4ff;
+            border-radius: 50%;
+            opacity: 0.5;
+        }
+
+        .radar-sweep {
+            position: absolute;
+            width: 50%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #00d4ff);
+            top: 50%;
+            left: 50%;
+            transform-origin: left center;
+            animation: radar-spin 2s linear infinite;
+        }
+
+        @keyframes radar-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .radar-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
             color: #00d4ff;
-            text-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
+            text-shadow: 0 0 15px rgba(0, 212, 255, 0.8);
             margin: 0;
             text-transform: uppercase;
+            letter-spacing: 1px;
         }
         
         .status-indicator {
             font-family: 'Rajdhani', sans-serif;
-            font-size: 9px;
+            font-size: 10px;
             color: #00ff88;
             letter-spacing: 1px;
             background: rgba(0, 255, 136, 0.1);
-            padding: 3px 6px;
+            padding: 4px 8px;
             border-radius: 5px;
             border: 1px solid rgba(0, 255, 136, 0.3);
             display: flex;
             align-items: center;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.1);
         }
         
         .status-dot {
-            height: 5px;
-            width: 5px;
+            height: 6px;
+            width: 6px;
             background-color: #00ff88;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 5px;
+            margin-right: 6px;
             box-shadow: 0 0 8px #00ff88;
             animation: pulse-green 2s infinite;
         }
         
         @keyframes pulse-green {
             0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(0, 255, 136, 0); }
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
 
         /* Styling Iframe agar lebih menyatu */
         .tradingview-widget-container iframe {
-            border-radius: 8px !important;
-            /* Filter dikurangi agar data angka (Actual/Forecast) lebih jelas terbaca */
-            filter: hue-rotate(180deg) brightness(0.9) contrast(1.1); 
+            border-radius: 10px !important;
+            filter: hue-rotate(180deg) brightness(0.95) contrast(1.1); 
+        }
+        
+        /* Info Bar (Actual, Forecast, Previous) */
+        .radar-info-bar {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(0, 212, 255, 0.1);
+            border-radius: 8px;
+            padding: 8px;
+            margin-bottom: 15px;
+            font-family: 'Rajdhani', sans-serif;
+        }
+
+        .info-item {
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 9px;
+            color: #888;
+            text-transform: uppercase;
+            display: block;
+        }
+
+        .info-value {
+            font-size: 12px;
+            color: #00d4ff;
+            font-weight: 700;
         }
         
         /* Legenda Dampak */
         .impact-legend {
             display: flex;
-            gap: 12px;
-            margin-top: 10px;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
             font-family: 'Rajdhani', sans-serif;
             font-size: 11px;
+            flex-wrap: wrap;
         }
         
         .legend-item {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
+            color: #aaa;
         }
         
-        .dot-high { color: #ff2a6d; }
-        .dot-med { color: #ffcc00; }
-        .dot-low { color: #00ff88; }
+        .star-icon {
+            font-size: 12px;
+        }
+        
+        .high-impact { color: #ff2a6d; text-shadow: 0 0 5px rgba(255, 42, 109, 0.5); }
+        .med-impact { color: #ffcc00; }
+        .low-impact { color: #00ff88; }
+
+        /* Responsivitas untuk HP */
+        @media (max-width: 600px) {
+            .radar-header {
+                flex-direction: row;
+                justify-content: space-between;
+            }
+            .radar-title {
+                font-size: 16px;
+            }
+            .status-indicator {
+                font-size: 8px;
+                padding: 2px 5px;
+            }
+        }
     </style>
     """, unsafe_allow_html=True)
 
     # Container Utama
     st.markdown("""
-    <div class="economic-calendar-container">
-        <div class="calendar-header">
-            <h2 class="calendar-title">KALENDER EKONOMI</h2>
+    <div class="economic-radar-container">
+        <div class="radar-header">
+            <div class="radar-title-wrapper">
+                <div class="radar-logo">
+                    <div class="radar-circle"></div>
+                    <div class="radar-sweep"></div>
+                </div>
+                <h2 class="radar-title">ECONOMIC RADAR</h2>
+            </div>
             <div class="status-indicator">
                 <span class="status-dot"></span>
-                STATUS: AKTIF • REAL-TIME
+                LIVE CONNECTION
+            </div>
+        </div>
+        
+        <div class="radar-info-bar">
+            <div class="info-item">
+                <span class="info-label">Actual</span>
+                <span class="info-value">REAL-TIME</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Forecast</span>
+                <span class="info-value">ESTIMATED</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Previous</span>
+                <span class="info-value">HISTORICAL</span>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
     # TradingView Economic Calendar Widget (Iframe)
-    # Tinggi dikurangi menjadi 450 agar tidak terlalu memakan layar
-    # importanceFilter disesuaikan agar menampilkan data yang lebih relevan
     tradingview_html = """
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
@@ -128,17 +243,16 @@ def economic_calendar_widget():
     """
     
     try:
-        # Menggunakan height=450 agar sesuai dengan konfigurasi widget
         st.components.v1.html(tradingview_html, height=450)
     except Exception as e:
-        st.error(f"Gagal memuat kalender ekonomi: {str(e)}")
+        st.error(f"Gagal memuat radar ekonomi: {str(e)}")
 
     # Legenda Dampak & Penutup Container
     st.markdown("""
         <div class="impact-legend">
-            <div class="legend-item"><span class="dot-high">🔴</span> High</div>
-            <div class="legend-item"><span class="dot-med">🟡</span> Medium</div>
-            <div class="legend-item"><span class="dot-low">🟢</span> Low</div>
+            <div class="legend-item"><span class="star-icon high-impact">★★★</span> High Impact</div>
+            <div class="legend-item"><span class="star-icon med-impact">★★☆</span> Medium</div>
+            <div class="legend-item"><span class="star-icon low-impact">★☆☆</span> Low</div>
         </div>
     </div>
     """, unsafe_allow_html=True)

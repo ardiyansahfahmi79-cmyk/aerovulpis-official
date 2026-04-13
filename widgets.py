@@ -20,7 +20,7 @@ def economic_calendar_widget():
         .economic-radar-container {
             border: 2px solid #00d4ff;
             border-radius: 12px;
-            padding: 12px 8px 8px 8px; /* Padding atas ditambah (12px) agar teks bernapas */
+            padding: 20px; /* Padding disesuaikan agar teks lebih seimbang dan tidak menempel border */
             background: rgba(0, 212, 255, 0.02);
             box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
             margin-bottom: 10px;
@@ -40,7 +40,7 @@ def economic_calendar_widget():
         
         .radar-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 6px; 
+            font-size: 28px; /* Ukuran font disesuaikan agar terlihat jelas dan seimbang */
             font-weight: 700;
             color: #00d4ff;
             text-shadow: 0 0 4px rgba(0, 212, 255, 0.8);
@@ -61,8 +61,8 @@ def economic_calendar_widget():
         }
 
         .radar-logo {
-            width: 10px;
-            height: 10px;
+            width: 16px;
+            height: 16px;
             position: relative;
             display: flex;
             align-items: center;

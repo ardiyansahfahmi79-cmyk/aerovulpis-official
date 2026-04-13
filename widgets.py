@@ -27,7 +27,7 @@ def economic_calendar_widget():
             justify-content: space-between;
             align-items: center;
             margin-bottom: 12px;
-            flex-wrap: nowrap; /* Mencegah pembungkusan baris agar tidak terpotong vertikal */
+            flex-wrap: nowrap;
             gap: 8px;
         }
         
@@ -74,14 +74,14 @@ def economic_calendar_widget():
         
         .radar-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 16px; /* Ukuran font dikecilkan agar lebih rapi */
+            font-size: 16px;
             font-weight: 700;
             color: #00d4ff;
             text-shadow: 0 0 10px rgba(0, 212, 255, 0.8);
             margin: 0;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            white-space: nowrap; /* Mencegah teks turun ke bawah */
+            white-space: nowrap;
         }
         
         .status-indicator {
@@ -116,13 +116,11 @@ def economic_calendar_widget():
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
 
-        /* Styling Iframe agar lebih menyatu */
         .tradingview-widget-container iframe {
             border-radius: 10px !important;
             filter: hue-rotate(180deg) brightness(0.95) contrast(1.1); 
         }
         
-        /* Info Bar (Actual, Forecast, Previous) */
         .radar-info-bar {
             display: flex;
             justify-content: space-around;
@@ -151,7 +149,6 @@ def economic_calendar_widget():
             font-weight: 700;
         }
         
-        /* Legenda Dampak */
         .impact-legend {
             display: flex;
             justify-content: center;
@@ -177,7 +174,6 @@ def economic_calendar_widget():
         .med-impact { color: #ffcc00; }
         .low-impact { color: #00ff88; }
 
-        /* Responsivitas untuk HP */
         @media (max-width: 480px) {
             .radar-title {
                 font-size: 14px;

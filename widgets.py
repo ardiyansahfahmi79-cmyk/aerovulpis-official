@@ -14,7 +14,7 @@ def economic_calendar_widget():
         .economic-radar-container {
             border: 2px solid #00d4ff;
             border-radius: 15px;
-            padding: 12px;
+            padding: 10px;
             background: rgba(0, 212, 255, 0.02);
             box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
             margin-bottom: 10px;
@@ -26,20 +26,20 @@ def economic_calendar_widget():
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             flex-wrap: nowrap;
-            gap: 8px;
+            gap: 5px;
         }
         
         .radar-title-wrapper {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .radar-logo {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             position: relative;
             display: flex;
             align-items: center;
@@ -51,7 +51,7 @@ def economic_calendar_widget():
             position: absolute;
             width: 100%;
             height: 100%;
-            border: 1.5px solid #00d4ff;
+            border: 1.2px solid #00d4ff;
             border-radius: 50%;
             opacity: 0.6;
         }
@@ -59,7 +59,7 @@ def economic_calendar_widget():
         .radar-sweep {
             position: absolute;
             width: 50%;
-            height: 1.5px;
+            height: 1.2px;
             background: linear-gradient(to right, transparent, #00d4ff);
             top: 50%;
             left: 50%;
@@ -74,10 +74,10 @@ def economic_calendar_widget():
         
         .radar-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 16px;
+            font-size: 14px; /* Dikecilkan lagi agar pas di HP */
             font-weight: 700;
             color: #00d4ff;
-            text-shadow: 0 0 10px rgba(0, 212, 255, 0.8);
+            text-shadow: 0 0 8px rgba(0, 212, 255, 0.8);
             margin: 0;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -86,12 +86,12 @@ def economic_calendar_widget():
         
         .status-indicator {
             font-family: 'Rajdhani', sans-serif;
-            font-size: 9px;
+            font-size: 8px;
             color: #00ff88;
             letter-spacing: 0.5px;
             background: rgba(0, 255, 136, 0.1);
-            padding: 3px 6px;
-            border-radius: 4px;
+            padding: 2px 5px;
+            border-radius: 3px;
             border: 1px solid rgba(0, 255, 136, 0.3);
             display: flex;
             align-items: center;
@@ -100,19 +100,19 @@ def economic_calendar_widget():
         }
         
         .status-dot {
-            height: 5px;
-            width: 5px;
+            height: 4px;
+            width: 4px;
             background-color: #00ff88;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 5px;
-            box-shadow: 0 0 6px #00ff88;
+            margin-right: 4px;
+            box-shadow: 0 0 5px #00ff88;
             animation: pulse-green 2s infinite;
         }
         
         @keyframes pulse-green {
             0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 5px rgba(0, 255, 136, 0); }
+            70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(0, 255, 136, 0); }
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
 
@@ -127,8 +127,8 @@ def economic_calendar_widget():
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(0, 212, 255, 0.1);
             border-radius: 8px;
-            padding: 6px;
-            margin-bottom: 12px;
+            padding: 5px;
+            margin-bottom: 10px;
             font-family: 'Rajdhani', sans-serif;
         }
 
@@ -137,14 +137,14 @@ def economic_calendar_widget():
         }
 
         .info-label {
-            font-size: 8px;
+            font-size: 7px;
             color: #888;
             text-transform: uppercase;
             display: block;
         }
 
         .info-value {
-            font-size: 11px;
+            font-size: 10px;
             color: #00d4ff;
             font-weight: 700;
         }
@@ -152,22 +152,22 @@ def economic_calendar_widget():
         .impact-legend {
             display: flex;
             justify-content: center;
-            gap: 15px;
-            margin-top: 12px;
+            gap: 12px;
+            margin-top: 10px;
             font-family: 'Rajdhani', sans-serif;
-            font-size: 10px;
+            font-size: 9px;
             flex-wrap: wrap;
         }
         
         .legend-item {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
             color: #aaa;
         }
         
         .star-icon {
-            font-size: 10px;
+            font-size: 9px;
         }
         
         .high-impact { color: #ff2a6d; text-shadow: 0 0 5px rgba(255, 42, 109, 0.5); }
@@ -176,20 +176,16 @@ def economic_calendar_widget():
 
         @media (max-width: 480px) {
             .radar-title {
-                font-size: 14px;
+                font-size: 13px;
             }
             .status-indicator {
-                font-size: 8px;
-            }
-            .radar-logo {
-                width: 18px;
-                height: 18px;
+                font-size: 7px;
             }
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # Container Utama
+    # Container Utama (DIBUNGKUS DALAM SATU st.markdown)
     st.markdown("""
     <div class="economic-radar-container">
         <div class="radar-header">

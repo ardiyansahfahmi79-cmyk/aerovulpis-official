@@ -74,7 +74,7 @@ def economic_calendar_widget():
         
         .radar-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 14px; /* Dikecilkan lagi agar pas di HP */
+            font-size: 14px;
             font-weight: 700;
             color: #00d4ff;
             text-shadow: 0 0 8px rgba(0, 212, 255, 0.8);
@@ -185,7 +185,7 @@ def economic_calendar_widget():
     </style>
     """, unsafe_allow_html=True)
 
-    # Container Utama (DIBUNGKUS DALAM SATU st.markdown)
+    # Container Utama
     st.markdown("""
     <div class="economic-radar-container">
         <div class="radar-header">

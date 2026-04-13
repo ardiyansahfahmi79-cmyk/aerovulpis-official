@@ -862,7 +862,7 @@ st.markdown("""
     <p class="rajdhani-font" style="font-style: italic; font-size: 18px; color: #ccc;">
         "Disiplin adalah kunci, emosi adalah musuh. Tetap tenang dan percaya pada sistem."
     </p>
-    <p class="digital-font" style="font-size: 16px; color: #00ff88;">
+    <p class="digital-font" style="font-size: 15px; color: #00ff88; white-space: nowrap;">
         — Fahmi (Pencipta AeroVulpis)
     </p>
     <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v3.3 ULTIMATE • 2026</p>

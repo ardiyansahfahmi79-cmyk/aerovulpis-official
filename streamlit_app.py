@@ -585,6 +585,7 @@ instruments = {
     "Stocks (ID)": {"BBRI": "BBRI.JK", "BBCA": "BBCA.JK", "TLKM": "TLKM.JK", "ASII": "ASII.JK", "BMRI": "BMRI.JK"},
     "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver": "SI=F", "Crude Oil (WTI)": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F"}
 }
+
 # ====================== UI HEADER ======================
 st.markdown(f"""
 <div class="main-title-container">
@@ -657,6 +658,7 @@ def get_news_data(query, max_articles=10):
         return [], t['no_news']
     except Exception as e:
         return [], f"⚠️ Error: {str(e)}"
+
 # ====================== LOGIKA HALAMAN ======================
 
 if menu_selection == "Live Dashboard":
@@ -852,7 +854,8 @@ elif menu_selection == "System Log":
     st.write("- Restored Indonesian motivational footer with DynamiHatch Identity.")
     st.write(f"- {t['created_by']}")
     st.markdown('</div>', unsafe_allow_html=True)
-    # ====================== FOOTER ======================
+
+# ====================== FOOTER ======================
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; padding: 20px; opacity: 0.8;">

@@ -169,6 +169,10 @@ def economic_calendar_widget():
         </div>
     """, unsafe_allow_html=True)
 
+    # Tag header stack sudah ditutup di baris 169 (</div>), 
+    # jadi kita tidak perlu menutup </div> lagi di sini agar container utama tetap terbuka.
+    pass
+
     # TradingView Economic Calendar Widget
     tradingview_html = """
     <div class="tradingview-widget-container">

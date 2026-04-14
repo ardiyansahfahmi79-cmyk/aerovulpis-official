@@ -787,10 +787,11 @@ elif menu_selection == "Market News":
             </div>
             """, unsafe_allow_html=True)
 
-    elif menu_selection == "Economic Radar":
-        economic_calendar_widget()
-    elif menu_selection == "Smart Alert Center":
-        smart_alert_widget()
+
+elif menu_selection == "Economic Radar":
+    economic_calendar_widget()
+elif menu_selection == "Smart Alert Center":
+    smart_alert_widget()
 
 elif menu_selection == "Chatbot AI":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">🤖 AeroVulpis AI Assistant</h2>', unsafe_allow_html=True)

@@ -348,19 +348,28 @@ def smart_alert_widget():
     # Main Button
     if st.button("**LOCK TARGET & ACTIVATE SENSOR**", key="activate_sensor_button", type="primary"):
         if price_target > 0 and telegram_chat_id:
+            # Membuat komponen bingkai secara terpisah untuk menghindari konflik f-string
+            top_border    = "╔═══════════════════════════════════╗"
+            header_text   = "║   🚨 TERMINAL MESSAGE - ALERT 🚨  ║"
+            mid_border    = "╠═══════════════════════════════════╣"
+            instr_line    = f"║ INSTRUMENT: {selected_instrument:<20}║"
+            price_line    = f"║ TARGET PRICE: ${price_target:,.2f:<16}║"
+            cond_line     = f"║ CONDITION: {selected_condition_label[:20]:<20}║"
+            bottom_border = "╚═══════════════════════════════════╝"
+
             alert_message = (
-                f"*AeroVulpis Alert Activated!*\n\n"
-                f"```\n"
-                f"╔═══════════════════════════════════╗\n"
-                f"║   🚨 TERMINAL MESSAGE - ALERT 🚨  ║\n"
-                f"╠═══════════════════════════════════╣\n"
-                f"║ INSTRUMENT: {selected_instrument:<20}║\n"
-                f"║ TARGET PRICE: ${price_target:.2f:<17}║\n"
-                f"║ CONDITION: {selected_condition_label:<20}║\n"
-                f"╚═══════════════════════════════════╝\n"
-                f"```\n\n"
+                "*AeroVulpis Alert Activated!*\n\n"
+                "```\n"
+                f"{top_border}\n"
+                f"{header_text}\n"
+                f"{mid_border}\n"
+                f"{instr_line}\n"
+                f"{price_line}\n"
+                f"{cond_line}\n"
+                f"{bottom_border}\n"
+                "```\n\n"
                 f"🔒 Monitoring {selected_instrument} for price movement.\n"
-                f"_By DynamiHatch Company_"
+                "_By DynamiHatch Company_"
             )
 
             telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or st.secrets.get("TELEGRAM_BOT_TOKEN")

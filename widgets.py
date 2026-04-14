@@ -374,10 +374,10 @@ def smart_alert_widget():
         # Header
         st.markdown("""
         <div class='alert-header'>
-            <h2 class='alert-titl                <img src=\'https://i.imgur.com/12345.png\' class=\'alert-title-logo\'> <!-- Ganti dengan URL logo elang Anda -->
-                AEROVULPIS TERMINAL
-            </h2>
-            <div class='status-indicators'>
+          <h2 class='alert-title'>
+                    <img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' class='alert-title-logo'>
+                    AEROVULPIS TERMINAL
+                </h2>       <div class='status-indicators'>
                 <span class='status-online'>SYSTEM STATUS: ONLINE</span>
                 <span class='status-sync'>SATELLITE SYNC ACTIVE</span>
             </div>

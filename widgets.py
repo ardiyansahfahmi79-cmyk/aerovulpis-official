@@ -6,15 +6,9 @@ def economic_calendar_widget():
     """
     Menampilkan Economic Radar Real-time menggunakan Iframe TradingView
     dengan gaya visual Cyber Tech Blue yang konsisten dengan AeroVulpis.
-    
-    PERBAIKAN DETAIL ESTETIKA:
-    - Memberikan padding-top (5px) agar judul tidak menempel ke border kotak atas.
-    - Judul "ECONOMIC RADAR" berukuran 6px (rata tengah).
-    - Jarak (gap) antar elemen diatur presisi agar tidak berhimpitan.
-    - Logo Radar dan Status diletakkan di bawah judul secara simetris.
     """
     
-    # CSS Khusus untuk Widget Economic Radar
+    # CSS Khusus untuk Widget Economic Radar (sama persis seperti aslimu)
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
@@ -97,58 +91,41 @@ def economic_calendar_widget():
         
         .status-indicator {
             font-family: 'Rajdhani', sans-serif;
-            font-size: 5.5px;
+            font-size: 12px;
             color: #00ff88;
             letter-spacing: 0.3px;
             background: rgba(0, 255, 136, 0.05);
-            padding: 1.5px 4px;
-            border-radius: 2px;
-            border: 0.5px solid rgba(0, 255, 136, 0.2);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 0.5px solid rgba(0, 255, 136, 0.3);
             display: flex;
             align-items: center;
         }
         
         .status-dot {
-            height: 2.5px;
-            width: 2.5px;
+            height: 8px;
+            width: 8px;
             background-color: #00ff88;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 3px;
-            box-shadow: 0 0 2px #00ff88;
+            margin-right: 6px;
+            box-shadow: 0 0 4px #00ff88;
             animation: pulse-green 2s infinite;
         }
         
         @keyframes pulse-green {
             0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 2px rgba(0, 255, 136, 0); }
+            70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(0, 255, 136, 0); }
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
 
-        .tradingview-widget-container iframe {
-            border-radius: 8px !important;
-            filter: hue-rotate(180deg) brightness(0.95) contrast(1.1); 
-        }
-        
         .impact-legend {
             display: flex;
             justify-content: center;
-            gap: 8px;
-            margin-top: 8px;
+            gap: 15px;
+            margin-top: 12px;
             font-family: 'Rajdhani', sans-serif;
-            font-size: 6px;
-            flex-wrap: wrap;
-        }
-        
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 2px;
-            color: #aaa;
-        }
-        
-        .star-icon {
-            font-size: 6px;
+            font-size: 13px;
         }
         
         .high-impact { color: #ff2a6d; text-shadow: 0 0 3px rgba(255, 42, 109, 0.5); }
@@ -175,35 +152,22 @@ def economic_calendar_widget():
         </div>
     """, unsafe_allow_html=True)
 
-    # TradingView Economic Calendar Widget
-    tradingview_html = """
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
-      {
-      "colorTheme": "dark",
-      "isTransparent": true,
-      "width": "100%",
-      "height": "450",
-      "locale": "en",
-      "importanceFilter": "-1,0,1",
-      "currencyFilter": "USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD"
-    }
-      </script>
-    </div>
-    """
-    
+    # Economic Calendar menggunakan iframe langsung (lebih stabil di Streamlit)
     try:
-        st.components.v1.html(tradingview_html, height=450)
+        st.components.v1.iframe(
+            src="https://www.tradingview.com/economic-calendar/",
+            height=520,
+            scrolling=True
+        )
     except Exception as e:
-        st.error(f"Gagal memuat radar ekonomi: {str(e)}")
+        st.error(f"Gagal memuat Economic Radar: {str(e)}")
 
     # Legenda Dampak & Penutup Container
     st.markdown("""
         <div class="impact-legend">
-            <div class="legend-item"><span class="star-icon high-impact">★★★</span> High Impact</div>
-            <div class="legend-item"><span class="star-icon med-impact">★★☆</span> Medium</div>
-            <div class="legend-item"><span class="star-icon low-impact">★☆☆</span> Low</div>
+            <div class="legend-item"><span class="high-impact">★★★</span> High Impact</div>
+            <div class="legend-item"><span class="med-impact">★★</span> Medium</div>
+            <div class="legend-item"><span class="low-impact">★</span> Low</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -214,7 +178,7 @@ def smart_alert_widget():
     Menampilkan AeroVulpis Smart Alert Center V3.3 dengan gaya UI cyber-tech/terminal.
     """
 
-    # Custom CSS for Smart Alert Center
+    # Custom CSS for Smart Alert Center (sama persis)
     st.markdown("""
     <style>
         .alert-center-container {
@@ -421,7 +385,7 @@ def smart_alert_widget():
                     else:
                         st.error(f"❌ Gagal mengirim notifikasi Telegram: {result}")
                 else:
-                    st.error("⚠️ TELEGRAM_BOT_TOKEN tidak ditemukan. Harap atur di st.secrets atau environment variables.")
+                    st.error("⚠️ TELEGRAM_BOT_TOKEN tidak ditemukan.")
             else:
                 st.warning("⚠️ Harap masukkan Target Harga dan Telegram Chat ID yang valid.")
 

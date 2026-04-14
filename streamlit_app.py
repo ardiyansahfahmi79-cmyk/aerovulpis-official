@@ -1,6 +1,6 @@
 import streamlit as st
 from groq import Groq
-from widgets import economic_calendar_widget
+from widgets import economic_calendar_widget, smart_alert_widget
 import os
 import yfinance as yf
 import pandas as pd
@@ -626,8 +626,8 @@ with st.sidebar:
 
     menu_selection = option_menu(
         menu_title=t['navigation'],
-        options=["Live Dashboard", "Signal Analysis", "Market Sessions", "Market News", "Economic Radar", "Chatbot AI", "Risk Management", "Settings", "System Log"],
-        icons=["activity", "graph-up-arrow", "globe", "newspaper", "calendar-event", "chat-dots", "shield-fill", "gear", "journal-text"],
+        options=["Live Dashboard", "Signal Analysis", "Market Sessions", "Market News", "Economic Radar", "Smart Alert Center", "Chatbot AI", "Risk Management", "Settings", "System Log"],
+        icons=["activity", "graph-up-arrow", "globe", "newspaper", "calendar-event", "bell-fill", "chat-dots", "shield-fill", "gear", "journal-text"],
         menu_icon="cast",
         default_index=0,
         styles={
@@ -787,8 +787,10 @@ elif menu_selection == "Market News":
             </div>
             """, unsafe_allow_html=True)
 
-elif menu_selection == "Economic Radar":
-    economic_calendar_widget()
+    elif menu_selection == "Economic Radar":
+        economic_calendar_widget()
+    elif menu_selection == "Smart Alert Center":
+        smart_alert_widget()
 
 elif menu_selection == "Chatbot AI":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">🤖 AeroVulpis AI Assistant</h2>', unsafe_allow_html=True)

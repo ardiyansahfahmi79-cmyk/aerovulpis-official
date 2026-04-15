@@ -425,6 +425,12 @@ def add_technical_indicators(df):
     return df
 
 def get_weighted_signal(df):
+    # Pastikan indikator tersedia sebelum diproses
+    required_cols = ["RSI", "MACD", "Signal_Line", "SMA50", "SMA200", "CCI", "WPR", "MFI", "EMA9", "EMA21", "BB_Lower", "BB_Upper", "ADX", "+DI", "-DI"]
+    for col in required_cols:
+        if col not in df.columns:
+            return 0, "WAITING DATA", ["Data indikator sedang dimuat atau tidak cukup..."], 0, 0, 100
+
     latest = df.iloc[-1]
     bullish_count = 0
     bearish_count = 0

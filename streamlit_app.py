@@ -322,8 +322,10 @@ else:
 def get_market_data(ticker_symbol):
     # Logika Khusus untuk Emas dan Perak menggunakan Twelve Data
     if ticker_symbol in ["GC=F", "SI=F", "XAUUSD", "XAGUSD"]:
+        # Gunakan simbol standar Twelve Data untuk sinkronisasi harga yang lebih baik
         symbol = "XAU/USD" if ticker_symbol in ["GC=F", "XAUUSD"] else "XAG/USD"
         if twelve_api_key:
+            # Tambahkan parameter exchange jika perlu, tapi default Twelve Data biasanya cukup akurat
             url = f"https://api.twelvedata.com/price?symbol={symbol}&apikey={twelve_api_key}"
             try:
                 response = requests.get(url)
@@ -489,7 +491,7 @@ def get_deep_analysis(asset_name, market_data, df, signal, reasons):
     """Fungsi khusus untuk Generate Deep Analysis menggunakan Llama-3.1-70b"""
     if not client: return "⚠️ Deep Analysis Inactive"
     
-    MODEL_NAME = 'llama-3.1-70b-versatile'  # Model 70B untuk analisis lebih mendalam
+    MODEL_NAME = 'llama-3.3-70b-versatile'  # Model 70B terbaru yang didukung Groq
     
     # Ambil data teknikal terbaru
     latest = df.iloc[-1]
@@ -548,7 +550,7 @@ def get_deep_analysis(asset_name, market_data, df, signal, reasons):
     {technical_data}
     
     Analisis harus mencakup:
-    1. Interpretasi indikator teknikal
+    1. Interpretasi indikator teknikal (KHUSUSNYA RSI dan SMA 200)
     2. Level entry spesifik (2-3 pilihan)
     3. Stop loss yang tepat
     4. Take profit dengan ratio 1:2 atau lebih
@@ -699,11 +701,11 @@ with st.sidebar:
 def get_news_data(query, max_articles=10):
     if not fmp_api_key: return [], "⚠️ FMP API KEY MISSING"
     
-    # Keywords filter untuk berita yang relevan
-    keywords = ["Fed", "Federal Reserve", "geopolitik", "geopolitical", "Forex", "XAUUSD", "Gold", "XAGUSD", "Silver", "perusahaan", "company", "stock", "saham"]
+    # Keywords filter untuk berita yang relevan (Disederhanakan agar pasti muncul)
+    keywords = ["fed", "reserve", "geopolitik", "geopolitical", "forex", "gold", "silver", "market", "economy", "finance", "stock", "crypto", "saham", "perusahaan"]
     
-    # Mengambil berita dengan limit yang lebih besar untuk filtering
-    url = f"https://financialmodelingprep.com/api/v4/general_news?limit=50&apikey={fmp_api_key}"
+    # Mengambil berita umum keuangan/ekonomi
+    url = f"https://financialmodelingprep.com/api/v4/general_news?limit=40&apikey={fmp_api_key}"
     try:
         response = requests.get(url)
         data = response.json()
@@ -711,12 +713,13 @@ def get_news_data(query, max_articles=10):
         
         if isinstance(data, list):
             for item in data:
-                title = item.get("title", "")
-                text = item.get("text", "")
-                content = f"{title} {text}".lower()
+                title = item.get("title", "").lower()
+                text = item.get("text", "").lower()
+                content = f"{title} {text}"
                 
-                # Filter berdasarkan keywords
-                if any(keyword.lower() in content for keyword in keywords):
+                # Filter berdasarkan keywords (Jika tidak ada keyword pun, ambil berita terbaru)
+                is_relevant = any(keyword in content for keyword in keywords)
+                if is_relevant or len(articles) < 5: # Pastikan minimal ada berita yang muncul
                     # Parse dan format tanggal
                     published_date = item.get("publishedDate", "N/A")
                     try:
@@ -760,7 +763,9 @@ if menu_selection == "Live Dashboard":
         df = add_technical_indicators(df)
         score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
         c1, c2, c3, c4 = st.columns(4)
-        with c1: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["live_price"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{market["price"]:,.4f}</p></div>', unsafe_allow_html=True)
+        # Format desimal: 2 angka untuk Emas/Perak, 4 angka untuk Forex
+        price_format = ":,.2f" if asset_name in ["Gold (XAUUSD)", "XAGUSD", "XAUUSD", "XAGUSD"] else ":,.4f"
+        with c1: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["live_price"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{market["price"]{price_format}}</p></div>', unsafe_allow_html=True)
         with c2:
             color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
             st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["signal"]}</p><p class="digital-font" style="font-size:20px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)

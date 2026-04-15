@@ -752,8 +752,6 @@ def get_news_data(query, max_articles=10):
         return articles, None
     else:
         return [], t['no_news'] + " (Cek API Key FMP Anda)"
-    except Exception as e:
-        return [], f"⚠️ Error: {str(e)}"
 
 # ====================== LOGIKA HALAMAN ======================
 

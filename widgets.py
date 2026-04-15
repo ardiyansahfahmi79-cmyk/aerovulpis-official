@@ -347,38 +347,45 @@ def smart_alert_widget():
     # Main Button
     if st.button("**LOCK TARGET & ACTIVATE SENSOR**", key="activate_sensor_button", type="primary"):
         if price_target > 0 and telegram_chat_id:
-            # Membuat komponen bingkai secara terpisah untuk menghindari konflik f-string
+            from datetime import datetime
+            import pytz
+            now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
+
+            # Desain Terminal Cyber-Tech AeroVulpis
             top_border    = "╔═══════════════════════════════════╗"
-            header_text   = "║   🚨 TERMINAL MESSAGE - ALERT 🚨  ║"
+            status_line   = "║ [ STATUS: TARGET LOCKED ]         ║"
             mid_border    = "╠═══════════════════════════════════╣"
             
-            # Format angka dan teks secara terpisah untuk menghindari ValueError
-            instr_val     = str(selected_instrument)[:20]
-            # Menggunakan rstrip untuk membuang nol yang tidak perlu tapi tetap presisi
+            # Pengolahan teks agar simetris dan tidak terpotong
+            instr_val     = str(selected_instrument)[:18]
             formatted_price = f"{price_target:,.4f}".rstrip('0').rstrip('.')
             price_val     = f"${formatted_price}"
-            cond_val      = str(selected_condition_label)[:20]
             
-            # Membangun baris teks secara manual sebelum dimasukkan ke f-string besar
-            instr_line    = "║ INSTRUMENT: " + f"{instr_val:<20}" + "║"
-            price_line    = "║ TARGET PRICE: " + f"{price_val:<17}" + "║"
-            cond_line     = "║ CONDITION: " + f"{cond_val:<20}" + "║"
+            # Logika label kondisi yang lebih pendek untuk tampilan terminal
+            cond_display = "BULLISH BREAKOUT ↑" if "BULLISH" in selected_condition_label else "BEARISH BREAKDOWN ↓"
+            
+            instr_line    = f"║ INSTR: {instr_val:<26} ║"
+            price_line    = f"║ PRICE: {price_val:<26} ║"
+            cond_line     = f"║ COND : {cond_display:<26} ║"
+            time_line     = f"║ TIME : {now_wib:<26} ║"
             bottom_border = "╚═══════════════════════════════════╝"
 
-            # Menggunakan format HTML (pre) agar bingkai terminal tetap rapi dan tidak error 400
+            # Pesan Telegram dengan format HTML yang lebih eksklusif
             alert_message = (
-                "<b>AeroVulpis Alert Activated!</b>\n\n"
+                "<b>🦅 AEROVULPIS SMART ALERT SYSTEM</b>\n"
+                "<i>DynamiHatch Digital Security Protocol</i>\n\n"
                 "<pre>\n"
                 f"{top_border}\n"
-                f"{header_text}\n"
+                f"{status_line}\n"
                 f"{mid_border}\n"
                 f"{instr_line}\n"
                 f"{price_line}\n"
                 f"{cond_line}\n"
+                f"{time_line}\n"
                 f"{bottom_border}\n"
-                "</pre>\n\n"
-                f"🔒 Monitoring {selected_instrument} for price movement.\n"
-                "<i>By DynamiHatch Company</i>"
+                "</pre>\n"
+                "📡 <b>Scanning market liquidity...</b>\n"
+                "🔒 <i>Sensor active. Notification on trigger.</i>"
             )
 
             telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or st.secrets.get("TELEGRAM_BOT_TOKEN")

@@ -484,6 +484,92 @@ def get_groq_response(question, context=""):
     except Exception as e:
         return f"⚠️ Error: {str(e)}"
 
+# ====================== FUNGSI DEEP ANALYSIS (Model 70B) ======================
+def get_deep_analysis(asset_name, market_data, df, signal, reasons):
+    """Fungsi khusus untuk Generate Deep Analysis menggunakan Llama-3.1-70b"""
+    if not client: return "⚠️ Deep Analysis Inactive"
+    
+    MODEL_NAME = 'llama-3.1-70b-versatile'  # Model 70B untuk analisis lebih mendalam
+    
+    # Ambil data teknikal terbaru
+    latest = df.iloc[-1]
+    price = market_data['price']
+    
+    # Format data untuk konteks
+    technical_data = f"""
+    INSTRUMEN: {asset_name}
+    HARGA SAAT INI: {price:,.4f}
+    SINYAL: {signal}
+    
+    INDIKATOR TEKNIKAL:
+    - RSI (14): {latest['RSI']:.2f}
+    - MACD: {latest['MACD']:.4f} (Signal: {latest['Signal_Line']:.4f})
+    - SMA 50: {latest['SMA50']:.4f}
+    - SMA 200: {latest['SMA200']:.4f}
+    - ATR (14): {latest['ATR']:.4f}
+    - Stochastic K: {latest['Stoch_K']:.2f}
+    - ADX (14): {latest['ADX']:.2f}
+    - Bollinger Bands Upper: {latest['BB_Upper']:.4f}, Lower: {latest['BB_Lower']:.4f}
+    - Volume Profile: {df['Volume'].iloc[-1]:,.0f}
+    
+    ANALISIS SINGKAT:
+    {', '.join(reasons)}
+    """
+    
+    system_prompt = f"""
+    Anda adalah AeroVulpis Deep Analysis Engine - AI Trading Analyst Profesional Tingkat Lanjut.
+    Waktu: {datetime.now().strftime('%d %B %Y, %H:%M:%S WIB')}
+    Bahasa: {st.session_state.lang}
+    
+    ANDA ADALAH EXPERT DALAM:
+    1. Analisis Teknikal Mendalam (Support/Resistance, Trend Analysis, Pattern Recognition)
+    2. Korelasi Fundamental (The Fed, Geopolitik, Berita Pasar)
+    3. Money Management & Risk-Reward Ratio
+    4. Market Microstructure & Order Flow
+    
+    INSTRUKSI ANALISIS:
+    1. ANALISIS TEKNIKAL: Berikan interpretasi mendalam tentang setiap indikator dan korelasi antar-indikator.
+    2. LEVEL ENTRY: Tentukan 2-3 level entry dengan alasan spesifik (support, breakout, retracement).
+    3. STOP LOSS: Tentukan level SL berdasarkan ATR dan struktur pasar (jangan lebih dari 2% dari entry).
+    4. TAKE PROFIT: Tentukan 2-3 level TP dengan risk-reward ratio minimal 1:2.
+    5. TIMEFRAME: Sesuaikan rekomendasi dengan timeframe yang digunakan.
+    6. RISK MANAGEMENT: Berikan ukuran posisi dan manajemen risiko yang optimal.
+    7. SCENARIO: Jelaskan kondisi bearish dan bullish yang mungkin terjadi.
+    
+    FORMAT OUTPUT:
+    - Gunakan markdown untuk struktur yang jelas
+    - Gunakan emoji untuk visual yang menarik
+    - Jangan lebih dari 2000 karakter
+    - Fokus pada actionable insights, bukan teori panjang
+    """
+    
+    user_prompt = f"""Berikan analisis teknikal mendalam dengan level entry, stop loss, dan take profit berdasarkan data berikut:
+    
+    {technical_data}
+    
+    Analisis harus mencakup:
+    1. Interpretasi indikator teknikal
+    2. Level entry spesifik (2-3 pilihan)
+    3. Stop loss yang tepat
+    4. Take profit dengan ratio 1:2 atau lebih
+    5. Risk management
+    6. Skenario bullish dan bearish
+    """
+    
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            model=MODEL_NAME,
+            temperature=0.6,  # Lebih rendah untuk konsistensi analisis
+            max_tokens=2000,
+        )
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        return f"⚠️ Error: {str(e)}"
+
 # ====================== MARKET SESSIONS LOGIC ======================
 def market_session_status():
     tz = pytz.timezone('Asia/Jakarta')
@@ -704,10 +790,7 @@ if menu_selection == "Live Dashboard":
             for r in reasons: st.write(f"💠 {r}")
             if st.button(t['generate_ai'], use_container_width=True):
                 with st.spinner(t['ai_thinking']):
-                    context = f"Asset: {asset_name}, Price: {market['price']}, RSI: {df['RSI'].iloc[-1]:.2f}, Signal: {signal}, SMA50: {df['SMA50'].iloc[-1]:.4f}, SMA200: {df['SMA200'].iloc[-1]:.4f}"
-                    if "active_alerts" in st.session_state:
-                        context += f", Active Alerts: {st.session_state.active_alerts}"
-                    ai_anal = get_groq_response("Berikan analisis teknikal mendalam, level entry, stop loss, dan take profit.", context)
+                    ai_anal = get_deep_analysis(asset_name, market, df, signal, reasons)
                     st.info(ai_anal)
             st.markdown("</div>", unsafe_allow_html=True)
 

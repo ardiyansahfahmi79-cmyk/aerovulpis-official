@@ -553,7 +553,7 @@ instruments = {
     "Indices": {"NASDAQ-100": "^IXIC", "S&P 500": "^GSPC", "Dow Jones": "^DJI", "DAX": "^GDAXI", "IHSG": "^JKSE"},
     "Stocks (AS)": {"NVIDIA": "NVDA", "Apple": "AAPL", "Tesla": "TSLA", "Microsoft": "MSFT", "Amazon": "AMZN"},
     "Stocks (ID)": {"BBRI": "BBRI.JK", "BBCA": "BBCA.JK", "TLKM": "TLKM.JK", "ASII": "ASII.JK", "BMRI": "BMRI.JK"},
-    "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver (XAGUSD)": "SI=F", "Crude Oil (WTI)": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F"}
+    "Commodities": {"Gold (XAUUSD)": "GC=F", "XAGUSD": "SI=F", "Crude Oil (WTI)": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F", "Palladium": "PA=F", "Platinum": "PL=F"}
 }
 
 # ====================== UI HEADER ======================
@@ -610,26 +610,54 @@ with st.sidebar:
 
 # ====================== FUNGSI MARKET NEWS ======================
 @st.cache_data(ttl=1200) # Otomatis update setiap 20 menit
-def get_news_data(query, max_articles=15):
+def get_news_data(query, max_articles=10):
     if not fmp_api_key: return [], "⚠️ FMP API KEY MISSING"
     
-    # Filter khusus sesuai instruksi
-    filters = "the Fed, geopolitik, konflik, harga emas, harga perak, forex, saham"
+    # Keywords filter untuk berita yang relevan
+    keywords = ["Fed", "Federal Reserve", "geopolitik", "geopolitical", "Forex", "XAUUSD", "Gold", "XAGUSD", "Silver", "perusahaan", "company", "stock", "saham"]
     
-    url = f"https://financialmodelingprep.com/api/v4/general_news?limit={max_articles}&apikey={fmp_api_key}"
+    # Mengambil berita dengan limit yang lebih besar untuk filtering
+    url = f"https://financialmodelingprep.com/api/v4/general_news?limit=50&apikey={fmp_api_key}"
     try:
         response = requests.get(url)
         data = response.json()
         articles = []
+        
         if isinstance(data, list):
             for item in data:
-                articles.append({
-                    "title": item.get("title"),
-                    "description": item.get("text"),
-                    "url": item.get("url"),
-                    "publishedAt": item.get("publishedDate")
-                })
-            return articles, None
+                title = item.get("title", "")
+                text = item.get("text", "")
+                content = f"{title} {text}".lower()
+                
+                # Filter berdasarkan keywords
+                if any(keyword.lower() in content for keyword in keywords):
+                    # Parse dan format tanggal
+                    published_date = item.get("publishedDate", "N/A")
+                    try:
+                        # Format: "2026-04-15 14:30:00" -> "15-04-2026 14.30"
+                        from datetime import datetime
+                        if published_date and published_date != "N/A":
+                            dt = datetime.strptime(published_date[:19], "%Y-%m-%d %H:%M:%S")
+                            formatted_date = dt.strftime("%d-%m-%Y %H.%M")
+                        else:
+                            formatted_date = "N/A"
+                    except:
+                        formatted_date = published_date
+                    
+                    articles.append({
+                        "title": item.get("title"),
+                        "description": item.get("text"),
+                        "url": item.get("url"),
+                        "publishedAt": formatted_date
+                    })
+                    
+                    if len(articles) >= max_articles:
+                        break
+            
+            if articles:
+                return articles, None
+            else:
+                return [], t['no_news']
         return [], t['no_news']
     except Exception as e:
         return [], f"⚠️ Error: {str(e)}"

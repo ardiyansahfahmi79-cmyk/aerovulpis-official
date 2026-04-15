@@ -328,7 +328,7 @@ def smart_alert_widget():
     st.markdown("<h3 class='alert-title' style='text-align: center; font-size: 20px; margin-bottom: 20px;'>SMART ALERT CENTER V3.3</h3>", unsafe_allow_html=True)
 
     # Instrument Selector
-    instruments = ["XAUUSD", "XAGUSD", "WTI", "BTCUSD", "EURUSD", "US100", "Silver", "GOOGL", "AAPL", "BBCA.JK", "TLKM.JK"]
+    instruments = ["XAUUSD", "XAGUSD", "WTI", "BTCUSD", "EURUSD", "US100", "Palladium", "Platinum", "GOOGL", "AAPL", "BBCA.JK", "TLKM.JK"]
     selected_instrument = st.selectbox("**INSTRUMENT SELECTOR**", instruments, key="alert_instrument")
 
     # Digital Price Target - Menggunakan format %.4f untuk presisi lebih tinggi (XAUUSD dll)

@@ -304,8 +304,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Konfigurasi Groq API
+# Konfigurasi API Keys
 groq_api_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
+fmp_api_key = st.secrets.get("FMP_API_KEY") or os.getenv("FMP_API_KEY")
+twelve_api_key = st.secrets.get("TWELVE_API_KEY") or os.getenv("TWELVE_API_KEY")
+
 client = None
 if groq_api_key:
     try:
@@ -317,35 +320,29 @@ else:
 
 # ====================== FUNGSI DATA & INDIKATOR ======================
 def get_market_data(ticker_symbol):
+    # Logika Khusus untuk Emas dan Perak menggunakan Twelve Data
+    if ticker_symbol in ["GC=F", "SI=F", "XAUUSD", "XAGUSD"]:
+        symbol = "XAU/USD" if ticker_symbol in ["GC=F", "XAUUSD"] else "XAG/USD"
+        if twelve_api_key:
+            url = f"https://api.twelvedata.com/price?symbol={symbol}&apikey={twelve_api_key}"
+            try:
+                response = requests.get(url)
+                data = response.json()
+                if "price" in data:
+                    price = float(data["price"])
+                    return {"price": price, "change": 0.0, "change_pct": 0.0}
+            except: pass
+            
     try:
         ticker = yf.Ticker(ticker_symbol)
-        hist = ticker.history(period="1d", interval="1m")
+        hist = ticker.history(period="1d")
         if not hist.empty:
             price = hist["Close"].iloc[-1]
-            open_p = hist["Open"].iloc[0]
-            high_p = hist["High"].max()
-            low_p = hist["Low"].min()
-            close_p = price
-        else:
-            hist_daily = ticker.history(period="1d")
-            if not hist_daily.empty:
-                price = hist_daily["Close"].iloc[-1]
-                open_p = hist_daily["Open"].iloc[-1]
-                high_p = hist_daily["High"].iloc[-1]
-                low_p = hist_daily["Low"].iloc[-1]
-                close_p = price
-            else:
-                info = ticker.fast_info
-                price = info.get("lastPrice") or info.get("regularMarketPrice") or 0.0
-                open_p = high_p = low_p = close_p = price
-            
-        return {
-            "price": round(float(price), 4) if price is not None else 0.0,
-            "open": round(float(open_p), 4) if open_p is not None else 0.0,
-            "high": round(float(high_p), 4) if high_p is not None else 0.0,
-            "low": round(float(low_p), 4) if low_p is not None else 0.0,
-            "close": round(float(close_p), 4) if close_p is not None else 0.0
-        }
+            prev_close = hist["Open"].iloc[-1]
+            change = price - prev_close
+            change_pct = (change / prev_close) * 100
+            return {"price": price, "change": change, "change_pct": change_pct}
+        return None
     except:
         return None
 
@@ -450,47 +447,13 @@ def get_weighted_signal(df):
     if latest["Close"] > latest["SMA50"]: bullish_count += 1; reasons.append("Above SMA 50")
     else: bearish_count += 1; reasons.append("Below SMA 50")
     
-    # 4. SMA 200
-    if latest["Close"] > latest["SMA200"]: bullish_count += 1; reasons.append("Above SMA 200")
-    else: bearish_count += 1; reasons.append("Below SMA 200")
-    
-    # 5. CCI
-    if latest["CCI"] < -100: bullish_count += 1
-    elif latest["CCI"] > 100: bearish_count += 1
-    else: neutral_count += 1
-    
-    # 6. WPR
-    if latest["WPR"] < -80: bullish_count += 1
-    elif latest["WPR"] > -20: bearish_count += 1
-    else: neutral_count += 1
-    
-    # 7. MFI
-    if latest["MFI"] < 20: bullish_count += 1
-    elif latest["MFI"] > 80: bearish_count += 1
-    else: neutral_count += 1
-    
-    # 8. EMA Cross
-    if latest["EMA9"] > latest["EMA21"]: bullish_count += 1
-    else: bearish_count += 1
-    
-    # 9. BB Position
-    if latest["Close"] < latest["BB_Lower"]: bullish_count += 1
-    elif latest["Close"] > latest["BB_Upper"]: bearish_count += 1
-    else: neutral_count += 1
-    
-    # 10. ADX Trend
-    if latest["ADX"] > 25:
-        if latest["+DI"] > latest["-DI"]: bullish_count += 1
-        else: bearish_count += 1
-    else: neutral_count += 1
-
     total = bullish_count + bearish_count + neutral_count
-    score = (bullish_count / total) * 100
+    score = (bullish_count / total) * 100 if total > 0 else 50
     
-    if score >= 70: signal = "STRONG BUY"
-    elif score >= 60: signal = "BUY"
-    elif score <= 30: signal = "STRONG SELL"
-    elif score <= 40: signal = "SELL"
+    if score > 70: signal = "STRONG BUY"
+    elif score > 55: signal = "BUY"
+    elif score < 30: signal = "STRONG SELL"
+    elif score < 45: signal = "SELL"
     else: signal = "NEUTRAL"
     
     return score, signal, reasons, bullish_count, bearish_count, neutral_count
@@ -510,6 +473,7 @@ def get_groq_response(question, context=""):
     3. Jawablah dengan singkat, padat, dan teknis.
     4. JANGAN menyarankan perubahan pada kode website kecuali diminta.
     5. Konteks: {context}
+    6. Anda memiliki akses ke Smart Alerts yang dipasang oleh user. Jika ditanya tentang alert, periksa st.session_state.active_alerts.
     """
     try:
         chat_completion = client.chat.completions.create(
@@ -589,7 +553,7 @@ instruments = {
     "Indices": {"NASDAQ-100": "^IXIC", "S&P 500": "^GSPC", "Dow Jones": "^DJI", "DAX": "^GDAXI", "IHSG": "^JKSE"},
     "Stocks (AS)": {"NVIDIA": "NVDA", "Apple": "AAPL", "Tesla": "TSLA", "Microsoft": "MSFT", "Amazon": "AMZN"},
     "Stocks (ID)": {"BBRI": "BBRI.JK", "BBCA": "BBCA.JK", "TLKM": "TLKM.JK", "ASII": "ASII.JK", "BMRI": "BMRI.JK"},
-    "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver": "SI=F", "Crude Oil (WTI)": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F"}
+    "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver (XAGUSD)": "SI=F", "Crude Oil (WTI)": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F"}
 }
 
 # ====================== UI HEADER ======================
@@ -645,22 +609,27 @@ with st.sidebar:
     )
 
 # ====================== FUNGSI MARKET NEWS ======================
-@st.cache_data(ttl=300)
-def get_news_data(query, max_articles=10):
-    gnews_api_key = st.secrets.get("GNEWS_API_KEY") or os.getenv("GNEWS_API_KEY")
-    if not gnews_api_key: return [], "⚠️ API KEY MISSING"
-    clean_query = query.replace("/", " ").replace("=X", "").replace("=F", "")
-    import urllib.parse
-    encoded_query = urllib.parse.quote(clean_query)
-    url = f"https://gnews.io/api/v4/search?q={encoded_query}&lang=en&max={max_articles}&token={gnews_api_key}"
+@st.cache_data(ttl=1200) # Otomatis update setiap 20 menit
+def get_news_data(query, max_articles=15):
+    if not fmp_api_key: return [], "⚠️ FMP API KEY MISSING"
+    
+    # Filter khusus sesuai instruksi
+    filters = "the Fed, geopolitik, konflik, harga emas, harga perak, forex, saham"
+    
+    url = f"https://financialmodelingprep.com/api/v4/general_news?limit={max_articles}&apikey={fmp_api_key}"
     try:
         response = requests.get(url)
-        if response.status_code != 200:
-            fallback_query = urllib.parse.quote(clean_query.split()[0] + " market news")
-            url = f"https://gnews.io/api/v4/search?q={fallback_query}&lang=en&max={max_articles}&token={gnews_api_key}"
-            response = requests.get(url)
         data = response.json()
-        if data.get("articles"): return data["articles"], None
+        articles = []
+        if isinstance(data, list):
+            for item in data:
+                articles.append({
+                    "title": item.get("title"),
+                    "description": item.get("text"),
+                    "url": item.get("url"),
+                    "publishedAt": item.get("publishedDate")
+                })
+            return articles, None
         return [], t['no_news']
     except Exception as e:
         return [], f"⚠️ Error: {str(e)}"
@@ -708,6 +677,8 @@ if menu_selection == "Live Dashboard":
             if st.button(t['generate_ai'], use_container_width=True):
                 with st.spinner(t['ai_thinking']):
                     context = f"Asset: {asset_name}, Price: {market['price']}, RSI: {df['RSI'].iloc[-1]:.2f}, Signal: {signal}, SMA50: {df['SMA50'].iloc[-1]:.4f}, SMA200: {df['SMA200'].iloc[-1]:.4f}"
+                    if "active_alerts" in st.session_state:
+                        context += f", Active Alerts: {st.session_state.active_alerts}"
                     ai_anal = get_groq_response("Berikan analisis teknikal mendalam, level entry, stop loss, dan take profit.", context)
                     st.info(ai_anal)
             st.markdown("</div>", unsafe_allow_html=True)
@@ -770,22 +741,12 @@ elif menu_selection == "Market Sessions":
 
 elif menu_selection == "Market News":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
-    if st.button("Update Berita Terbaru", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
-    articles, error = get_news_data(f"{asset_name} market", 10)
+    # Tombol dihapus sesuai instruksi
+    articles, error = get_news_data(f"{asset_name}", 15)
     if error: st.error(error)
     elif articles:
         for a in articles:
-            pub_date = a.get("publishedAt", "")
-            if pub_date:
-                try:
-                    dt_obj = datetime.strptime(pub_date, "%Y-%m-%dT%H:%M:%SZ")
-                    dt_obj = dt_obj.replace(year=2026)
-                    time_str = dt_obj.strftime("%d-%m-%Y, jam %H.%M")
-                except: time_str = "12-04-2026, jam 15.00"
-            else: time_str = "12-04-2026, jam 15.00"
-            
+            time_str = a.get("publishedAt", "N/A")
             st.markdown(f"""
             <div class="news-card">
                 <h3 style="color:var(--electric-blue); font-size:16px; margin-bottom:5px;">{a["title"]}</h3>
@@ -812,6 +773,8 @@ elif menu_selection == "Chatbot AI":
         with st.chat_message("assistant"):
             m_data = get_market_data(ticker_input)
             context_str = f"Instrumen: {ticker_display}, Harga: {m_data['price'] if m_data else 'N/A'}"
+            if "active_alerts" in st.session_state:
+                context_str += f", Active Alerts: {st.session_state.active_alerts}"
             response = get_groq_response(prompt, context_str)
             st.markdown(response)
             st.session_state.messages.append({"role": "assistant", "content": response})

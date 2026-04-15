@@ -328,7 +328,7 @@ def smart_alert_widget():
     st.markdown("<h3 class='alert-title' style='text-align: center; font-size: 20px; margin-bottom: 20px;'>SMART ALERT CENTER V3.3</h3>", unsafe_allow_html=True)
 
     # Instrument Selector
-    instruments = ["XAUUSD", "WTI", "BTCUSD", "EURUSD", "US100", "Silver", "GOOGL", "AAPL", "BBCA.JK", "TLKM.JK"]
+    instruments = ["XAUUSD", "XAGUSD", "WTI", "BTCUSD", "EURUSD", "US100", "Silver", "GOOGL", "AAPL", "BBCA.JK", "TLKM.JK"]
     selected_instrument = st.selectbox("**INSTRUMENT SELECTOR**", instruments, key="alert_instrument")
 
     # Digital Price Target - Menggunakan format %.4f untuk presisi lebih tinggi (XAUUSD dll)
@@ -394,6 +394,14 @@ def smart_alert_widget():
                 success, result = send_telegram_alert(telegram_chat_id, alert_message, telegram_bot_token)
                 if success:
                     st.success("✅ Alert berhasil diaktifkan! Notifikasi akan dikirim ke Telegram.")
+                    if "active_alerts" not in st.session_state:
+                        st.session_state.active_alerts = []
+                    st.session_state.active_alerts.append({
+                        "instrument": selected_instrument,
+                        "target": price_target,
+                        "condition": condition_options[selected_condition_label],
+                        "time": now_wib
+                    })
                 else:
                     st.error(f"❌ Gagal mengirim notifikasi Telegram: {result}")
             else:

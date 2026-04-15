@@ -529,8 +529,8 @@ def get_deep_analysis(asset_name, market_data, df, signal, reasons):
     3. Money Management & Risk-Reward Ratio
     4. Market Microstructure & Order Flow
     
-    INSTRUKSI ANALISIS:
-    1. ANALISIS TEKNIKAL: Berikan interpretasi mendalam tentang setiap indikator dan korelasi antar-indikator.
+    INSTRUKSI ANALISIS WAJIB:
+    1. ANALISIS TEKNIKAL: Berikan interpretasi mendalam tentang RSI (14) dan SMA 200. Jelaskan apakah RSI menunjukkan jenuh beli/jual dan apakah harga berada di atas atau di bawah SMA 200 sebagai penentu tren jangka panjang.
     2. LEVEL ENTRY: Tentukan 2-3 level entry dengan alasan spesifik (support, breakout, retracement).
     3. STOP LOSS: Tentukan level SL berdasarkan ATR dan struktur pasar (jangan lebih dari 2% dari entry).
     4. TAKE PROFIT: Tentukan 2-3 level TP dengan risk-reward ratio minimal 1:2.
@@ -702,46 +702,56 @@ with st.sidebar:
 def get_news_data(query, max_articles=10):
     if not fmp_api_key: return [], "⚠️ FMP API KEY MISSING"
     
-    # Mengambil berita pasar forex, crypto, dan saham secara global
-    # Menggunakan endpoint fmp_articles untuk berita yang lebih komprehensif
-    url = f"https://financialmodelingprep.com/api/v3/fmp/articles?page=0&size=40&apikey={fmp_api_key}"
-    try:
-        response = requests.get(url)
-        data = response.json()
-        articles = []
-        
-        if isinstance(data, list):
-            for item in data:
-                # Ambil semua berita tanpa filter ketat agar informasi tetap muncul
-                if len(articles) < max_articles:
-                    # Parse dan format tanggal
-                    published_date = item.get("publishedDate", "N/A")
-                    try:
-                        # Format: "2026-04-15 14:30:00" -> "15-04-2026 14.30"
-                        from datetime import datetime
-                        if published_date and published_date != "N/A":
-                            dt = datetime.strptime(published_date[:19], "%Y-%m-%d %H:%M:%S")
-                            formatted_date = dt.strftime("%d-%m-%Y %H.%M")
-                        else:
-                            formatted_date = "N/A"
-                    except:
-                        formatted_date = published_date
-                    
-                    articles.append({
-                        "title": item.get("title"),
-                        "description": item.get("text"),
-                        "url": item.get("url"),
-                        "publishedAt": formatted_date
-                    })
-                    
-                    if len(articles) >= max_articles:
-                        break
+    # Menggunakan endpoint stock_news sebagai fallback yang lebih umum dan sering terisi
+    urls = [
+        f"https://financialmodelingprep.com/api/v3/fmp/articles?page=0&size=40&apikey={fmp_api_key}",
+        f"https://financialmodelingprep.com/api/v3/stock_news?limit=40&apikey={fmp_api_key}"
+    ]
+    
+    articles = []
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=10)
+            data = response.json()
             
-            if articles:
-                return articles, None
-            else:
-                return [], t['no_news']
-        return [], t['no_news']
+            # FMP terkadang mengembalikan error dalam bentuk dictionary
+            if isinstance(data, dict) and "Error Message" in data:
+                continue
+
+            if isinstance(data, list) and len(data) > 0:
+                for item in data:
+                    if len(articles) < max_articles:
+                        title = item.get("title")
+                        text = item.get("text") or item.get("content")
+                        url_link = item.get("url")
+                        published_date = item.get("publishedDate", "N/A")
+                        
+                        if not title or not url_link: continue
+
+                        try:
+                            from datetime import datetime
+                            if published_date and published_date != "N/A":
+                                dt = datetime.strptime(published_date[:19], "%Y-%m-%d %H:%M:%S")
+                                formatted_date = dt.strftime("%d-%m-%Y %H.%M")
+                            else:
+                                formatted_date = "N/A"
+                        except:
+                            formatted_date = published_date
+                        
+                        articles.append({
+                            "title": title,
+                            "description": text,
+                            "url": url_link,
+                            "publishedAt": formatted_date
+                        })
+                if articles: break # Jika sudah dapat berita dari satu sumber, cukup
+        except Exception as e:
+            continue
+            
+    if articles:
+        return articles, None
+    else:
+        return [], t['no_news'] + " (Cek API Key FMP Anda)"
     except Exception as e:
         return [], f"⚠️ Error: {str(e)}"
 

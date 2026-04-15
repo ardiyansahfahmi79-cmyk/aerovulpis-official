@@ -300,7 +300,7 @@ def smart_alert_widget():
         payload = {
             'chat_id': chat_id,
             'text': message,
-            'parse_mode': 'MarkdownV2'
+            'parse_mode': 'HTML'
         }
         try:
             response = requests.post(url, json=payload)
@@ -331,12 +331,11 @@ def smart_alert_widget():
     instruments = ["XAUUSD", "WTI", "BTCUSD", "EURUSD", "US100", "Silver", "GOOGL", "AAPL", "BBCA.JK", "TLKM.JK"]
     selected_instrument = st.selectbox("**INSTRUMENT SELECTOR**", instruments, key="alert_instrument")
 
-    # Digital Price Target
-    price_target = st.number_input("**DIGITAL PRICE TARGET**", min_value=0.0, format="%.2f", key="alert_price_target")
+    # Digital Price Target - Menggunakan format %.4f untuk presisi lebih tinggi (XAUUSD dll)
+    price_target = st.number_input("**DIGITAL PRICE TARGET**", min_value=0.0, format="%.4f", step=0.0001, key="alert_price_target")
 
-    # Telegram Chat ID
-    default_chat_id = os.getenv("TELEGRAM_CHAT_ID") or st.secrets.get("TELEGRAM_CHAT_ID", "")
-    telegram_chat_id = st.text_input("**TELEGRAM CHAT ID**", value=default_chat_id, key="alert_chat_id")
+    # Telegram Chat ID - Dikosongkan agar user mengetik sendiri
+    telegram_chat_id = st.text_input("**TELEGRAM CHAT ID**", value="", placeholder="Masukkan Chat ID Anda...", key="alert_chat_id")
 
     # Condition Trigger
     condition_options = {
@@ -355,7 +354,9 @@ def smart_alert_widget():
             
             # Format angka dan teks secara terpisah untuk menghindari ValueError
             instr_val     = str(selected_instrument)[:20]
-            price_val     = f"${price_target:,.2f}"
+            # Menggunakan rstrip untuk membuang nol yang tidak perlu tapi tetap presisi
+            formatted_price = f"{price_target:,.4f}".rstrip('0').rstrip('.')
+            price_val     = f"${formatted_price}"
             cond_val      = str(selected_condition_label)[:20]
             
             # Membangun baris teks secara manual sebelum dimasukkan ke f-string besar
@@ -364,9 +365,10 @@ def smart_alert_widget():
             cond_line     = "║ CONDITION: " + f"{cond_val:<20}" + "║"
             bottom_border = "╚═══════════════════════════════════╝"
 
+            # Menggunakan format HTML (pre) agar bingkai terminal tetap rapi dan tidak error 400
             alert_message = (
-                "*AeroVulpis Alert Activated!*\n\n"
-                "```\n"
+                "<b>AeroVulpis Alert Activated!</b>\n\n"
+                "<pre>\n"
                 f"{top_border}\n"
                 f"{header_text}\n"
                 f"{mid_border}\n"
@@ -374,9 +376,9 @@ def smart_alert_widget():
                 f"{price_line}\n"
                 f"{cond_line}\n"
                 f"{bottom_border}\n"
-                "```\n\n"
+                "</pre>\n\n"
                 f"🔒 Monitoring {selected_instrument} for price movement.\n"
-                "_By DynamiHatch Company_"
+                "<i>By DynamiHatch Company</i>"
             )
 
             telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or st.secrets.get("TELEGRAM_BOT_TOKEN")

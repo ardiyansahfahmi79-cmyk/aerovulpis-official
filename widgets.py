@@ -354,13 +354,14 @@ def smart_alert_widget():
             mid_border    = "╠═══════════════════════════════════╣"
             
             # Format angka dan teks secara terpisah untuk menghindari ValueError
-            instr_val     = f"{selected_instrument}"[:20]
+            instr_val     = str(selected_instrument)[:20]
             price_val     = f"${price_target:,.2f}"
-            cond_val      = f"{selected_condition_label}"[:20]
+            cond_val      = str(selected_condition_label)[:20]
             
-            instr_line    = f"║ INSTRUMENT: {instr_val:<20}║"
-            price_line    = f"║ TARGET PRICE: {price_val:<18}║"
-            cond_line     = f"║ CONDITION: {cond_val:<20}║"
+            # Membangun baris teks secara manual sebelum dimasukkan ke f-string besar
+            instr_line    = "║ INSTRUMENT: " + f"{instr_val:<20}" + "║"
+            price_line    = "║ TARGET PRICE: " + f"{price_val:<17}" + "║"
+            cond_line     = "║ CONDITION: " + f"{cond_val:<20}" + "║"
             bottom_border = "╚═══════════════════════════════════╝"
 
             alert_message = (

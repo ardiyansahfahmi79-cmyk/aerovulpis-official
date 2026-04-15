@@ -36,7 +36,7 @@ translations = {
         "signal": "SINYAL",
         "rsi": "RSI (14)",
         "atr": "ATR (VOL)",
-        "refresh": "REFRESH INDICATOR",
+        "refresh": "REFRESH TECHNICALS",
         "ai_analysis": "🤖 AeroVulpis Analysis",
         "generate_ai": "GENERATE DEEP AI ANALYSIS",
         "market_sessions": "🌐 Market Sessions",
@@ -69,7 +69,7 @@ translations = {
         "signal": "SIGNAL",
         "rsi": "RSI (14)",
         "atr": "ATR (VOL)",
-        "refresh": "REFRESH INDICATOR",
+        "refresh": "REFRESH TECHNICALS",
         "ai_analysis": "🤖 AeroVulpis Analysis",
         "generate_ai": "GENERATE DEEP AI ANALYSIS",
         "market_sessions": "🌐 Market Sessions",
@@ -617,8 +617,8 @@ with st.sidebar:
 
     st.markdown("---")
     tf_options = {
-        "5m": {"period": "1d", "interval": "5m"},
-        "15m": {"period": "1d", "interval": "15m"},
+        "5m": {"period": "5d", "interval": "5m"},
+        "15m": {"period": "5d", "interval": "15m"},
         "30m": {"period": "5d", "interval": "30m"},
         "1h": {"period": "1mo", "interval": "1h"},
         "3h": {"period": "1mo", "interval": "1h"},
@@ -681,8 +681,10 @@ if menu_selection == "Live Dashboard":
         with c2:
             color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
             st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["signal"]}</p><p class="digital-font" style="font-size:20px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
-        with c3: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["rsi"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{df["RSI"].iloc[-1]:.2f}</p></div>', unsafe_allow_html=True)
-        with c4: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["atr"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{df["ATR"].iloc[-1]:.4f}</p></div>', unsafe_allow_html=True)
+        rsi_val = df["RSI"].iloc[-1] if "RSI" in df.columns else 0.0
+        atr_val = df["ATR"].iloc[-1] if "ATR" in df.columns else 0.0
+        with c3: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["rsi"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{rsi_val:.2f}</p></div>', unsafe_allow_html=True)
+        with c4: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["atr"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{atr_val:.4f}</p></div>', unsafe_allow_html=True)
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))

@@ -437,17 +437,21 @@ def get_weighted_signal(df):
     reasons = []
     
     # 1. RSI
-    if latest["RSI"] < 30: bullish_count += 1; reasons.append("RSI Oversold")
-    elif latest["RSI"] > 70: bearish_count += 1; reasons.append("RSI Overbought")
-    else: neutral_count += 1
+    if latest["RSI"] < 30: bullish_count += 1; reasons.append(f"RSI Oversold ({latest['RSI']:.2f})")
+    elif latest["RSI"] > 70: bearish_count += 1; reasons.append(f"RSI Overbought ({latest['RSI']:.2f})")
+    else: neutral_count += 1; reasons.append(f"RSI Neutral ({latest['RSI']:.2f})")
     
     # 2. MACD
     if latest["MACD"] > latest["Signal_Line"]: bullish_count += 1; reasons.append("MACD Bullish")
     else: bearish_count += 1; reasons.append("MACD Bearish")
     
     # 3. SMA 50
-    if latest["Close"] > latest["SMA50"]: bullish_count += 1; reasons.append("Above SMA 50")
-    else: bearish_count += 1; reasons.append("Below SMA 50")
+    if latest["Close"] > latest["SMA50"]: bullish_count += 1; reasons.append("SMA 50 Bullish")
+    else: bearish_count += 1; reasons.append("SMA 50 Bearish")
+
+    # 4. SMA 200 (TAMBAHAN)
+    if latest["Close"] > latest["SMA200"]: bullish_count += 1; reasons.append("SMA 200 Bullish")
+    else: bearish_count += 1; reasons.append("SMA 200 Bearish")
     
     total = bullish_count + bearish_count + neutral_count
     score = (bullish_count / total) * 100 if total > 0 else 50
@@ -702,10 +706,13 @@ with st.sidebar:
 def get_news_data(query, max_articles=10):
     if not fmp_api_key: return [], "⚠️ FMP API KEY MISSING"
     
-    # Menggunakan endpoint stock_news sebagai fallback yang lebih umum dan sering terisi
+    # Menggunakan berbagai endpoint FMP untuk memastikan berita muncul
     urls = [
+        f"https://financialmodelingprep.com/api/v4/general_news?limit=40&apikey={fmp_api_key}",
         f"https://financialmodelingprep.com/api/v3/fmp/articles?page=0&size=40&apikey={fmp_api_key}",
-        f"https://financialmodelingprep.com/api/v3/stock_news?limit=40&apikey={fmp_api_key}"
+        f"https://financialmodelingprep.com/api/v3/stock_news?limit=40&apikey={fmp_api_key}",
+        f"https://financialmodelingprep.com/api/v3/crypto_news?limit=40&apikey={fmp_api_key}",
+        f"https://financialmodelingprep.com/api/v3/forex_news?limit=40&apikey={fmp_api_key}"
     ]
     
     articles = []

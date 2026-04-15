@@ -491,7 +491,7 @@ def get_deep_analysis(asset_name, market_data, df, signal, reasons):
     """Fungsi khusus untuk Generate Deep Analysis menggunakan Llama-3.1-70b"""
     if not client: return "⚠️ Deep Analysis Inactive"
     
-    MODEL_NAME = 'llama-3.3-70b-versatile'  # Model 70B terbaru yang didukung Groq
+    MODEL_NAME = 'llama-3.3-70b-versatile'  # Diperbarui ke model yang didukung
     
     # Ambil data teknikal terbaru
     latest = df.iloc[-1]
@@ -549,13 +549,14 @@ def get_deep_analysis(asset_name, market_data, df, signal, reasons):
     
     {technical_data}
     
-    Analisis harus mencakup:
-    1. Interpretasi indikator teknikal (KHUSUSNYA RSI dan SMA 200)
-    2. Level entry spesifik (2-3 pilihan)
-    3. Stop loss yang tepat
-    4. Take profit dengan ratio 1:2 atau lebih
-    5. Risk management
-    6. Skenario bullish dan bearish
+    Analisis WAJIB mencakup:
+    1. Interpretasi mendalam RSI (14) saat ini: {latest['RSI']:.2f}
+    2. Interpretasi posisi harga terhadap SMA 200: {latest['SMA200']:.4f}
+    3. Level entry spesifik (2-3 pilihan) berdasarkan Support/Resistance atau FVG.
+    4. Stop loss yang tepat (berdasarkan ATR: {latest['ATR']:.4f}).
+    5. Take profit dengan ratio minimal 1:2.
+    6. Risk management (Position sizing).
+    7. Skenario bullish dan bearish.
     """
     
     try:
@@ -701,11 +702,9 @@ with st.sidebar:
 def get_news_data(query, max_articles=10):
     if not fmp_api_key: return [], "⚠️ FMP API KEY MISSING"
     
-    # Keywords filter untuk berita yang relevan (Disederhanakan agar pasti muncul)
-    keywords = ["fed", "reserve", "geopolitik", "geopolitical", "forex", "gold", "silver", "market", "economy", "finance", "stock", "crypto", "saham", "perusahaan"]
-    
-    # Mengambil berita umum keuangan/ekonomi
-    url = f"https://financialmodelingprep.com/api/v4/general_news?limit=40&apikey={fmp_api_key}"
+    # Mengambil berita pasar forex, crypto, dan saham secara global
+    # Menggunakan endpoint fmp_articles untuk berita yang lebih komprehensif
+    url = f"https://financialmodelingprep.com/api/v3/fmp/articles?page=0&size=40&apikey={fmp_api_key}"
     try:
         response = requests.get(url)
         data = response.json()
@@ -713,13 +712,8 @@ def get_news_data(query, max_articles=10):
         
         if isinstance(data, list):
             for item in data:
-                title = item.get("title", "").lower()
-                text = item.get("text", "").lower()
-                content = f"{title} {text}"
-                
-                # Filter berdasarkan keywords (Jika tidak ada keyword pun, ambil berita terbaru)
-                is_relevant = any(keyword in content for keyword in keywords)
-                if is_relevant or len(articles) < 5: # Pastikan minimal ada berita yang muncul
+                # Ambil semua berita tanpa filter ketat agar informasi tetap muncul
+                if len(articles) < max_articles:
                     # Parse dan format tanggal
                     published_date = item.get("publishedDate", "N/A")
                     try:
@@ -763,9 +757,14 @@ if menu_selection == "Live Dashboard":
         df = add_technical_indicators(df)
         score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
         c1, c2, c3, c4 = st.columns(4)
-        # Format desimal: 2 angka untuk Emas/Perak, 4 angka untuk Forex
-        price_format = ":,.2f" if asset_name in ["Gold (XAUUSD)", "XAGUSD", "XAUUSD", "XAGUSD"] else ":,.4f"
-        with c1: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["live_price"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{market["price"]{price_format}}</p></div>', unsafe_allow_html=True)
+        # Format desimal: 2 angka untuk Emas/Perak, 4 angka untuk Forex, hapus nol berlebih
+        # Menggunakan format khusus untuk Gold (XAUUSD) agar tidak terlalu banyak nol
+        if "Gold" in asset_name or "XAU" in asset_name or "XAG" in asset_name:
+            formatted_price = f"{market['price']:,.2f}"
+        else:
+            formatted_price = f"{market['price']:,.4f}".rstrip('0').rstrip('.')
+            
+        with c1: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["live_price"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{formatted_price}</p></div>', unsafe_allow_html=True)
         with c2:
             color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
             st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["signal"]}</p><p class="digital-font" style="font-size:20px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
@@ -821,8 +820,8 @@ elif menu_selection == "Signal Analysis":
         indicators_data = [
             ("RSI (14)", f"{latest['RSI']:.2f}", "Bullish" if latest['RSI'] < 30 else "Bearish" if latest['RSI'] > 70 else "Neutral"),
             ("MACD", f"{latest['MACD']:.4f}", "Bullish" if latest['MACD'] > latest['Signal_Line'] else "Bearish"),
-            ("SMA 50", f"{latest['SMA50']:.2f}", "Bullish" if latest['Close'] > latest['SMA50'] else "Bearish"),
-            ("SMA 200", f"{latest['SMA200']:.2f}", "Bullish" if latest['Close'] > latest['SMA200'] else "Bearish"),
+            ("SMA 50", f"{latest['SMA50']:.4f}".rstrip('0').rstrip('.'), "Bullish" if latest['Close'] > latest['SMA50'] else "Bearish"),
+            ("SMA 200", f"{latest['SMA200']:.4f}".rstrip('0').rstrip('.'), "Bullish" if latest['Close'] > latest['SMA200'] else "Bearish"),
             ("CCI (20)", f"{latest['CCI']:.2f}", "Bullish" if latest['CCI'] < -100 else "Bearish" if latest['CCI'] > 100 else "Neutral"),
             ("WPR (14)", f"{latest['WPR']:.2f}", "Bullish" if latest['WPR'] < -80 else "Bearish" if latest['WPR'] > -20 else "Neutral"),
             ("MFI (14)", f"{latest['MFI']:.2f}", "Bullish" if latest['MFI'] < 20 else "Bearish" if latest['MFI'] > 80 else "Neutral"),

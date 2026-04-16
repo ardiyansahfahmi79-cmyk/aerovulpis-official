@@ -351,61 +351,21 @@ def smart_alert_widget():
             import pytz
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
 
-            # Desain Terminal Cyber-Tech AeroVulpis
-            top_border    = "╔═══════════════════════════════════╗"
-            status_line   = "║ [ STATUS: TARGET LOCKED ]         ║"
-            mid_border    = "╠═══════════════════════════════════╣"
+            # Alert hanya disimpan di session state, tidak langsung dikirim ke Telegram
+            if "active_alerts" not in st.session_state:
+                st.session_state.active_alerts = []
             
-            # Pengolahan teks agar simetris dan tidak terpotong
-            instr_val     = str(selected_instrument)[:18]
-            formatted_price = f"{price_target:,.4f}".rstrip('0').rstrip('.')
-            price_val     = f"${formatted_price}"
+            # Tambahkan alert baru ke daftar aktif
+            st.session_state.active_alerts.append({
+                "instrument": selected_instrument,
+                "target": price_target,
+                "condition": condition_options[selected_condition_label],
+                "chat_id": telegram_chat_id,
+                "time_created": now_wib,
+                "triggered": False
+            })
             
-            # Logika label kondisi yang lebih pendek untuk tampilan terminal
-            cond_display = "BULLISH BREAKOUT ↑" if "BULLISH" in selected_condition_label else "BEARISH BREAKDOWN ↓"
-            
-            instr_line    = f"║ INSTR: {instr_val:<26} ║"
-            price_line    = f"║ PRICE: {price_val:<26} ║"
-            cond_line     = f"║ COND : {cond_display:<26} ║"
-            time_line     = f"║ TIME : {now_wib:<26} ║"
-            bottom_border = "╚═══════════════════════════════════╝"
-
-            # Pesan Telegram dengan format HTML yang lebih eksklusif
-            alert_message = (
-                "<b>🦅 AEROVULPIS SMART ALERT SYSTEM</b>\n"
-                "<i>DynamiHatch Digital Security Protocol</i>\n\n"
-                "<pre>\n"
-                f"{top_border}\n"
-                f"{status_line}\n"
-                f"{mid_border}\n"
-                f"{instr_line}\n"
-                f"{price_line}\n"
-                f"{cond_line}\n"
-                f"{time_line}\n"
-                f"{bottom_border}\n"
-                "</pre>\n"
-                "📡 <b>Scanning market liquidity...</b>\n"
-                "🔒 <i>Sensor active. Notification on trigger.</i>"
-            )
-
-            telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or st.secrets.get("TELEGRAM_BOT_TOKEN")
-
-            if telegram_bot_token:
-                success, result = send_telegram_alert(telegram_chat_id, alert_message, telegram_bot_token)
-                if success:
-                    st.success("✅ Alert berhasil diaktifkan! Notifikasi akan dikirim ke Telegram.")
-                    if "active_alerts" not in st.session_state:
-                        st.session_state.active_alerts = []
-                    st.session_state.active_alerts.append({
-                        "instrument": selected_instrument,
-                        "target": price_target,
-                        "condition": condition_options[selected_condition_label],
-                        "time": now_wib
-                    })
-                else:
-                    st.error(f"❌ Gagal mengirim notifikasi Telegram: {result}")
-            else:
-                st.error("⚠️ TELEGRAM_BOT_TOKEN tidak ditemukan.")
+            st.success(f"✅ SENSOR AKTIF: Memantau {selected_instrument} di harga {price_target:,.2f}. Notifikasi akan dikirim saat target tercapai.")
         else:
             st.warning("⚠️ Harap masukkan Target Harga dan Telegram Chat ID yang valid.")
 

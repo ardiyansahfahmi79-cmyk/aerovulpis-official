@@ -306,7 +306,8 @@ st.markdown("""
 
 # Konfigurasi API Keys
 groq_api_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
-fmp_api_key = st.secrets.get("FMP_API_KEY") or os.getenv("FMP_API_KEY")
+marketaux_key = st.secrets.get("MARKETAUX_KEY") or os.getenv("MARKETAUX_KEY")
+tiingo_key = st.secrets.get("TIINGO_KEY") or os.getenv("TIINGO_KEY")
 twelve_api_key = st.secrets.get("TWELVE_API_KEY") or os.getenv("TWELVE_API_KEY")
 
 client = None
@@ -701,64 +702,136 @@ with st.sidebar:
         }
     )
 
-# ====================== FUNGSI MARKET NEWS ======================
-@st.cache_data(ttl=1200) # Otomatis update setiap 20 menit
-def get_news_data(query, max_articles=10):
-    if not fmp_api_key: return [], "⚠️ FMP API KEY MISSING"
-    
-    # Menggunakan berbagai endpoint FMP untuk memastikan berita muncul
-    urls = [
-        f"https://financialmodelingprep.com/api/v4/general_news?limit=40&apikey={fmp_api_key}",
-        f"https://financialmodelingprep.com/api/v3/fmp/articles?page=0&size=40&apikey={fmp_api_key}",
-        f"https://financialmodelingprep.com/api/v3/stock_news?limit=40&apikey={fmp_api_key}",
-        f"https://financialmodelingprep.com/api/v3/crypto_news?limit=40&apikey={fmp_api_key}",
-        f"https://financialmodelingprep.com/api/v3/forex_news?limit=40&apikey={fmp_api_key}"
-    ]
-    
-    articles = []
-    for url in urls:
+# ====================== FUNGSI MARKET NEWS (MARKETAUX & TIINGO) ======================
+@st.cache_data(ttl=1200) # Update otomatis tiap 20 menit
+def get_news_data(query, max_articles=15):
+    berita_final = []
+    urls_terpakai = set()
+
+    # --- 1. AMBIL DARI MARKETAUX ---
+    if marketaux_key:
+        url_m = f"https://api.marketaux.com/v1/news/all?api_token={marketaux_key}&language=en&limit=10"
         try:
-            response = requests.get(url, timeout=10)
-            data = response.json()
-            
-            # FMP terkadang mengembalikan error dalam bentuk dictionary
-            if isinstance(data, dict) and "Error Message" in data:
-                continue
-
-            if isinstance(data, list) and len(data) > 0:
-                for item in data:
-                    if len(articles) < max_articles:
-                        title = item.get("title")
-                        text = item.get("text") or item.get("content")
-                        url_link = item.get("url")
-                        published_date = item.get("publishedDate", "N/A")
-                        
-                        if not title or not url_link: continue
-
-                        try:
-                            from datetime import datetime
-                            if published_date and published_date != "N/A":
-                                dt = datetime.strptime(published_date[:19], "%Y-%m-%d %H:%M:%S")
-                                formatted_date = dt.strftime("%d-%m-%Y %H.%M")
-                            else:
-                                formatted_date = "N/A"
-                        except:
-                            formatted_date = published_date
-                        
-                        articles.append({
-                            "title": title,
-                            "description": text,
-                            "url": url_link,
-                            "publishedAt": formatted_date
-                        })
-                if articles: break # Jika sudah dapat berita dari satu sumber, cukup
+            res_m = requests.get(url_m, timeout=10).json()
+            for item in res_m.get('data', []):
+                if item['url'] not in urls_terpakai:
+                    berita_final.append({
+                        'publishedAt': item['published_at'],
+                        'title': item['title'],
+                        'description': item['description'],
+                        'source': 'Marketaux',
+                        'url': item['url']
+                    })
+                    urls_terpakai.add(item['url'])
         except Exception as e:
-            continue
+            pass
+
+    # --- 2. AMBIL DARI TIINGO ---
+    if tiingo_key:
+        url_t = f"https://api.tiingo.com/tiingo/news?token={tiingo_key}"
+        headers_t = {'Content-Type': 'application/json'}
+        try:
+            res_t = requests.get(url_t, headers=headers_t, timeout=10).json()
+            if isinstance(res_t, list):
+                for item in res_t:
+                    if item['url'] not in urls_terpakai:
+                        berita_final.append({
+                            'publishedAt': item['publishedDate'],
+                            'title': item['title'],
+                            'description': item['description'],
+                            'source': 'Tiingo',
+                            'url': item['url']
+                        })
+                        urls_terpakai.add(item['url'])
+        except Exception as e:
+            pass
+
+    if not berita_final:
+        return [], t['no_news'] + " (Cek API Key Marketaux/Tiingo Anda)"
+
+    # Urutkan berdasarkan waktu terbaru
+    berita_final = sorted(berita_final, key=lambda x: x['publishedAt'], reverse=True)
+    
+    # Format waktu untuk tampilan AeroVulpis
+    for b in berita_final:
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(b['publishedAt'].replace('Z', '+00:00'))
+            b['publishedAt'] = dt.strftime("%d-%m-%Y %H.%M")
+        except:
+            pass
             
-    if articles:
-        return articles, None
-    else:
-        return [], t['no_news'] + " (Cek API Key FMP Anda)"
+    return berita_final[:max_articles], None
+
+# ====================== FUNGSI PENGECEKAN SMART ALERT ======================
+def check_smart_alerts(current_price, current_asset):
+    if "active_alerts" not in st.session_state or not st.session_state.active_alerts:
+        return
+
+    telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or st.secrets.get("TELEGRAM_BOT_TOKEN")
+    if not telegram_bot_token:
+        return
+
+    for alert in st.session_state.active_alerts:
+        # Hanya cek alert yang sesuai dengan instrumen yang sedang dilihat dan belum terpicu
+        if alert.get("instrument") in current_asset and not alert.get("triggered", False):
+            target = alert["target"]
+            condition = alert["condition"]
+            triggered = False
+
+            if condition == "bullish" and current_price >= target:
+                triggered = True
+            elif condition == "bearish" and current_price <= target:
+                triggered = True
+
+            if triggered:
+                alert["triggered"] = True
+                from datetime import datetime
+                import pytz
+                now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
+
+                # Desain Terminal Cyber-Tech AeroVulpis
+                top_border    = "╔═══════════════════════════════════╗"
+                status_line   = "║ [ STATUS: TARGET REACHED! ]       ║"
+                mid_border    = "╠═══════════════════════════════════╣"
+                instr_val     = str(alert["instrument"])[:18]
+                price_val     = f"${current_price:,.2f}"
+                target_val    = f"${target:,.2f}"
+                cond_display  = "BULLISH BREAKOUT ↑" if condition == "bullish" else "BEARISH BREAKDOWN ↓"
+                
+                instr_line    = f"║ INSTR: {instr_val:<26} ║"
+                price_line    = f"║ PRICE: {price_val:<26} ║"
+                target_line   = f"║ TARGET: {target_val:<25} ║"
+                cond_line     = f"║ COND : {cond_display:<26} ║"
+                time_line     = f"║ TIME : {now_wib:<26} ║"
+                bottom_border = "╚═══════════════════════════════════╝"
+
+                alert_message = (
+                    "<b>🚨 AEROVULPIS TARGET BREACHED!</b>\n"
+                    "<i>Market Sensor Protocol Triggered</i>\n\n"
+                    "<pre>\n"
+                    f"{top_border}\n"
+                    f"{status_line}\n"
+                    f"{mid_border}\n"
+                    f"{instr_line}\n"
+                    f"{price_line}\n"
+                    f"{target_line}\n"
+                    f"{cond_line}\n"
+                    f"{time_line}\n"
+                    f"{bottom_border}\n"
+                    "</pre>\n"
+                    "🎯 <b>Price target successfully hit!</b>\n"
+                    "🦅 <i>AeroVulpis Monitoring Complete.</i>"
+                )
+
+                # Kirim ke Telegram
+                url = f"https://api.telegram.org/bot{telegram_bot_token}/sendMessage"
+                payload = {'chat_id': alert["chat_id"], 'text': alert_message, 'parse_mode': 'HTML'}
+                try:
+                    requests.post(url, json=payload, timeout=10)
+                    st.toast(f"🚀 ALERT TERPICU: {alert['instrument']} menyentuh {target_val}!", icon="🚨")
+                except:
+                    pass
 
 # ====================== LOGIKA HALAMAN ======================
 
@@ -766,6 +839,8 @@ if menu_selection == "Live Dashboard":
     market = get_market_data(ticker_input)
     df = get_historical_data(ticker_input, period, interval)
     if market and not df.empty:
+        # Jalankan pengecekan alert setiap kali dashboard dimuat
+        check_smart_alerts(market["price"], asset_name)
         if selected_tf_display in ["3h", "4h"]:
             rule = "3h" if selected_tf_display == "3h" else "4h"
             df = df.resample(rule).agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
@@ -814,8 +889,11 @@ if menu_selection == "Live Dashboard":
             st.markdown("</div>", unsafe_allow_html=True)
 
 elif menu_selection == "Signal Analysis":
+    market = get_market_data(ticker_input)
     df = get_historical_data(ticker_input, period, interval)
     if not df.empty:
+        if market:
+            check_smart_alerts(market["price"], asset_name)
         if selected_tf_display in ["3h", "4h"]:
             rule = "3h" if selected_tf_display == "3h" else "4h"
             df = df.resample(rule).agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
@@ -877,10 +955,11 @@ elif menu_selection == "Market News":
     elif articles:
         for a in articles:
             time_str = a.get("publishedAt", "N/A")
+            source_name = a.get("source", "Market News")
             st.markdown(f"""
             <div class="news-card">
                 <h3 style="color:var(--electric-blue); font-size:16px; margin-bottom:5px;">{a["title"]}</h3>
-                <p style="font-size:11px; color:#888; margin-bottom:8px;">📅 {time_str}</p>
+                <p style="font-size:11px; color:#888; margin-bottom:8px;">🌐 {source_name} | 📅 {time_str}</p>
                 <p style="font-size:13px; color:#ccc;">{a["description"]}</p>
                 <a href="{a["url"]}" target="_blank" style="color:var(--neon-green); font-size:12px; font-weight:bold;">READ MORE →</a>
             </div>

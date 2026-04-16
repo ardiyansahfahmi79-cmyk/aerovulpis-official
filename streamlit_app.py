@@ -301,6 +301,49 @@ st.markdown("""
         margin-top: 5px;
         text-transform: uppercase;
     }
+
+    .pillar-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        margin: 15px 0;
+    }
+
+    .pillar-item {
+        flex: 1;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .pillar-icon {
+        width: 45px;
+        height: 45px;
+        margin-bottom: 8px;
+        filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.4));
+    }
+
+    .pillar-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        color: #00d4ff;
+        margin: 2px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        text-shadow: 0 0 5px rgba(0, 212, 255, 0.3);
+    }
+
+    .pillar-desc {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 9px;
+        color: #888;
+        line-height: 1.1;
+        margin: 0;
+        max-width: 90px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -997,48 +1040,31 @@ elif menu_selection == "Risk Management":
     st.markdown('<h2 class="digital-font" style="text-align:center; font-size:26px; margin-bottom:10px;">Ultimate Risk Framework & Return Simulator</h2>', unsafe_allow_html=True)
     st.markdown('<p style="text-align:center; color:#888; font-family:Rajdhani; margin-top:-10px;">The Four Pillars of Survival</p>', unsafe_allow_html=True)
     
-    # Four Pillars Icons - Redesigned with Digital Fintech Logos
-    p1, p2, p3, p4 = st.columns(4, gap="small")
-    
-    with p1:
-        st.markdown(
-            '<div style="text-align:center; padding:10px;">' +
-            '<img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/lxtUFfqAGtqmckoG.png" width="50" style="margin-bottom:10px;">' +
-            '<p style="font-family:Orbitron; font-size:11px; font-weight:bold; color:#00d4ff; margin:5px 0; text-shadow: 0 0 5px #00d4ff;">1. TRADING RULES</p>' +
-            '<p style="font-family:Rajdhani; font-size:8px; color:#aaa; margin:0; line-height:1.2;">Stop Loss, definition of erecalculation.</p>' +
-            '</div>',
-            unsafe_allow_html=True
-        )
-    
-    with p2:
-        st.markdown(
-            '<div style="text-align:center; padding:10px;">' +
-            '<img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/IrMPKUKVGNWfJYiT.png" width="50" style="margin-bottom:10px;">' +
-            '<p style="font-family:Orbitron; font-size:11px; font-weight:bold; color:#00d4ff; margin:5px 0; text-shadow: 0 0 5px #00d4ff;">2. POSITION SIZING</p>' +
-            '<p style="font-family:Rajdhani; font-size:8px; color:#aaa; margin:0; line-height:1.2;">Scale redescription of saition positing.</p>' +
-            '</div>',
-            unsafe_allow_html=True
-        )
-    
-    with p3:
-        st.markdown(
-            '<div style="text-align:center; padding:10px;">' +
-            '<img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/KvlBOIcTGsUXIlxi.png" width="50" style="margin-bottom:10px;">' +
-            '<p style="font-family:Orbitron; font-size:11px; font-weight:bold; color:#00d4ff; margin:5px 0; text-shadow: 0 0 5px #00d4ff;">3. CONFIDENCE SCORES</p>' +
-            '<p style="font-family:Rajdhani; font-size:8px; color:#aaa; margin:0; line-height:1.2;">Definition motion of chart realtime.</p>' +
-            '</div>',
-            unsafe_allow_html=True
-        )
-    
-    with p4:
-        st.markdown(
-            '<div style="text-align:center; padding:10px;">' +
-            '<img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/XagmGYTISfZpBVMv.png" width="50" style="margin-bottom:10px;">' +
-            '<p style="font-family:Orbitron; font-size:11px; font-weight:bold; color:#00d4ff; margin:5px 0; text-shadow: 0 0 5px #00d4ff;">4. RISK ALLOCATION</p>' +
-            '<p style="font-family:Rajdhani; font-size:8px; color:#aaa; margin:0; line-height:1.2;">Description of the risk allocation.</p>' +
-            '</div>',
-            unsafe_allow_html=True
-        )
+    # Four Pillars Icons - Redesigned with Flexbox for Perfect Alignment
+    st.markdown("""
+    <div class="pillar-container">
+        <div class="pillar-item">
+            <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/lxtUFfqAGtqmckoG.png" class="pillar-icon">
+            <p class="pillar-title">1. TRADING RULES</p>
+            <p class="pillar-desc">Stop Loss, definition of erecalculation.</p>
+        </div>
+        <div class="pillar-item">
+            <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/IrMPKUKVGNWfJYiT.png" class="pillar-icon">
+            <p class="pillar-title">2. POSITION SIZING</p>
+            <p class="pillar-desc">Scale redescription of saition positing.</p>
+        </div>
+        <div class="pillar-item">
+            <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/KvlBOIcTGsUXIlxi.png" class="pillar-icon">
+            <p class="pillar-title">3. CONFIDENCE SCORES</p>
+            <p class="pillar-desc">Definition motion of chart realtime.</p>
+        </div>
+        <div class="pillar-item">
+            <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/XagmGYTISfZpBVMv.png" class="pillar-icon">
+            <p class="pillar-title">4. RISK ALLOCATION</p>
+            <p class="pillar-desc">Description of the risk allocation.</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("""
     <div class="glass-card" style="border-left: 4px solid #00d4ff; padding:15px; margin-top:15px;">

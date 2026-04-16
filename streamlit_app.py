@@ -322,23 +322,25 @@ st.markdown("""
         width: 45px;
         height: 45px;
         margin-bottom: 8px;
-        filter: drop-shadow(0 0 12px rgba(0, 212, 255, 0.8)); /* Efek neon diperkuat agar semua menyala */
+        filter: drop-shadow(0 0 15px #00d4ff) brightness(1.2); /* Efek neon diperkuat secara eksplisit */
+        display: block;
     }
 
     .pillar-title {
         font-family: 'Orbitron', sans-serif;
-        font-size: 11px;
+        font-size: 9px;
         font-weight: 700;
         color: #00d4ff;
         margin: 5px 0 2px 0;
         text-transform: uppercase;
-        letter-spacing: 1px;
-        text-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
-        line-height: 1.3;
-        min-height: 2.6em;
+        letter-spacing: 0.5px;
+        text-shadow: 0 0 8px rgba(0, 212, 255, 0.8);
+        line-height: 1.2;
+        min-height: 2.4em;
         display: flex;
         align-items: center;
         justify-content: center;
+        text-align: center;
     }
 
     .pillar-desc {

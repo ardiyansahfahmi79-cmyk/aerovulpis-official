@@ -752,12 +752,17 @@ def get_news_data(query, max_articles=15):
     # Urutkan berdasarkan waktu terbaru
     berita_final = sorted(berita_final, key=lambda x: x['publishedAt'], reverse=True)
     
-    # Format waktu untuk tampilan AeroVulpis
+    # Format waktu untuk tampilan AeroVulpis (Konversi ke WIB)
+    import pytz
+    tz_wib = pytz.timezone('Asia/Jakarta')
+    
     for b in berita_final:
         try:
             from datetime import datetime
-            dt = datetime.fromisoformat(b['publishedAt'].replace('Z', '+00:00'))
-            b['publishedAt'] = dt.strftime("%d-%m-%Y %H.%M")
+            # Asumsi waktu dari API adalah UTC
+            dt_utc = datetime.fromisoformat(b['publishedAt'].replace('Z', '+00:00'))
+            dt_wib = dt_utc.astimezone(tz_wib)
+            b['publishedAt'] = dt_wib.strftime("%d-%m-%Y %H.%M")
         except:
             pass
             
@@ -989,30 +994,84 @@ elif menu_selection == "Chatbot AI":
             st.session_state.messages.append({"role": "assistant", "content": response})
 
 elif menu_selection == "Risk Management":
-    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["risk_mgmt"]}</h2>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
+    st.markdown('<h2 class="digital-font" style="text-align:center; font-size:26px; margin-bottom:10px;">Ultimate Risk Framework & Return Simulator</h2>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align:center; color:#888; font-family:Rajdhani; margin-top:-10px;">The Four Pillars of Survival</p>', unsafe_allow_html=True)
+    
+    # Four Pillars Icons
+    p1, p2, p3, p4 = st.columns(4)
+    with p1: st.markdown('<div style="text-align:center;"><p style="font-size:24px; margin:0;">📋</p><p style="font-size:10px; color:#aaa; margin:0;">1. TRADING RULES</p></div>', unsafe_allow_html=True)
+    with p2: st.markdown('<div style="text-align:center;"><p style="font-size:24px; margin:0;">⚖️</p><p style="font-size:10px; color:#aaa; margin:0;">2. POSITION SIZING</p></div>', unsafe_allow_html=True)
+    with p3: st.markdown('<div style="text-align:center;"><p style="font-size:24px; margin:0;">📊</p><p style="font-size:10px; color:#aaa; margin:0;">3. CONFIDENCE SCORES</p></div>', unsafe_allow_html=True)
+    with p4: st.markdown('<div style="text-align:center;"><p style="font-size:24px; margin:0;">🛡️</p><p style="font-size:10px; color:#aaa; margin:0;">4. RISK ALLOCATION</p></div>', unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="glass-card" style="border-left: 4px solid #00d4ff; padding:15px; margin-top:15px;">
+        <p class="digital-font" style="font-size:14px; color:#00d4ff; margin-bottom:5px;">AeroVulpis Intelligence Rules</p>
+        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>TP:</b> Price win showers of Stop Loss</p>
+        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>SL:</b> The price value for Stop Loss</p>
+        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>Wait:</b> Confidence Nation to perfect time</p>
+        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>Rule 4:</b> Customize your pronocy Rule 4</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Funding Details
+    st.markdown('<p style="font-family:Orbitron; font-size:14px; margin-top:20px; color:#888;">FUNDING DETAILS</p>', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card" style="border: 1px solid #00d4ff;">', unsafe_allow_html=True)
+    st.markdown('<p style="font-family:Orbitron; font-size:12px; color:#00d4ff; margin-bottom:5px;">ACCOUNT BALANCE ($)</p>', unsafe_allow_html=True)
+    balance = st.number_input("", value=1000.0, step=100.0, key="sim_balance", label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Reward-to-Risk Simulator
+    st.markdown('<p style="font-family:Orbitron; font-size:14px; margin-top:20px; color:#888;">REWARD-TO-RISK SIMULATOR</p>', unsafe_allow_html=True)
+    rr_ratios = {
+        "1:2": 2.0, "1:3": 3.0, "1:4": 4.0,
+        "2:3": 1.5, "2:4": 2.0, "2:5": 2.5,
+        "3:4": 1.33, "3:5": 1.67, "3:6": 2.0
+    }
+    
+    # Grid for RR Ratios
+    selected_rr = st.selectbox("Select Ratio", list(rr_ratios.keys()), key="rr_ratio_select")
+    
+    # Win/Loss Inputs
+    st.markdown('<p style="font-family:Rajdhani; font-size:14px; margin-top:10px; color:#ccc;">Simulated Weekly Trade Win/Loss</p>', unsafe_allow_html=True)
+    w_col, l_col = st.columns(2)
+    with w_col:
+        wins = st.number_input("Wins:", min_value=0, value=3, step=1, key="sim_wins")
+    with l_col:
+        losses = st.number_input("Losses:", min_value=0, value=2, step=1, key="sim_losses")
+
+    risk_per_trade_pct = st.slider("Risk per Trade (%)", 0.1, 5.0, 1.0, key="sim_risk_pct")
+
+    if st.button("SIMULATE & CALCULATE RETURNS", use_container_width=True, type="primary"):
+        # Logika Kalkulasi
+        risk_amt = balance * (risk_per_trade_pct / 100)
+        reward_amt = risk_amt * rr_ratios[selected_rr]
+        
+        weekly_net = (wins * reward_amt) - (losses * risk_amt)
+        weekly_return_pct = (weekly_net / balance) * 100
+        
+        monthly_return_pct = weekly_return_pct * 4
+        yearly_return_pct = weekly_return_pct * 52
+        
+        st.markdown('<p style="font-family:Orbitron; font-size:14px; margin-top:20px; color:#888;">Projected Performance</p>', unsafe_allow_html=True)
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        balance = st.number_input("Account Balance ($)", value=1000.0)
-        risk_pct = st.slider("Risk per Trade (%)", 0.1, 5.0, 1.0)
-        entry_p = st.number_input("Entry Price", value=0.0)
-        stop_l = st.number_input("Stop Loss Price", value=0.0)
+        res_col1, res_col2, res_col3 = st.columns(3)
+        
+        with res_col1:
+            color = "#00ff88" if weekly_return_pct >= 0 else "#ff2a6d"
+            arrow = "▲" if weekly_return_pct >= 0 else "▼"
+            st.markdown(f'<p style="font-size:10px; color:#aaa; margin:0;">Wkly Return:</p><p style="color:{color}; font-family:Orbitron; font-size:16px; margin:0;">{weekly_return_pct:+.2f}% {arrow}</p>', unsafe_allow_html=True)
+            
+        with res_col2:
+            color = "#00ff88" if monthly_return_pct >= 0 else "#ff2a6d"
+            st.markdown(f'<p style="font-size:10px; color:#aaa; margin:0;">Mthly Return:</p><p style="color:{color}; font-family:Orbitron; font-size:16px; margin:0;">{monthly_return_pct:+.2f}%</p>', unsafe_allow_html=True)
+            
+        with res_col3:
+            color = "#00ff88" if yearly_return_pct >= 0 else "#ff2a6d"
+            st.markdown(f'<p style="font-size:10px; color:#aaa; margin:0;">Yrly Return:</p><p style="color:{color}; font-family:Orbitron; font-size:16px; margin:0;">{yearly_return_pct:+.2f}%</p>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-    with col2:
-        if entry_p > 0 and stop_l > 0:
-            risk_amt = balance * (risk_pct / 100)
-            diff = abs(entry_p - stop_l)
-            pos_size = risk_amt / diff if diff > 0 else 0
-            st.markdown(f"""
-            <div class="glass-card" style="text-align:center;">
-                <p class="rajdhani-font" style="font-size:14px;">{t['pos_size']}</p>
-                <h2 class="digital-font" style="color:#00d4ff;">{pos_size:,.2f} Units</h2>
-                <hr style="border-color:rgba(255,255,255,0.1);">
-                <p class="rajdhani-font" style="font-size:12px;">{t['risk_amt']}: <span style="color:#ff2a6d;">${risk_amt:,.2f}</span></p>
-                <p class="rajdhani-font" style="font-size:12px;">{t['reward']}: <span style="color:#00ff88;">${risk_amt*2:,.2f}</span></p>
-            </div>
-            """, unsafe_allow_html=True)
-        else: st.info(t['risk_info'])
+    else:
+        st.info("Adjust parameters and click the button to simulate returns.")
 
 elif menu_selection == "Settings":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["settings"]}</h2>', unsafe_allow_html=True)

@@ -997,12 +997,12 @@ elif menu_selection == "Risk Management":
     st.markdown('<h2 class="digital-font" style="text-align:center; font-size:26px; margin-bottom:10px;">Ultimate Risk Framework & Return Simulator</h2>', unsafe_allow_html=True)
     st.markdown('<p style="text-align:center; color:#888; font-family:Rajdhani; margin-top:-10px;">The Four Pillars of Survival</p>', unsafe_allow_html=True)
     
-    # Four Pillars Icons
+    # Four Pillars Icons - Redesigned with Digital Fintech Logos
     p1, p2, p3, p4 = st.columns(4)
-    with p1: st.markdown('<div style="text-align:center;"><p style="font-size:24px; margin:0;">📋</p><p style="font-size:10px; color:#aaa; margin:0;">1. TRADING RULES</p></div>', unsafe_allow_html=True)
-    with p2: st.markdown('<div style="text-align:center;"><p style="font-size:24px; margin:0;">⚖️</p><p style="font-size:10px; color:#aaa; margin:0;">2. POSITION SIZING</p></div>', unsafe_allow_html=True)
-    with p3: st.markdown('<div style="text-align:center;"><p style="font-size:24px; margin:0;">📊</p><p style="font-size:10px; color:#aaa; margin:0;">3. CONFIDENCE SCORES</p></div>', unsafe_allow_html=True)
-    with p4: st.markdown('<div style="text-align:center;"><p style="font-size:24px; margin:0;">🛡️</p><p style="font-size:10px; color:#aaa; margin:0;">4. RISK ALLOCATION</p></div>', unsafe_allow_html=True)
+    with p1: st.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/lxtUFfqAGtqmckoG.png" width="40" style="margin-bottom:5px;"><p style="font-family:Orbitron; font-size:9px; color:#00d4ff; margin:0; text-shadow: 0 0 5px #00d4ff;">1. TRADING RULES</p></div>', unsafe_allow_html=True)
+    with p2: st.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/IrMPKUKVGNWfJYiT.png" width="40" style="margin-bottom:5px;"><p style="font-family:Orbitron; font-size:9px; color:#00d4ff; margin:0; text-shadow: 0 0 5px #00d4ff;">2. POSITION SIZING</p></div>', unsafe_allow_html=True)
+    with p3: st.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/KvlBOIcTGsUXIlxi.png" width="40" style="margin-bottom:5px;"><p style="font-family:Orbitron; font-size:9px; color:#00d4ff; margin:0; text-shadow: 0 0 5px #00d4ff;">3. CONFIDENCE SCORES</p></div>', unsafe_allow_html=True)
+    with p4: st.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/XagmGYTISfZpBVMv.png" width="40" style="margin-bottom:5px;"><p style="font-family:Orbitron; font-size:9px; color:#00d4ff; margin:0; text-shadow: 0 0 5px #00d4ff;">4. RISK ALLOCATION</p></div>', unsafe_allow_html=True)
 
     st.markdown("""
     <div class="glass-card" style="border-left: 4px solid #00d4ff; padding:15px; margin-top:15px;">

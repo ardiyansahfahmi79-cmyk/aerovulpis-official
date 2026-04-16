@@ -304,55 +304,56 @@ st.markdown("""
 
     .pillar-container {
         display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 10px;
-        margin: 15px 0;
+        justify-content: space-around;
+        align-items: stretch;
+        gap: 5px;
+        margin: 20px 0;
+        width: 100%;
     }
 
     .pillar-item {
         flex: 1;
-        text-align: center;
         display: flex;
         flex-direction: column;
         align-items: center;
+        text-align: center;
+        min-width: 0; /* Penting untuk mencegah overflow pada flex child */
     }
 
     .pillar-icon {
-        width: 45px;
-        height: 45px;
-        margin-bottom: 8px;
-        filter: drop-shadow(0 0 10px #00d4ff) drop-shadow(0 0 20px rgba(0, 212, 255, 0.6)) brightness(1.5);
-        display: block;
-        transition: all 0.3s ease;
+        width: 40px;
+        height: 40px;
+        object-fit: contain;
+        margin-bottom: 10px;
+        /* Teknik neon ganda yang lebih kompatibel */
+        filter: drop-shadow(0 0 8px #00d4ff) drop-shadow(0 0 12px rgba(0, 212, 255, 0.5));
+        -webkit-filter: drop-shadow(0 0 8px #00d4ff) drop-shadow(0 0 12px rgba(0, 212, 255, 0.5));
     }
 
     .pillar-title {
         font-family: 'Orbitron', sans-serif;
-        font-size: 7px;
+        font-size: 8px; /* Ukuran seimbang */
         font-weight: 700;
         color: #00d4ff;
-        margin: 5px 0 2px 0;
+        margin: 0 0 5px 0;
         text-transform: uppercase;
-        letter-spacing: 0.3px;
-        text-shadow: 0 0 5px rgba(0, 212, 255, 1);
-        line-height: 1.1;
-        min-height: 2.2em;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
+        letter-spacing: 0.5px;
+        text-shadow: 0 0 10px rgba(0, 212, 255, 0.8);
+        line-height: 1.2;
+        width: 100%;
+        display: block;
+        /* Mencegah pemenggalan kata yang buruk */
+        overflow-wrap: normal;
+        word-break: normal;
     }
 
     .pillar-desc {
         font-family: 'Rajdhani', sans-serif;
-        font-size: 11px;
+        font-size: 8px;
         color: #888;
-        line-height: 1.2;
+        line-height: 1.1;
         margin: 0;
-        max-width: 100%;
+        width: 100%;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1061,17 +1062,17 @@ elif menu_selection == "Risk Management":
         <div class="pillar-item">
             <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/IrMPKUKVGNWfJYiT.png" class="pillar-icon">
             <p class="pillar-title">2. POSITION SIZING</p>
-            <p class="pillar-desc">Scale & Position Sizing.</p>
+            <p class="pillar-desc">Scale & Size.</p>
         </div>
         <div class="pillar-item">
             <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/KvlBOIcTGsUXIlxi.png" class="pillar-icon">
             <p class="pillar-title">3. CONFIDENCE SCORES</p>
-            <p class="pillar-desc">Real-time Chart Definition.</p>
+            <p class="pillar-desc">Real-time Chart.</p>
         </div>
         <div class="pillar-item">
             <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/XagmGYTISfZpBVMv.png" class="pillar-icon">
-            <p class="pillar-title">4. RISK MANAGEMENT</p>
-            <p class="pillar-desc">Risk Allocation Strategy.</p>
+            <p class="pillar-title">4. RISK MGMT</p>
+            <p class="pillar-desc">Risk Strategy.</p>
         </div>
     </div>
     """, unsafe_allow_html=True)

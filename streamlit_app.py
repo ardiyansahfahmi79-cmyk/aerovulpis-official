@@ -322,7 +322,7 @@ st.markdown("""
         width: 45px;
         height: 45px;
         margin-bottom: 8px;
-        filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.4));
+        filter: drop-shadow(0 0 12px rgba(0, 212, 255, 0.8)); /* Efek neon diperkuat agar semua menyala */
     }
 
     .pillar-title {
@@ -333,12 +333,12 @@ st.markdown("""
         margin: 2px 0;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        text-shadow: 0 0 5px rgba(0, 212, 255, 0.3);
+        text-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
     }
 
     .pillar-desc {
         font-family: 'Rajdhani', sans-serif;
-        font-size: 9px;
+        font-size: 5px; /* Font dikecilkan sesuai permintaan */
         color: #888;
         line-height: 1.1;
         margin: 0;

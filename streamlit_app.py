@@ -998,11 +998,47 @@ elif menu_selection == "Risk Management":
     st.markdown('<p style="text-align:center; color:#888; font-family:Rajdhani; margin-top:-10px;">The Four Pillars of Survival</p>', unsafe_allow_html=True)
     
     # Four Pillars Icons - Redesigned with Digital Fintech Logos
-    p1, p2, p3, p4 = st.columns(4)
-    with p1: st.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/lxtUFfqAGtqmckoG.png" width="40" style="margin-bottom:5px;"><p style="font-family:Orbitron; font-size:9px; color:#00d4ff; margin:0; text-shadow: 0 0 5px #00d4ff;">1. TRADING RULES</p></div>', unsafe_allow_html=True)
-    with p2: st.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/IrMPKUKVGNWfJYiT.png" width="40" style="margin-bottom:5px;"><p style="font-family:Orbitron; font-size:9px; color:#00d4ff; margin:0; text-shadow: 0 0 5px #00d4ff;">2. POSITION SIZING</p></div>', unsafe_allow_html=True)
-    with p3: st.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/KvlBOIcTGsUXIlxi.png" width="40" style="margin-bottom:5px;"><p style="font-family:Orbitron; font-size:9px; color:#00d4ff; margin:0; text-shadow: 0 0 5px #00d4ff;">3. CONFIDENCE SCORES</p></div>', unsafe_allow_html=True)
-    with p4: st.markdown('<div style="text-align:center;"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/XagmGYTISfZpBVMv.png" width="40" style="margin-bottom:5px;"><p style="font-family:Orbitron; font-size:9px; color:#00d4ff; margin:0; text-shadow: 0 0 5px #00d4ff;">4. RISK ALLOCATION</p></div>', unsafe_allow_html=True)
+    p1, p2, p3, p4 = st.columns(4, gap="small")
+    
+    with p1:
+        st.markdown(
+            '<div style="text-align:center; padding:10px;">' +
+            '<img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/lxtUFfqAGtqmckoG.png" width="50" style="margin-bottom:10px;">' +
+            '<p style="font-family:Orbitron; font-size:11px; font-weight:bold; color:#00d4ff; margin:5px 0; text-shadow: 0 0 5px #00d4ff;">1. TRADING RULES</p>' +
+            '<p style="font-family:Rajdhani; font-size:8px; color:#aaa; margin:0; line-height:1.2;">Stop Loss, definition of erecalculation.</p>' +
+            '</div>',
+            unsafe_allow_html=True
+        )
+    
+    with p2:
+        st.markdown(
+            '<div style="text-align:center; padding:10px;">' +
+            '<img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/IrMPKUKVGNWfJYiT.png" width="50" style="margin-bottom:10px;">' +
+            '<p style="font-family:Orbitron; font-size:11px; font-weight:bold; color:#00d4ff; margin:5px 0; text-shadow: 0 0 5px #00d4ff;">2. POSITION SIZING</p>' +
+            '<p style="font-family:Rajdhani; font-size:8px; color:#aaa; margin:0; line-height:1.2;">Scale redescription of saition positing.</p>' +
+            '</div>',
+            unsafe_allow_html=True
+        )
+    
+    with p3:
+        st.markdown(
+            '<div style="text-align:center; padding:10px;">' +
+            '<img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/KvlBOIcTGsUXIlxi.png" width="50" style="margin-bottom:10px;">' +
+            '<p style="font-family:Orbitron; font-size:11px; font-weight:bold; color:#00d4ff; margin:5px 0; text-shadow: 0 0 5px #00d4ff;">3. CONFIDENCE SCORES</p>' +
+            '<p style="font-family:Rajdhani; font-size:8px; color:#aaa; margin:0; line-height:1.2;">Definition motion of chart realtime.</p>' +
+            '</div>',
+            unsafe_allow_html=True
+        )
+    
+    with p4:
+        st.markdown(
+            '<div style="text-align:center; padding:10px;">' +
+            '<img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/XagmGYTISfZpBVMv.png" width="50" style="margin-bottom:10px;">' +
+            '<p style="font-family:Orbitron; font-size:11px; font-weight:bold; color:#00d4ff; margin:5px 0; text-shadow: 0 0 5px #00d4ff;">4. RISK ALLOCATION</p>' +
+            '<p style="font-family:Rajdhani; font-size:8px; color:#aaa; margin:0; line-height:1.2;">Description of the risk allocation.</p>' +
+            '</div>',
+            unsafe_allow_html=True
+        )
 
     st.markdown("""
     <div class="glass-card" style="border-left: 4px solid #00d4ff; padding:15px; margin-top:15px;">

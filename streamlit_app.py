@@ -332,19 +332,19 @@ st.markdown("""
 
     .pillar-title {
         font-family: 'Orbitron', sans-serif;
-        font-size: 8px; /* Ukuran seimbang */
+        font-size: 5px; /* Dikecilkan sesuai permintaan user */
         font-weight: 700;
         color: #00d4ff;
         margin: 0 0 5px 0;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        text-shadow: 0 0 10px rgba(0, 212, 255, 0.8);
-        line-height: 1.2;
+        letter-spacing: 0.3px;
+        text-shadow: 0 0 5px rgba(0, 212, 255, 0.8);
+        line-height: 1.1;
         width: 100%;
         display: block;
-        /* Mencegah pemenggalan kata yang buruk */
         overflow-wrap: normal;
         word-break: normal;
+        text-align: center;
     }
 
     .pillar-desc {

@@ -1021,16 +1021,52 @@ elif menu_selection == "Risk Management":
     balance = st.number_input("", value=1000.0, step=100.0, key="sim_balance", label_visibility="collapsed")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Reward-to-Risk Simulator
+    # Reward-to-Risk Simulator (Custom Fintech UI)
     st.markdown('<p style="font-family:Orbitron; font-size:14px; margin-top:20px; color:#888;">REWARD-TO-RISK SIMULATOR</p>', unsafe_allow_html=True)
+    
     rr_ratios = {
         "1:2": 2.0, "1:3": 3.0, "1:4": 4.0,
         "2:3": 1.5, "2:4": 2.0, "2:5": 2.5,
         "3:4": 1.33, "3:5": 1.67, "3:6": 2.0
     }
     
-    # Grid for RR Ratios
-    selected_rr = st.selectbox("Select Ratio", list(rr_ratios.keys()), key="rr_ratio_select")
+    # CSS for Neon Buttons
+    st.markdown("""
+    <style>
+    .rr-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .rr-btn {
+        background: rgba(0, 212, 255, 0.05);
+        border: 1px solid rgba(0, 212, 255, 0.3);
+        border-radius: 8px;
+        padding: 10px;
+        text-align: center;
+        color: #00d4ff;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .rr-btn:hover {
+        background: rgba(0, 212, 255, 0.2);
+        border-color: #00d4ff;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+    }
+    .rr-btn.active {
+        background: linear-gradient(145deg, #00d4ff, #0055ff);
+        color: white;
+        border-color: #00d4ff;
+        box-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Menggunakan radio button tersembunyi untuk logika pilihan rasio agar tetap fungsional
+    selected_rr = st.radio("Select Ratio", list(rr_ratios.keys()), horizontal=True, key="rr_ratio_radio")
     
     # Win/Loss Inputs
     st.markdown('<p style="font-family:Rajdhani; font-size:14px; margin-top:10px; color:#ccc;">Simulated Weekly Trade Win/Loss</p>', unsafe_allow_html=True)
@@ -1040,7 +1076,8 @@ elif menu_selection == "Risk Management":
     with l_col:
         losses = st.number_input("Losses:", min_value=0, value=2, step=1, key="sim_losses")
 
-    risk_per_trade_pct = st.slider("Risk per Trade (%)", 0.1, 5.0, 1.0, key="sim_risk_pct")
+    # Risk per trade dihapus sesuai instruksi, default ke 1% untuk kalkulasi
+    risk_per_trade_pct = 1.0 
 
     if st.button("SIMULATE & CALCULATE RETURNS", use_container_width=True, type="primary"):
         # Logika Kalkulasi
@@ -1054,7 +1091,7 @@ elif menu_selection == "Risk Management":
         yearly_return_pct = weekly_return_pct * 52
         
         st.markdown('<p style="font-family:Orbitron; font-size:14px; margin-top:20px; color:#888;">Projected Performance</p>', unsafe_allow_html=True)
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown('<div class="glass-card" style="border: 1px solid rgba(0, 255, 136, 0.3); background: rgba(0, 255, 136, 0.02);">', unsafe_allow_html=True)
         res_col1, res_col2, res_col3 = st.columns(3)
         
         with res_col1:

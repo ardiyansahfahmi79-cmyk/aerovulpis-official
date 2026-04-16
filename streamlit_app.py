@@ -327,22 +327,27 @@ st.markdown("""
 
     .pillar-title {
         font-family: 'Orbitron', sans-serif;
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 700;
         color: #00d4ff;
-        margin: 2px 0;
+        margin: 5px 0 2px 0;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 1px;
         text-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
+        line-height: 1.3;
+        min-height: 2.6em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .pillar-desc {
         font-family: 'Rajdhani', sans-serif;
-        font-size: 5px; /* Font dikecilkan sesuai permintaan */
+        font-size: 11px;
         color: #888;
-        line-height: 1.1;
+        line-height: 1.2;
         margin: 0;
-        max-width: 90px;
+        max-width: 100%;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1046,22 +1051,22 @@ elif menu_selection == "Risk Management":
         <div class="pillar-item">
             <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/lxtUFfqAGtqmckoG.png" class="pillar-icon">
             <p class="pillar-title">1. TRADING RULES</p>
-            <p class="pillar-desc">Stop Loss, definition of erecalculation.</p>
+            <p class="pillar-desc">Stop Loss & Definition Rules.</p>
         </div>
         <div class="pillar-item">
             <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/IrMPKUKVGNWfJYiT.png" class="pillar-icon">
             <p class="pillar-title">2. POSITION SIZING</p>
-            <p class="pillar-desc">Scale redescription of saition positing.</p>
+            <p class="pillar-desc">Scale & Position Sizing.</p>
         </div>
         <div class="pillar-item">
             <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/KvlBOIcTGsUXIlxi.png" class="pillar-icon">
             <p class="pillar-title">3. CONFIDENCE SCORES</p>
-            <p class="pillar-desc">Definition motion of chart realtime.</p>
+            <p class="pillar-desc">Real-time Chart Definition.</p>
         </div>
         <div class="pillar-item">
             <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/XagmGYTISfZpBVMv.png" class="pillar-icon">
-            <p class="pillar-title">4. RISK ALLOCATION</p>
-            <p class="pillar-desc">Description of the risk allocation.</p>
+            <p class="pillar-title">4. RISK MANAGEMENT</p>
+            <p class="pillar-desc">Risk Allocation Strategy.</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1069,10 +1074,10 @@ elif menu_selection == "Risk Management":
     st.markdown("""
     <div class="glass-card" style="border-left: 4px solid #00d4ff; padding:15px; margin-top:15px;">
         <p class="digital-font" style="font-size:14px; color:#00d4ff; margin-bottom:5px;">AeroVulpis Intelligence Rules</p>
-        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>TP:</b> Price win showers of Stop Loss</p>
-        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>SL:</b> The price value for Stop Loss</p>
-        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>Wait:</b> Confidence Nation to perfect time</p>
-        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>Rule 4:</b> Customize your pronocy Rule 4</p>
+        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>TP:</b> Target Price for Profit Taking</p>
+        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>SL:</b> Stop Loss Price Protection</p>
+        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>Wait:</b> Wait for Perfect Confidence</p>
+        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>Rule 4:</b> Custom Strategy Rule 4</p>
     </div>
     """, unsafe_allow_html=True)
 

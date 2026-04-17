@@ -303,57 +303,54 @@ st.markdown("""
     }
 
     .pillar-container {
-        display: flex;
-        justify-content: space-around;
-        align-items: stretch;
-        gap: 5px;
-        margin: 20px 0;
-        width: 100%;
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 2px !important;
+        margin: 20px 0 !important;
+        width: 100% !important;
+        overflow: visible !important;
     }
 
     .pillar-item {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        min-width: 0; /* Penting untuk mencegah overflow pada flex child */
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+        min-width: 0 !important;
+        overflow: visible !important;
     }
 
     .pillar-icon {
-        width: 40px;
-        height: 40px;
-        object-fit: contain;
-        margin-bottom: 10px;
-        /* Teknik neon ganda yang lebih kompatibel */
-        filter: drop-shadow(0 0 8px #00d4ff) drop-shadow(0 0 12px rgba(0, 212, 255, 0.5));
-        -webkit-filter: drop-shadow(0 0 8px #00d4ff) drop-shadow(0 0 12px rgba(0, 212, 255, 0.5));
+        width: 35px !important;
+        height: 35px !important;
+        object-fit: contain !important;
+        margin-bottom: 8px !important;
+        filter: drop-shadow(0 0 10px #00d4ff) !important;
+        -webkit-filter: drop-shadow(0 0 10px #00d4ff) !important;
+        overflow: visible !important;
     }
 
     .pillar-title {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 5px; /* Dikecilkan sesuai permintaan user */
-        font-weight: 700;
-        color: #00d4ff;
-        margin: 0 0 5px 0;
-        text-transform: uppercase;
-        letter-spacing: 0.3px;
-        text-shadow: 0 0 5px rgba(0, 212, 255, 0.8);
-        line-height: 1.1;
-        width: 100%;
-        display: block;
-        overflow-wrap: normal;
-        word-break: normal;
-        text-align: center;
+        font-family: 'Orbitron', sans-serif !important;
+        font-size: 6px !important;
+        font-weight: 700 !important;
+        color: #00d4ff !important;
+        margin: 0 0 4px 0 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.2px !important;
+        text-shadow: 0 0 8px rgba(0, 212, 255, 0.9) !important;
+        line-height: 1.0 !important;
+        white-space: nowrap !important;
+        display: block !important;
     }
 
     .pillar-desc {
-        font-family: 'Rajdhani', sans-serif;
-        font-size: 8px;
-        color: #888;
-        line-height: 1.1;
-        margin: 0;
-        width: 100%;
+        font-family: 'Rajdhani', sans-serif !important;
+        font-size: 6px !important;
+        color: #888 !important;
+        line-height: 1.0 !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -715,6 +712,9 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# Jalankan pengecekan alert secara global di setiap rerun
+check_smart_alerts()
+
 # Sidebar
 with st.sidebar:
     st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:55px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
@@ -823,7 +823,11 @@ def get_news_data(query, max_articles=15):
     return berita_final[:max_articles], None
 
 # ====================== FUNGSI PENGECEKAN SMART ALERT ======================
-def check_smart_alerts(current_price, current_asset):
+def check_smart_alerts():
+    """
+    Memeriksa semua alert aktif secara global dengan mengambil data harga terbaru
+    untuk setiap instrumen yang ada di daftar alert.
+    """
     if "active_alerts" not in st.session_state or not st.session_state.active_alerts:
         return
 
@@ -831,9 +835,34 @@ def check_smart_alerts(current_price, current_asset):
     if not telegram_bot_token:
         return
 
+    # Kumpulkan instrumen unik yang perlu dicek harganya
+    unique_instruments = list(set([a["instrument"] for a in st.session_state.active_alerts if not a.get("triggered")]))
+    if not unique_instruments:
+        return
+
+    # Map nama instrumen ke ticker yfinance/twelve
+    instrument_to_ticker = {}
+    for cat in instruments.values():
+        for name, ticker in cat.items():
+            instrument_to_ticker[name] = ticker
+
+    # Cek harga untuk setiap instrumen
+    current_prices = {}
+    for inst in unique_instruments:
+        ticker = instrument_to_ticker.get(inst)
+        if ticker:
+            m_data = get_market_data(ticker)
+            if m_data:
+                current_prices[inst] = m_data["price"]
+
     for alert in st.session_state.active_alerts:
-        # Hanya cek alert yang sesuai dengan instrumen yang sedang dilihat dan belum terpicu
-        if alert.get("instrument") in current_asset and not alert.get("triggered", False):
+        if not alert.get("triggered", False):
+            inst_name = alert.get("instrument")
+            current_price = current_prices.get(inst_name)
+            
+            if current_price is None:
+                continue
+
             target = alert["target"]
             condition = alert["condition"]
             triggered = False
@@ -853,7 +882,7 @@ def check_smart_alerts(current_price, current_asset):
                 top_border    = "╔═══════════════════════════════════╗"
                 status_line   = "║ [ STATUS: TARGET REACHED! ]       ║"
                 mid_border    = "╠═══════════════════════════════════╣"
-                instr_val     = str(alert["instrument"])[:18]
+                instr_val     = str(inst_name)[:18]
                 price_val     = f"${current_price:,.2f}"
                 target_val    = f"${target:,.2f}"
                 cond_display  = "BULLISH BREAKOUT ↑" if condition == "bullish" else "BEARISH BREAKDOWN ↓"
@@ -888,7 +917,7 @@ def check_smart_alerts(current_price, current_asset):
                 payload = {'chat_id': alert["chat_id"], 'text': alert_message, 'parse_mode': 'HTML'}
                 try:
                     requests.post(url, json=payload, timeout=10)
-                    st.toast(f"🚀 ALERT TERPICU: {alert['instrument']} menyentuh {target_val}!", icon="🚨")
+                    st.toast(f"🚀 ALERT TERPICU: {inst_name} menyentuh {target_val}!", icon="🚨")
                 except:
                     pass
 
@@ -898,8 +927,6 @@ if menu_selection == "Live Dashboard":
     market = get_market_data(ticker_input)
     df = get_historical_data(ticker_input, period, interval)
     if market and not df.empty:
-        # Jalankan pengecekan alert setiap kali dashboard dimuat
-        check_smart_alerts(market["price"], asset_name)
         if selected_tf_display in ["3h", "4h"]:
             rule = "3h" if selected_tf_display == "3h" else "4h"
             df = df.resample(rule).agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
@@ -951,8 +978,6 @@ elif menu_selection == "Signal Analysis":
     market = get_market_data(ticker_input)
     df = get_historical_data(ticker_input, period, interval)
     if not df.empty:
-        if market:
-            check_smart_alerts(market["price"], asset_name)
         if selected_tf_display in ["3h", "4h"]:
             rule = "3h" if selected_tf_display == "3h" else "4h"
             df = df.resample(rule).agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()

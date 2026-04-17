@@ -11,6 +11,7 @@ import pytz
 import ta
 import time
 import requests
+import json
 from streamlit_option_menu import option_menu
 
 # Memuat variabel lingkungan dari file .env
@@ -598,11 +599,14 @@ def get_groq_response(question, context=""):
 
 # ====================== FUNGSI SENTINEL ANALYSIS (Model 405B) ======================
 def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
-    """Fungsi khusus untuk AeroVulpis Sentinel menggunakan Hermes 3 405B (Llama-3.1-405b)"""
-    if not client: return "⚠️ Sentinel Intelligence Inactive"
+    """Fungsi khusus untuk AeroVulpis Sentinel menggunakan Hermes 3 405B via OpenRouter"""
+    openrouter_api_key = st.secrets.get("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
     
-    # Menggunakan model 405B untuk analisis Pro
-    MODEL_NAME = 'llama-3.1-405b-reasoning' 
+    if not openrouter_api_key:
+        return "⚠️ OpenRouter API Key tidak ditemukan. Harap tambahkan OPENROUTER_API_KEY di secrets Streamlit."
+    
+    # Menggunakan model Hermes 3 405B dari OpenRouter
+    MODEL_NAME = 'nousresearch/hermes-3-llama-3.1-405b' 
     
     latest = df.iloc[-1]
     price = market_data['price']
@@ -612,7 +616,7 @@ def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
     news_context = "\n".join([f"- {n['title']} ({n['source']})" for n in news_list]) if news_list else "Tidak ada berita terbaru."
 
     prompt = f"""
-    Anda adalah AeroVulpis Sentinel Intelligence, sistem AI Pro tingkat lanjut.
+    Anda adalah AeroVulpis Sentinel Intelligence, sistem AI Pro tingkat lanjut yang menggunakan model Hermes 3 405B.
     Tugas Anda adalah memberikan analisis institusional mendalam untuk {asset_name}.
 
     DATA PASAR:
@@ -627,31 +631,39 @@ def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
     FORMAT OUTPUT (WAJIB):
     1. **SENTINEL INTELLIGENCE REPORT**
     2. **KEY LEVELS**: Berikan Support & Resistance yang akurat.
-    3. **FUNDAMENTAL INSIGHT**: Analisis singkat tentang suku bunga (FED/BI jika relevan) dan sentimen pasar.
+    3. **FUNDAMENTAL INSIGHT**: Analisis mendalam tentang suku bunga (FED/BI/ECB jika relevan), inflasi, dan sentimen pasar global.
     4. **TRADE SCENARIOS (PRO)**: 
        - Skenario A (Bullish): Entry, Target, Stop Loss.
        - Skenario B (Bearish): Entry, Target, Stop Loss.
-    5. **FINAL VERDICT**: BUY, SELL, atau WAIT dengan keyakinan tinggi.
+    5. **FINAL VERDICT**: BUY, SELL, atau WAIT dengan keyakinan tinggi berdasarkan model Hermes 3 405B.
 
     Gunakan gaya bahasa profesional, teknis, dan tegas.
     """
     
     try:
-        chat_completion = client.chat.completions.create(
-            messages=[{"role": "system", "content": "Anda adalah AeroVulpis Sentinel Pro Intelligence."}, {"role": "user", "content": prompt}],
-            model=MODEL_NAME, temperature=0.6, max_tokens=1500,
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {openrouter_api_key}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps({
+                "model": MODEL_NAME,
+                "messages": [
+                    {"role": "system", "content": "Anda adalah AeroVulpis Sentinel Pro Intelligence yang didukung oleh Hermes 3 405B."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.6,
+                "max_tokens": 1500
+            })
         )
-        return chat_completion.choices[0].message.content
+        result = response.json()
+        if "choices" in result:
+            return result["choices"][0]["message"]["content"]
+        else:
+            return f"⚠️ OpenRouter Error: {result.get('error', {}).get('message', 'Unknown error')}"
     except Exception as e:
-        # Fallback ke model 70B jika 405B tidak tersedia
-        try:
-            chat_completion = client.chat.completions.create(
-                messages=[{"role": "system", "content": "AeroVulpis Sentinel Fallback Mode."}, {"role": "user", "content": prompt}],
-                model='llama-3.3-70b-versatile', temperature=0.6, max_tokens=1500,
-            )
-            return chat_completion.choices[0].message.content
-        except:
-            return f"⚠️ Sentinel Error: {str(e)}"
+        return f"⚠️ Sentinel Error: {str(e)}"
 
 # ====================== FUNGSI DEEP ANALYSIS (Model 70B) ======================
 def get_deep_analysis(asset_name, market_data, df, signal, reasons):
@@ -852,8 +864,8 @@ with st.sidebar:
 
     menu_selection = option_menu(
         menu_title=t['navigation'],
-        options=["AeroVulpis Sentinel", "Live Dashboard", "Signal Analysis", "Market Sessions", "Market News", "Economic Radar", "Smart Alert Center", "Chatbot AI", "Risk Management", "Settings", "System Log"],
-        icons=["shield-shaded", "activity", "graph-up-arrow", "globe", "newspaper", "calendar-event", "bell-fill", "chat-dots", "shield-fill", "gear", "journal-text"],
+        options=["Live Dashboard", "AeroVulpis Sentinel", "Signal Analysis", "Market Sessions", "Market News", "Economic Radar", "Smart Alert Center", "Chatbot AI", "Risk Management", "Settings", "System Log"],
+        icons=["activity", "shield-shaded", "graph-up-arrow", "globe", "newspaper", "calendar-event", "bell-fill", "chat-dots", "shield-fill", "gear", "journal-text"],
         menu_icon="cast",
         default_index=0,
         styles={
@@ -1037,9 +1049,9 @@ check_smart_alerts()
 if menu_selection == "AeroVulpis Sentinel":
     st.markdown(f"""
     <div class="sentinel-container">
-        <div class="sentinel-header">
-            <h2 class="sentinel-title">🦅 AEROVULPIS SENTINEL</h2>
-            <div style="display: flex; gap: 10px;">
+        <div class="sentinel-header" style="flex-direction: column; align-items: flex-start;">
+            <h2 class="sentinel-title">AEROVULPIS SENTINEL</h2>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <span class="status-badge status-open">MARKET STATUS: OPEN</span>
                 <span class="status-badge status-ai">AI STATUS: HERMES 3 405B (PRO)</span>
             </div>
@@ -1081,7 +1093,7 @@ if menu_selection == "AeroVulpis Sentinel":
         st.components.v1.html(tv_html, height=500)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🚀 GENERATE DEEP ANALYSIS PRO", key="sentinel_pro_btn", use_container_width=True):
+        if st.button("GENERATE DEEP ANALYSIS PRO", key="sentinel_pro_btn", use_container_width=True):
             market = get_market_data(ticker_input)
             df = get_historical_data(ticker_input, period, interval)
             if market and not df.empty:

@@ -712,9 +712,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Jalankan pengecekan alert secara global di setiap rerun
-check_smart_alerts()
-
 # Sidebar
 with st.sidebar:
     st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:55px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
@@ -922,6 +919,9 @@ def check_smart_alerts():
                     pass
 
 # ====================== LOGIKA HALAMAN ======================
+
+# Jalankan pengecekan alert secara global di setiap rerun
+check_smart_alerts()
 
 if menu_selection == "Live Dashboard":
     market = get_market_data(ticker_input)

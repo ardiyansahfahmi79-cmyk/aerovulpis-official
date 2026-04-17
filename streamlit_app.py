@@ -352,6 +352,60 @@ st.markdown("""
         margin: 0 !important;
         white-space: nowrap !important;
     }
+
+    /* AeroVulpis Sentinel Styles */
+    .sentinel-container {
+        border: 2px solid var(--electric-blue);
+        border-radius: 15px;
+        padding: 20px;
+        background: rgba(0, 212, 255, 0.03);
+        box-shadow: 0 0 30px rgba(0, 212, 255, 0.15);
+        margin-bottom: 20px;
+    }
+    .sentinel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+        padding-bottom: 10px;
+    }
+    .sentinel-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 24px;
+        color: var(--electric-blue);
+        text-shadow: 0 0 10px var(--electric-blue);
+        margin: 0;
+    }
+    .intelligence-panel {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--glass-border);
+        border-radius: 10px;
+        padding: 15px;
+        height: 100%;
+    }
+    .intel-header {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 16px;
+        color: var(--electric-blue);
+        margin-bottom: 10px;
+        border-left: 3px solid var(--electric-blue);
+        padding-left: 10px;
+    }
+    .intel-content {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 14px;
+        color: #e0e0e0;
+    }
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-family: 'Orbitron', sans-serif;
+        text-transform: uppercase;
+    }
+    .status-open { background: rgba(0, 255, 136, 0.1); color: var(--neon-green); border: 1px solid var(--neon-green); }
+    .status-ai { background: rgba(0, 212, 255, 0.1); color: var(--electric-blue); border: 1px solid var(--electric-blue); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -541,6 +595,63 @@ def get_groq_response(question, context=""):
         return chat_completion.choices[0].message.content
     except Exception as e:
         return f"⚠️ Error: {str(e)}"
+
+# ====================== FUNGSI SENTINEL ANALYSIS (Model 405B) ======================
+def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
+    """Fungsi khusus untuk AeroVulpis Sentinel menggunakan Hermes 3 405B (Llama-3.1-405b)"""
+    if not client: return "⚠️ Sentinel Intelligence Inactive"
+    
+    # Menggunakan model 405B untuk analisis Pro
+    MODEL_NAME = 'llama-3.1-405b-reasoning' 
+    
+    latest = df.iloc[-1]
+    price = market_data['price']
+    
+    # Ambil berita terbaru untuk konteks fundamental
+    news_list, _ = get_news_data(asset_name, max_articles=5)
+    news_context = "\n".join([f"- {n['title']} ({n['source']})" for n in news_list]) if news_list else "Tidak ada berita terbaru."
+
+    prompt = f"""
+    Anda adalah AeroVulpis Sentinel Intelligence, sistem AI Pro tingkat lanjut.
+    Tugas Anda adalah memberikan analisis institusional mendalam untuk {asset_name}.
+
+    DATA PASAR:
+    - Harga: {price:,.4f}
+    - Sinyal Teknis: {signal}
+    - Indikator: RSI={latest.get('RSI', 0):.2f}, MACD={latest.get('MACD', 0):.4f}, ATR={latest.get('ATR', 0):.4f}
+    - Alasan Teknis: {", ".join(reasons)}
+
+    BERITA & FUNDAMENTAL:
+    {news_context}
+
+    FORMAT OUTPUT (WAJIB):
+    1. **SENTINEL INTELLIGENCE REPORT**
+    2. **KEY LEVELS**: Berikan Support & Resistance yang akurat.
+    3. **FUNDAMENTAL INSIGHT**: Analisis singkat tentang suku bunga (FED/BI jika relevan) dan sentimen pasar.
+    4. **TRADE SCENARIOS (PRO)**: 
+       - Skenario A (Bullish): Entry, Target, Stop Loss.
+       - Skenario B (Bearish): Entry, Target, Stop Loss.
+    5. **FINAL VERDICT**: BUY, SELL, atau WAIT dengan keyakinan tinggi.
+
+    Gunakan gaya bahasa profesional, teknis, dan tegas.
+    """
+    
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "system", "content": "Anda adalah AeroVulpis Sentinel Pro Intelligence."}, {"role": "user", "content": prompt}],
+            model=MODEL_NAME, temperature=0.6, max_tokens=1500,
+        )
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        # Fallback ke model 70B jika 405B tidak tersedia
+        try:
+            chat_completion = client.chat.completions.create(
+                messages=[{"role": "system", "content": "AeroVulpis Sentinel Fallback Mode."}, {"role": "user", "content": prompt}],
+                model='llama-3.3-70b-versatile', temperature=0.6, max_tokens=1500,
+            )
+            return chat_completion.choices[0].message.content
+        except:
+            return f"⚠️ Sentinel Error: {str(e)}"
 
 # ====================== FUNGSI DEEP ANALYSIS (Model 70B) ======================
 def get_deep_analysis(asset_name, market_data, df, signal, reasons):
@@ -741,8 +852,8 @@ with st.sidebar:
 
     menu_selection = option_menu(
         menu_title=t['navigation'],
-        options=["Live Dashboard", "Signal Analysis", "Market Sessions", "Market News", "Economic Radar", "Smart Alert Center", "Chatbot AI", "Risk Management", "Settings", "System Log"],
-        icons=["activity", "graph-up-arrow", "globe", "newspaper", "calendar-event", "bell-fill", "chat-dots", "shield-fill", "gear", "journal-text"],
+        options=["AeroVulpis Sentinel", "Live Dashboard", "Signal Analysis", "Market Sessions", "Market News", "Economic Radar", "Smart Alert Center", "Chatbot AI", "Risk Management", "Settings", "System Log"],
+        icons=["shield-shaded", "activity", "graph-up-arrow", "globe", "newspaper", "calendar-event", "bell-fill", "chat-dots", "shield-fill", "gear", "journal-text"],
         menu_icon="cast",
         default_index=0,
         styles={
@@ -923,7 +1034,86 @@ def check_smart_alerts():
 # Jalankan pengecekan alert secara global di setiap rerun
 check_smart_alerts()
 
-if menu_selection == "Live Dashboard":
+if menu_selection == "AeroVulpis Sentinel":
+    st.markdown(f"""
+    <div class="sentinel-container">
+        <div class="sentinel-header">
+            <h2 class="sentinel-title">🦅 AEROVULPIS SENTINEL</h2>
+            <div style="display: flex; gap: 10px;">
+                <span class="status-badge status-open">MARKET STATUS: OPEN</span>
+                <span class="status-badge status-ai">AI STATUS: HERMES 3 405B (PRO)</span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    col_chart, col_intel = st.columns([2, 1])
+    
+    with col_chart:
+        # TradingView Advanced Real-Time Chart Widget
+        # Kita perlu menyesuaikan simbol untuk TradingView
+        tv_symbol = ticker_input.replace("-USD", "USD").replace("=X", "").replace(".JK", "")
+        if "GC=F" in ticker_input: tv_symbol = "COMEX:GC1!"
+        elif "SI=F" in ticker_input: tv_symbol = "COMEX:SI1!"
+        elif "CL=F" in ticker_input: tv_symbol = "NYMEX:CL1!"
+        
+        tv_html = f"""
+        <div class="tradingview-widget-container" style="height:500px; width:100%;">
+          <div id="tradingview_sentinel" style="height:500px;"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+          <script type="text/javascript">
+          new TradingView.widget({{
+            "autosize": true,
+            "symbol": "{tv_symbol}",
+            "interval": "D",
+            "timezone": "Asia/Jakarta",
+            "theme": "dark",
+            "style": "1",
+            "locale": "en",
+            "toolbar_bg": "#f1f3f6",
+            "enable_publishing": false,
+            "hide_side_toolbar": false,
+            "allow_symbol_change": true,
+            "container_id": "tradingview_sentinel"
+          }});
+          </script>
+        </div>
+        """
+        st.components.v1.html(tv_html, height=500)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🚀 GENERATE DEEP ANALYSIS PRO", key="sentinel_pro_btn", use_container_width=True):
+            market = get_market_data(ticker_input)
+            df = get_historical_data(ticker_input, period, interval)
+            if market and not df.empty:
+                df = add_technical_indicators(df)
+                score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
+                
+                with st.spinner("Sentinel Intelligence sedang memproses data pasar..."):
+                    analysis = get_sentinel_analysis(asset_name, market, df, signal, reasons)
+                    st.session_state.sentinel_analysis = analysis
+            else:
+                st.error("Gagal mengambil data pasar untuk analisis.")
+
+    with col_intel:
+        st.markdown("""
+        <div class="intelligence-panel">
+            <div class="intel-header">SENTINEL INTELLIGENCE</div>
+            <div class="intel-content">
+        """, unsafe_allow_html=True)
+        
+        if "sentinel_analysis" in st.session_state:
+            st.markdown(st.session_state.sentinel_analysis)
+        else:
+            st.info("Klik tombol di bawah grafik untuk memulai analisis AI Pro tingkat lanjut.")
+            
+        st.markdown("""
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+
+elif menu_selection == "Live Dashboard":
     market = get_market_data(ticker_input)
     df = get_historical_data(ticker_input, period, interval)
     if market and not df.empty:

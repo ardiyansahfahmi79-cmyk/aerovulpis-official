@@ -1473,28 +1473,68 @@ elif menu_selection == "Settings":
     st.markdown('</div>', unsafe_allow_html=True)
 
 elif menu_selection == "Help & Support":
-    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-    st.subheader("🛡️ AeroVulpis Help & Support")
-    st.write("Butuh bantuan atau ingin melaporkan masalah? Tim kami siap membantu Anda.")
+    st.markdown('<h2 class="digital-font" style="text-align:center; font-size:28px; margin-bottom:20px;">AeroVulpis v3.3 Help & Support</h2>', unsafe_allow_html=True)
     
-    col1, col2 = st.columns(2)
-    with col1:
+    with st.expander("🛡️ 1. AEROVULPIS SENTINEL (PRO)", expanded=True):
         st.markdown("""
-        ### 📖 Panduan Penggunaan
-        - **Live Dashboard**: Pantau harga real-time dan sinyal teknikal dasar.
-        - **AeroVulpis Sentinel**: Analisis AI tingkat lanjut dengan model Core V3.3.
-        - **Smart Alert**: Pasang pengingat harga otomatis ke Telegram.
+        **Sentinel** adalah dashboard utama tingkat lanjut yang dirancang untuk analisis institusional.
+        - **TradingView Chart**: Grafik real-time interaktif dengan alat gambar lengkap.
+        - **Generate Deep Analysis Pro**: Menggunakan model **Hermes 3 405B (AI Pro)** untuk memberikan laporan mendalam tentang *Key Levels*, *Fundamental Insight* (suku bunga), dan skenario trading (Buy/Sell/Wait).
+        - **AI Status**: Menampilkan status model AI yang sedang aktif memproses data.
         """)
-    
-    with col2:
+
+    with st.expander("📊 2. LIVE DASHBOARD"):
         st.markdown("""
-        ### 📞 Hubungi Kami
-        - **Telegram**: [@AeroVulpisSupport](https://t.me/)
-        - **Email**: support@aerovulpis.com
-        - **Status Sistem**: 🟢 Operasional
+        Pusat pemantauan harga dan sinyal teknikal cepat.
+        - **Live Price**: Harga terkini dari yFinance atau Twelve Data (untuk Gold/Silver).
+        - **Technical Strength**: Gauge yang menunjukkan kekuatan tren berdasarkan 15+ indikator.
+        - **Generate Deep Analysis**: Analisis AI cepat menggunakan model **Llama 3.3 70B** untuk memberikan alasan di balik sinyal saat ini.
         """)
+
+    with st.expander("📈 3. SIGNAL ANALYSIS"):
+        st.markdown("""
+        Grid indikator teknikal lengkap untuk konfirmasi manual.
+        - **Indikator**: RSI, MACD, SMA, EMA, Bollinger Bands, CCI, Williams %R, MFI, TRIX, ROC, Awesome Oscillator, KAMA, Ichimoku, dan Parabolic SAR.
+        - **Warna Sinyal**: Hijau (Bullish), Merah (Bearish), Kuning (Neutral/Normal).
+        """)
+
+    with st.expander("🌐 4. MARKET SESSIONS & NEWS"):
+        st.markdown("""
+        - **Market Sessions**: Menampilkan status sesi pasar (Tokyo, London, New York) dan *Golden Time* (volatilitas tinggi).
+        - **Market News**: Berita real-time dari Marketaux dan Tiingo yang difilter berdasarkan aset yang dipilih.
+        """)
+
+    with st.expander("🔔 5. SMART ALERT CENTER"):
+        st.markdown("""
+        Sistem sensor harga otomatis yang terhubung ke Telegram.
+        - **Lock Target**: Masukkan harga target dan Chat ID Telegram Anda.
+        - **Sensor Active**: Sistem akan terus memantau harga di latar belakang dan mengirim notifikasi saat target tercapai.
+        """)
+
+    with st.expander("🤖 6. CHATBOT AI"):
+        st.markdown("""
+        Asisten AI pribadi yang memahami konteks pasar Anda.
+        - Anda bisa bertanya tentang strategi, penjelasan indikator, atau status alert Anda.
+        - AI memiliki akses ke data harga live dan daftar alert aktif Anda.
+        """)
+
+    with st.expander("🛡️ 7. RISK MANAGEMENT"):
+        st.markdown("""
+        Framework untuk menjaga kelangsungan akun trading Anda.
+        - **Four Pillars**: Trading Rules, Position Sizing, Confidence Scores, dan Risk Strategy.
+        - **RR Simulator**: Hitung proyeksi keuntungan mingguan, bulanan, dan tahunan berdasarkan rasio Risk-to-Reward dan Win Rate Anda.
+        """)
+
+    st.info("💡 **Tips**: Gunakan menu **Settings** untuk mengganti bahasa (ID/EN) atau membersihkan cache jika data terasa lambat diperbarui.")
     
-    st.info("Tips: Pastikan koneksi internet Anda stabil untuk mendapatkan pembaruan harga real-time.")
+    st.markdown("<div class='glass-card' style='margin-top:20px;'>", unsafe_allow_html=True)
+    st.markdown("""
+    ### 📞 Hubungi Dukungan Teknis
+    Jika Anda mengalami kendala teknis atau memiliki pertanyaan lebih lanjut, silakan hubungi kami melalui:
+    - **Telegram**: [@AeroVulpisSupport](https://t.me/)
+    - **Email**: support@aerovulpis.com
+    - **Status Sistem**: 🟢 Operasional (v3.3 Ultimate)
+    """)
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ====================== FOOTER ======================

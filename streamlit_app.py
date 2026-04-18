@@ -799,7 +799,13 @@ def market_session_status():
         is_active = False
         if sess["start"] < sess["end"]: is_active = sess["start"] <= current_time <= sess["end"]
         else: is_active = current_time >= sess["start"] or current_time <= sess["end"]
-        status_text = "🟢 Active" if is_active else "🔴 Closed"
+        
+        # Digital Neon Status Badge
+        if is_active:
+            status_html = f'<span style="padding: 2px 8px; border-radius: 4px; background: rgba(0, 255, 136, 0.1); border: 1px solid #00ff88; color: #00ff88; font-size: 10px; box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);">ACTIVE</span>'
+        else:
+            status_html = f'<span style="padding: 2px 8px; border-radius: 4px; background: rgba(255, 42, 109, 0.1); border: 1px solid #ff2a6d; color: #ff2a6d; font-size: 10px; opacity: 0.6;">CLOSED</span>'
+            
         if is_active: active_sessions.append(sess["name"])
         progress = 0
         if is_active:
@@ -811,15 +817,16 @@ def market_session_status():
             total_duration = end_minutes - start_minutes
             elapsed = now_minutes - start_minutes
             progress = min(100, max(0, int((elapsed / total_duration) * 100)))
+            
         st.markdown(f"""
         <div class="session-card">
-            <div style="display:flex; justify-content:between; align-items:center;">
-                <span style="font-family:Orbitron; font-weight:bold; color:{sess['color']}; flex:1;">{sess['name']}</span>
-                <span style="font-family:Rajdhani; font-weight:bold; color:{'#00ff88' if is_active else '#ff2a6d'};">{status_text}</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                <span style="font-family:Orbitron; font-weight:bold; color:{sess['color']}; flex:1; font-size: 14px;">{sess['name']}</span>
+                {status_html}
             </div>
             <div style="font-family:Rajdhani; font-size:12px; color:#888; margin-bottom:5px;">{sess['start'].strftime('%H:%M')} - {sess['end'].strftime('%H:%M')} WIB</div>
             <div style="background:rgba(255,255,255,0.1); height:6px; border-radius:3px; overflow:hidden;">
-                <div style="background:{sess['color'] if is_active else '#444'}; width:{progress if is_active else 0}%; height:100%; transition:width 0.5s ease;"></div>
+                <div style="background:{sess['color'] if is_active else '#444'}; width:{progress if is_active else 0}%; height:100%; transition:width 0.5s ease; box-shadow: 0 0 10px {sess['color'] if is_active else 'transparent'};"></div>
             </div>
             <div style="font-family:Rajdhani; font-size:11px; color:#aaa; margin-top:5px;">{ "Currently ACTIVE" if is_active else "Next session" }</div>
         </div>
@@ -905,53 +912,61 @@ with st.sidebar:
 
 # ====================== FUNGSI MARKET NEWS (MARKETAUX & TIINGO) ======================
 @st.cache_data(ttl=1200) # Update otomatis tiap 20 menit
-def get_news_data(query, max_articles=15):
+def get_news_data(query, max_articles=10):
+    """Mengambil berita dari Marketaux dan Tiingo, menampilkan max 10 artikel terbaru dengan rotasi otomatis."""
     berita_final = []
     urls_terpakai = set()
 
-    # --- 1. AMBIL DARI MARKETAUX ---
+    # --- 1. AMBIL DARI MARKETAUX (Prioritas Utama) ---
     if marketaux_key:
-        url_m = f"https://api.marketaux.com/v1/news/all?api_token={marketaux_key}&language=en&limit=10"
         try:
+            url_m = f"https://api.marketaux.com/v1/news/all?api_token={marketaux_key}&language=en&limit=20"
             res_m = requests.get(url_m, timeout=10).json()
             for item in res_m.get('data', []):
-                if item['url'] not in urls_terpakai:
+                if item.get('url') and item['url'] not in urls_terpakai:
                     berita_final.append({
-                        'publishedAt': item['published_at'],
-                        'title': item['title'],
-                        'description': item['description'],
+                        'publishedAt': item.get('published_at', ''),
+                        'title': item.get('title', 'No Title'),
+                        'description': item.get('description', ''),
                         'source': 'Marketaux',
                         'url': item['url']
                     })
                     urls_terpakai.add(item['url'])
         except Exception as e:
-            pass
+            st.warning(f"Marketaux Error: {str(e)}")
 
-    # --- 2. AMBIL DARI TIINGO ---
+    # --- 2. AMBIL DARI TIINGO (Tambahan) ---
     if tiingo_key:
-        url_t = f"https://api.tiingo.com/tiingo/news?token={tiingo_key}"
-        headers_t = {'Content-Type': 'application/json'}
         try:
-            res_t = requests.get(url_t, headers=headers_t, timeout=10).json()
+            # Ekstrak ticker dari query dengan lebih robust
+            ticker_query = query.replace("/", "").replace("-USD", "").replace("=X", "").replace(".JK", "").split(".")[0]
+            url_t = f"https://api.tiingo.com/tiingo/news?tickers={ticker_query}&token={tiingo_key}"
+            res_t = requests.get(url_t, timeout=10).json()
             if isinstance(res_t, list):
                 for item in res_t:
-                    if item['url'] not in urls_terpakai:
+                    if item.get('url') and item['url'] not in urls_terpakai:
                         berita_final.append({
-                            'publishedAt': item['publishedDate'],
-                            'title': item['title'],
-                            'description': item['description'],
+                            'publishedAt': item.get('publishedDate', ''),
+                            'title': item.get('title', 'No Title'),
+                            'description': item.get('description', item.get('title', '')),
                             'source': 'Tiingo',
                             'url': item['url']
                         })
                         urls_terpakai.add(item['url'])
         except Exception as e:
-            pass
+            st.warning(f"Tiingo Error: {str(e)}")
 
     if not berita_final:
         return [], t['no_news'] + " (Cek API Key Marketaux/Tiingo Anda)"
 
-    # Urutkan berdasarkan waktu terbaru
-    berita_final = sorted(berita_final, key=lambda x: x['publishedAt'], reverse=True)
+    # Urutkan berdasarkan waktu terbaru (yang terbaru di atas)
+    try:
+        berita_final = sorted(berita_final, key=lambda x: x['publishedAt'], reverse=True)
+    except:
+        pass
+    
+    # Batasi hasil menjadi tepat 10 berita terbaru (Rotasi Otomatis setiap 20 menit)
+    berita_final = berita_final[:max_articles]
     
     # Format waktu untuk tampilan AeroVulpis (Konversi ke WIB)
     import pytz
@@ -959,15 +974,23 @@ def get_news_data(query, max_articles=15):
     
     for b in berita_final:
         try:
-            from datetime import datetime
-            # Asumsi waktu dari API adalah UTC
-            dt_utc = datetime.fromisoformat(b['publishedAt'].replace('Z', '+00:00'))
-            dt_wib = dt_utc.astimezone(tz_wib)
-            b['publishedAt'] = dt_wib.strftime("%d-%m-%Y %H.%M")
+            raw_date = b['publishedAt'].replace('Z', '+00:00') if b['publishedAt'] else ''
+            if raw_date:
+                try:
+                    dt_utc = datetime.fromisoformat(raw_date)
+                except:
+                    # Fallback untuk format yang mungkin tidak standar
+                    dt_utc = datetime.strptime(raw_date[:19], "%Y-%m-%dT%H:%M:%S")
+                    dt_utc = dt_utc.replace(tzinfo=pytz.UTC)
+                    
+                dt_wib = dt_utc.astimezone(tz_wib)
+                b['publishedAt'] = dt_wib.strftime("%d-%m-%Y %H.%M")
+            else:
+                b['publishedAt'] = 'N/A'
         except:
-            pass
+            b['publishedAt'] = 'N/A'
             
-    return berita_final[:max_articles], None
+    return berita_final, None
 
 # ====================== FUNGSI PENGECEKAN SMART ALERT ======================
 def check_smart_alerts():
@@ -1263,7 +1286,7 @@ elif menu_selection == "Market Sessions":
 elif menu_selection == "Market News":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
     # Tombol dihapus sesuai instruksi
-    articles, error = get_news_data(f"{asset_name}", 15)
+    articles, error = get_news_data(f"{asset_name}", 10)
     if error: st.error(error)
     elif articles:
         for a in articles:

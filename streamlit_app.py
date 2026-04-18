@@ -616,11 +616,15 @@ def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
     news_context = "\n".join([f"- {n['title']} ({n['source']})" for n in news_list]) if news_list else "Tidak ada berita terbaru."
 
     prompt = f"""
-    Anda adalah AeroVulpis Sentinel Intelligence, sistem AI Pro tingkat lanjut yang menggunakan model Hermes 3 405B.
+    Anda adalah AeroVulpis Sentinel Intelligence, sistem AI Pro tingkat lanjut (AeroVulpis Core V3.3).
     Tugas Anda adalah memberikan analisis institusional mendalam untuk {asset_name}.
 
-    DATA PASAR:
-    - Harga: {price:,.4f}
+    INFO DASAR:
+    Instrumen: {asset_name}
+    Tanggal: {datetime.now().strftime('%d %B %Y')}
+    Harga saat ini: {price:,.4f}
+
+    DATA PASAR TEKNIS:
     - Sinyal Teknis: {signal}
     - Indikator: RSI={latest.get('RSI', 0):.2f}, MACD={latest.get('MACD', 0):.4f}, ATR={latest.get('ATR', 0):.4f}
     - Alasan Teknis: {", ".join(reasons)}
@@ -628,16 +632,39 @@ def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
     BERITA & FUNDAMENTAL:
     {news_context}
 
-    FORMAT OUTPUT (WAJIB):
-    1. **SENTINEL INTELLIGENCE REPORT**
-    2. **KEY LEVELS**: Berikan Support & Resistance yang akurat.
-    3. **FUNDAMENTAL INSIGHT**: Analisis mendalam tentang suku bunga (FED/BI/ECB jika relevan), inflasi, dan sentimen pasar global.
-    4. **TRADE SCENARIOS (PRO)**: 
-       - Skenario A (Bullish): Entry, Target, Stop Loss.
-       - Skenario B (Bearish): Entry, Target, Stop Loss.
-    5. **FINAL VERDICT**: BUY, SELL, atau WAIT dengan keyakinan tinggi berdasarkan model Hermes 3 405B.
+    STRUKTUR OUTPUT (WAJIB):
+    SENTINEL INTELLIGENCE REPORT
 
-    Gunakan gaya bahasa profesional, teknis, dan tegas.
+    KEY LEVELS:  
+    Support: [2-3 level + alasan singkat]  
+    Resistance: [2-3 level + alasan singkat]
+
+    FUNDAMENTAL INSIGHT:  
+    [Ringkas faktor utama yang mempengaruhi instrumen ini saat ini (suku bunga, inflasi, geopolitik, dll) secara seimbang.]
+
+    TRADE SCENARIOS:
+
+    Bullish:  
+    Entry:  
+    Target:  
+    Stop Loss:  
+    R:R:
+
+    Bearish:  
+    Entry:  
+    Target:  
+    Stop Loss:  
+    R:R:
+
+    FINAL VERDICT:  
+    [Kesimpulan netral (Buy/Sell/Wait) + risiko utama yang harus diwaspadai.]
+
+    ATURAN TAMBAHAN:
+    - Jawab dalam bahasa Indonesia yang jelas dan ringkas.
+    - Total maksimal 320 kata.
+    - Selalu seimbang antara bullish dan bearish.
+    - Dasarkan pada data terkini April 2026.
+    - Buat sangat ringkas.
     """
     
     try:
@@ -864,8 +891,8 @@ with st.sidebar:
 
     menu_selection = option_menu(
         menu_title=t['navigation'],
-        options=["Live Dashboard", "AeroVulpis Sentinel", "Signal Analysis", "Market Sessions", "Market News", "Economic Radar", "Smart Alert Center", "Chatbot AI", "Risk Management", "Settings", "System Log"],
-        icons=["activity", "shield-shaded", "graph-up-arrow", "globe", "newspaper", "calendar-event", "bell-fill", "chat-dots", "shield-fill", "gear", "journal-text"],
+        options=["Live Dashboard", "AeroVulpis Sentinel", "Signal Analysis", "Market Sessions", "Market News", "Economic Radar", "Smart Alert Center", "Chatbot AI", "Risk Management", "Settings", "Help & Support"],
+        icons=["activity", "shield-shaded", "graph-up-arrow", "globe", "newspaper", "calendar-event", "bell-fill", "chat-dots", "shield-fill", "gear", "question-circle"],
         menu_icon="cast",
         default_index=0,
         styles={
@@ -1053,7 +1080,7 @@ if menu_selection == "AeroVulpis Sentinel":
             <h2 class="sentinel-title">AEROVULPIS SENTINEL</h2>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <span class="status-badge status-open">MARKET STATUS: OPEN</span>
-                <span class="status-badge status-ai">AI STATUS: HERMES 3 405B (PRO)</span>
+                <span class="status-badge status-ai">AI STATUS: AEROVULPIS CORE V3.3 (PRO)</span>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -1422,17 +1449,30 @@ elif menu_selection == "Settings":
         st.success("Cache Cleared!")
     st.markdown('</div>', unsafe_allow_html=True)
 
-elif menu_selection == "System Log":
-    st.markdown(f'<div class="glass-card">', unsafe_allow_html=True)
-    st.subheader(t['sys_log'])
-    st.write(f"**{t['version']}**")
-    st.write("- Updated sidebar branding to DYNAMIC HATCH EDITION.")
-    st.write("- Added detailed timestamp (DD-MM-YYYY, jam HH.MM) to Market News.")
-    st.write("- Refined Signal Analysis grid for better symmetry and fintech look.")
-    st.write("- Adjusted logo size and spacing for optimal visual balance.")
-    st.write("- Restored Indonesian motivational footer with DynamiHatch Identity.")
-    st.write(f"- {t['created_by']}")
-    st.markdown('</div>', unsafe_allow_html=True)
+elif menu_selection == "Help & Support":
+    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+    st.subheader("🛡️ AeroVulpis Help & Support")
+    st.write("Butuh bantuan atau ingin melaporkan masalah? Tim kami siap membantu Anda.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        ### 📖 Panduan Penggunaan
+        - **Live Dashboard**: Pantau harga real-time dan sinyal teknikal dasar.
+        - **AeroVulpis Sentinel**: Analisis AI tingkat lanjut dengan model Core V3.3.
+        - **Smart Alert**: Pasang pengingat harga otomatis ke Telegram.
+        """)
+    
+    with col2:
+        st.markdown("""
+        ### 📞 Hubungi Kami
+        - **Telegram**: [@AeroVulpisSupport](https://t.me/)
+        - **Email**: support@aerovulpis.com
+        - **Status Sistem**: 🟢 Operasional
+        """)
+    
+    st.info("Tips: Pastikan koneksi internet Anda stabil untuk mendapatkan pembaruan harga real-time.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # ====================== FOOTER ======================
 st.markdown("---")

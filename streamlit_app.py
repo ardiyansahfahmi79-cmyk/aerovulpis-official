@@ -1479,7 +1479,7 @@ elif menu_selection == "Help & Support":
         st.markdown("""
         **Sentinel** adalah dashboard utama tingkat lanjut yang dirancang untuk analisis institusional.
         - **TradingView Chart**: Grafik real-time interaktif dengan alat gambar lengkap.
-        - **Generate Deep Analysis Pro**: Menggunakan model **Hermes 3 405B (AI Pro)** untuk memberikan laporan mendalam tentang *Key Levels*, *Fundamental Insight* (suku bunga), dan skenario trading (Buy/Sell/Wait).
+        - **Generate Deep Analysis Pro**: Menggunakan sistem **AeroVulpis AI Pro** untuk memberikan laporan mendalam tentang *Key Levels*, *Fundamental Insight* (suku bunga), dan skenario trading (Buy/Sell/Wait).
         - **AI Status**: Menampilkan status model AI yang sedang aktif memproses data.
         """)
 
@@ -1488,7 +1488,7 @@ elif menu_selection == "Help & Support":
         Pusat pemantauan harga dan sinyal teknikal cepat.
         - **Live Price**: Harga terkini dari yFinance atau Twelve Data (untuk Gold/Silver).
         - **Technical Strength**: Gauge yang menunjukkan kekuatan tren berdasarkan 15+ indikator.
-        - **Generate Deep Analysis**: Analisis AI cepat menggunakan model **Llama 3.3 70B** untuk memberikan alasan di balik sinyal saat ini.
+        - **Generate Deep Analysis**: Analisis AI cepat menggunakan sistem **AeroVulpis Intelligence Engine** untuk memberikan alasan di balik sinyal saat ini.
         """)
 
     with st.expander("📈 3. SIGNAL ANALYSIS"):
@@ -1501,7 +1501,7 @@ elif menu_selection == "Help & Support":
     with st.expander("🌐 4. MARKET SESSIONS & NEWS"):
         st.markdown("""
         - **Market Sessions**: Menampilkan status sesi pasar (Tokyo, London, New York) dan *Golden Time* (volatilitas tinggi).
-        - **Market News**: Berita real-time dari Marketaux dan Tiingo yang difilter berdasarkan aset yang dipilih.
+        - **Market News**: Berita real-time dari berbagai **media keuangan resmi dan terpercaya** yang difilter berdasarkan aset yang dipilih.
         """)
 
     with st.expander("🔔 5. SMART ALERT CENTER"):

@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ====================== KONFIGURASI ======================
-st.set_page_config(layout="wide", page_title="AeroVulpis v3.3 Ultimate", page_icon="🦅", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="AeroVulpis v3.4 Ultimate", page_icon="🦅", initial_sidebar_state="expanded")
 
 # Inisialisasi Session State untuk Bahasa
 if "lang" not in st.session_state:
@@ -42,7 +42,7 @@ translations = {
         "ai_analysis": "🤖 AeroVulpis Analysis",
         "generate_ai": "GENERATE DEEP AI ANALYSIS",
         "market_sessions": "🌐 Market Sessions",
-        "market_news": "📰 Market News",
+        "market_news": "📡 Market News",
         "risk_mgmt": "🛡️ Risk Management Protocol",
         "settings": "⚙️ Settings",
         "clear_cache": "Hapus Cache Sistem",
@@ -58,7 +58,7 @@ translations = {
         "risk_amt": "Jumlah Risiko",
         "reward": "Imbalan (1:2)",
         "sys_log": "📜 AeroVulpis System Log",
-        "version": "v3.3 Ultimate Digital Edition (Current)",
+        "version": "v3.4 Ultimate Digital Edition (Current)",
         "created_by": "Dibuat oleh Fahmi."
     },
     "EN": {
@@ -75,7 +75,7 @@ translations = {
         "ai_analysis": "🤖 AeroVulpis Analysis",
         "generate_ai": "GENERATE DEEP AI ANALYSIS",
         "market_sessions": "🌐 Market Sessions",
-        "market_news": "📰 Market News",
+        "market_news": "📡 Market News",
         "risk_mgmt": "🛡️ Risk Management Protocol",
         "settings": "⚙️ Settings",
         "clear_cache": "Clear System Cache",
@@ -91,7 +91,7 @@ translations = {
         "risk_amt": "Risk Amount",
         "reward": "Reward (1:2)",
         "sys_log": "📜 AeroVulpis System Log",
-        "version": "v3.3 Ultimate Digital Edition (Current)",
+        "version": "v3.4 Ultimate Digital Edition (Current)",
         "created_by": "Created by Fahmi."
     }
 }
@@ -617,7 +617,7 @@ def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
     news_context = "\n".join([f"- {n['title']} ({n['source']})" for n in news_list]) if news_list else "Tidak ada berita terbaru."
 
     prompt = f"""
-    Anda adalah AeroVulpis Sentinel Intelligence, sistem AI Pro tingkat lanjut (AeroVulpis Core V3.3).
+    Anda adalah AeroVulpis Sentinel Intelligence, sistem AI Pro tingkat lanjut (AeroVulpis Core V3.4).
     Tugas Anda adalah memberikan analisis institusional mendalam untuk {asset_name}.
 
     INFO DASAR:
@@ -863,18 +863,18 @@ instruments = {
 st.markdown(f"""
 <div class="main-title-container">
     <div class="main-logo-container">
-        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png" alt="AeroVulpis Logo" class="custom-logo">
+        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663574425191/XOezQELHpSeVrDno.png" alt="AeroVulpis Logo" class="custom-logo">
     </div>
-    <h1 class="main-title">AEROVULPIS v3.3</h1>
+    <h1 class="main-title">AEROVULPIS v3.4</h1>
     <p style="text-align: center; color: #aaa; font-family: 'Rajdhani', sans-serif; margin-top: -5px; padding: 0;">ULTIMATE DIGITAL EDITION</p>
 </div>
 """, unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
-    st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:55px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663574425191/XOezQELHpSeVrDno.png' alt='AeroVulpis Logo' style='width:55px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
     st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px; margin-bottom: 0;'>{t['control_center']}</h2>", unsafe_allow_html=True)
-    st.markdown("**AeroVulpis V3.3** — **DYNAMIHATCH**")
+    st.markdown("**AeroVulpis V3.4** — **DYNAMIHATCH**")
     st.caption("2026 • Powered by Real-Time AI")
 
     category = st.selectbox(t['category'], list(instruments.keys()))
@@ -941,8 +941,14 @@ def get_news_data(query, max_articles=20):
         try:
             # Ekstrak ticker dari query dengan lebih robust
             ticker_query = query.replace("/", "").replace("-USD", "").replace("=X", "").replace(".JK", "").split(".")[0]
-            url_t = f"https://api.tiingo.com/tiingo/news?tickers={ticker_query}&token={tiingo_key}"
+            # Tiingo terkadang gagal jika ticker terlalu spesifik, coba ambil berita umum jika ticker gagal
+            url_t = f"https://api.tiingo.com/tiingo/news?tickers={ticker_query}&token={tiingo_key}&limit=20"
             res_t = requests.get(url_t, timeout=10).json()
+            
+            # Jika tidak ada hasil untuk ticker spesifik, ambil berita pasar umum
+            if not res_t or (isinstance(res_t, list) and len(res_t) == 0):
+                url_t_general = f"https://api.tiingo.com/tiingo/news?token={tiingo_key}&limit=20"
+                res_t = requests.get(url_t_general, timeout=10).json()
             if isinstance(res_t, list):
                 for item in res_t:
                     if item.get('url') and item['url'] not in urls_terpakai:
@@ -966,7 +972,13 @@ def get_news_data(query, max_articles=20):
     except:
         pass
     
-    # Batasi hasil menjadi tepat 10 berita terbaru (Rotasi Otomatis setiap 20 menit)
+    # Urutkan ulang setelah penggabungan untuk memastikan yang terbaru di atas
+    try:
+        berita_final = sorted(berita_final, key=lambda x: x['publishedAt'], reverse=True)
+    except:
+        pass
+
+    # Batasi hasil sesuai permintaan (biasanya 20 untuk buffer rotasi menjadi 10)
     berita_final = berita_final[:max_articles]
     
     # Format waktu untuk tampilan AeroVulpis (Konversi ke WIB)
@@ -1104,7 +1116,7 @@ if menu_selection == "AeroVulpis Sentinel":
             <h2 class="sentinel-title">AEROVULPIS SENTINEL</h2>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <span class="status-badge status-open">MARKET STATUS: OPEN</span>
-                <span class="status-badge status-ai">AI STATUS: AEROVULPIS CORE V3.3 (PRO)</span>
+                <span class="status-badge status-ai">AI STATUS: AEROVULPIS CORE V3.4 (PRO)</span>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -1286,7 +1298,7 @@ elif menu_selection == "Market Sessions":
     market_session_status()
 
 elif menu_selection == "Market News":
-    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">🌐 {t["market_news"]}</h2>', unsafe_allow_html=True)
     st.markdown('<p style="font-size:12px; color:#888; margin-bottom:15px;">📡 Berita real-time dari Marketaux & Tiingo | Diperbarui secara cerdas setiap 20 menit</p>', unsafe_allow_html=True)
     
     # Inisialisasi news cache

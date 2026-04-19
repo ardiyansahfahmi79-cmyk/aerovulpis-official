@@ -427,6 +427,18 @@ else:
     st.sidebar.error("⚠️ GROQ_API_KEY NOT FOUND")
 
 # ====================== FUNGSI DATA & INDIKATOR ======================
+def get_fed_rate():
+    try:
+        ticker = yf.Ticker("^IRX")
+        data = ticker.history(period="5d")
+        if not data.empty:
+            rate = data['Close'].iloc[-1]
+            date = data.index[-1]
+            return rate, date
+        return None, None
+    except:
+        return None, None
+
 def get_market_data(ticker_symbol):
     # Logika Khusus untuk Emas dan Perak menggunakan Twelve Data
     if ticker_symbol in ["GC=F", "SI=F", "XAUUSD", "XAGUSD"]:
@@ -1208,7 +1220,12 @@ elif menu_selection == "Live Dashboard":
             change_color = '#00ff88' if price_change >= 0 else '#ff2a6d'
             change_arrow = '▲' if price_change >= 0 else '▼'
             bg_color = '0, 255, 136' if price_change >= 0 else '255, 42, 109'
-            st.markdown(f'<div class="glass-card" style="background: rgba({bg_color}, 0.05); border-left: 4px solid {change_color};"><p style="color:#888; margin:0; font-size:10px;">PRICE DIFFERENCE</p><p class="digital-font" style="font-size:18px; margin:0; color:{change_color};">{change_arrow} {price_change:+.4f} ({price_change_pct:+.2f}%)</p></div>', unsafe_allow_html=True)
+            fed_rate, fed_date = get_fed_rate()
+            if fed_rate:
+                fed_date_str = fed_date.strftime('%d %B %Y')
+                st.markdown(f'<div class="glass-card" style="background: rgba(0, 212, 255, 0.05); border-left: 4px solid var(--electric-blue);"><p style="color:#888; margin:0; font-size:10px;">THE FED\'S INTEREST RATE ({fed_date_str})</p><p class="digital-font" style="font-size:18px; margin:0; color:var(--electric-blue);">{fed_rate:.2f}%</p></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="glass-card" style="background: rgba({bg_color}, 0.05); border-left: 4px solid {change_color};"><p style="color:#888; margin:0; font-size:10px;">PRICE DIFFERENCE</p><p class="digital-font" style="font-size:18px; margin:0; color:{change_color};">{change_arrow} {price_change:+.4f} ({price_change_pct:+.2f}%)</p></div>', unsafe_allow_html=True)
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))
@@ -1504,66 +1521,123 @@ elif menu_selection == "Settings":
 elif menu_selection == "Help & Support":
     st.markdown('<h2 class="digital-font" style="text-align:center; font-size:28px; margin-bottom:20px;">AeroVulpis v3.3 Help & Support</h2>', unsafe_allow_html=True)
     
-    with st.expander("🏛️ 1. AEROVULPIS SENTINEL (PRO)", expanded=True):
+    with st.expander("1. AEROVULPIS SENTINEL (PRO)", expanded=True):
         st.markdown("""
+        <div style="text-align: center; margin-bottom: 15px;">
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">🏛️</div>
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">INSTITUTIONAL SENTINEL SYSTEM</div>
+        </div>
         **Sentinel** adalah dashboard utama tingkat lanjut yang dirancang untuk analisis institusional.
-        - **TradingView Chart**: Grafik real-time interaktif dengan alat gambar lengkap.
-        - **Generate Deep Analysis Pro**: Menggunakan sistem **AeroVulpis AI Pro** untuk memberikan laporan mendalam tentang *Key Levels*, *Fundamental Insight* (suku bunga), dan skenario trading (Buy/Sell/Wait).
-        - **AI Status**: Menampilkan status model AI yang sedang aktif memproses data.
-        """)
+        
+        **TradingView Chart**: Grafik real-time interaktif dengan alat gambar lengkap.
+        
+        **Generate Deep Analysis Pro**: Menggunakan sistem **AeroVulpis AI Pro** untuk memberikan laporan mendalam tentang *Key Levels*, *Fundamental Insight* (suku bunga), dan skenario trading (Buy/Sell/Wait).
+        
+        **AI Status**: Menampilkan status model AI yang sedang aktif memproses data.
+        """, unsafe_allow_html=True)
 
-    with st.expander("📊 2. LIVE DASHBOARD"):
+    with st.expander("2. LIVE DASHBOARD"):
         st.markdown("""
+        <div style="text-align: center; margin-bottom: 15px;">
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">📊</div>
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">LIVE DASHBOARD SYSTEM</div>
+        </div>
         Pusat pemantauan harga dan sinyal teknikal cepat.
-        - **Live Price**: Harga terkini dari yFinance atau Twelve Data (untuk Gold/Silver).
-        - **Technical Strength**: Gauge yang menunjukkan kekuatan tren berdasarkan 15+ indikator.
-        - **Generate Deep Analysis**: Analisis AI cepat menggunakan sistem **AeroVulpis Intelligence Engine** untuk memberikan alasan di balik sinyal saat ini.
-        """)
+        
+        **Live Price**: Harga terkini dari yFinance atau Twelve Data (untuk Gold/Silver).
+        
+        **Technical Strength**: Gauge yang menunjukkan kekuatan tren berdasarkan 15+ indikator.
+        
+        **Generate Deep Analysis**: Analisis AI cepat menggunakan sistem **AeroVulpis Intelligence Engine** untuk memberikan alasan di balik sinyal saat ini. Perlu diperhatikan bahwa ada kemungkinan selisih harga antara data live dan eksekusi pasar.
+        """, unsafe_allow_html=True)
 
-    with st.expander("📈 3. SIGNAL ANALYSIS"):
+    with st.expander("3. SIGNAL ANALYSIS"):
         st.markdown("""
+        <div style="text-align: center; margin-bottom: 15px;">
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">📈</div>
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">TECHNICAL SIGNAL GRID</div>
+        </div>
         Grid indikator teknikal lengkap untuk konfirmasi manual.
-        - **Indikator**: RSI, MACD, SMA, EMA, Bollinger Bands, CCI, Williams %R, MFI, TRIX, ROC, Awesome Oscillator, KAMA, Ichimoku, dan Parabolic SAR.
-        - **Warna Sinyal**: Hijau (Bullish), Merah (Bearish), Kuning (Neutral/Normal).
-        """)
+        
+        **Indikator**: RSI, MACD, SMA, EMA, Bollinger Bands, CCI, Williams %R, MFI, TRIX, ROC, Awesome Oscillator, KAMA, Ichimoku, dan Parabolic SAR.
+        
+        **Warna Sinyal**: Hijau (Bullish), Merah (Bearish), Kuning (Neutral/Normal).
+        """, unsafe_allow_html=True)
 
-    with st.expander("🌍 4. MARKET SESSIONS & NEWS"):
+    with st.expander("4. MARKET SESSIONS & NEWS"):
         st.markdown("""
-        - **Market Sessions**: Menampilkan status sesi pasar (Tokyo, London, New York) dan *Golden Time* (volatilitas tinggi).
-        - **Market News**: Berita real-time tentang geopolitik, konflik, dan peristiwa ekonomi global dari berbagai media keuangan resmi dan terpercaya. Diperbarui setiap 20 menit dengan rotasi berita terbaru dari Marketaux dan Tiingo.
-        """)
+        <div style="text-align: center; margin-bottom: 15px;">
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">🌍</div>
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">GLOBAL MARKET INTELLIGENCE</div>
+        </div>
+        **Market Sessions**: Menampilkan status sesi pasar (Tokyo, London, New York) dan *Golden Time* (volatilitas tinggi).
+        
+        **Market News**: Berita real-time tentang geopolitik, konflik, dan peristiwa ekonomi global dari berbagai media keuangan resmi dan terpercaya. Diperbarui setiap 20 menit dengan rotasi berita terbaru dari Marketaux dan Tiingo.
+        """, unsafe_allow_html=True)
 
-    with st.expander("📡 5. SMART ALERT CENTER"):
+    with st.expander("5. SMART ALERT CENTER"):
         st.markdown("""
+        <div style="text-align: center; margin-bottom: 15px;">
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">📡</div>
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">SMART SENSOR NETWORK</div>
+        </div>
         Sistem sensor harga otomatis yang terhubung ke Telegram.
-        - **Lock Target**: Masukkan harga target dan Chat ID Telegram Anda.
-        - **Sensor Active**: Sistem akan terus memantau harga di latar belakang dan mengirim notifikasi saat target tercapai.
-        - **Cara Mendapatkan User ID**: Buka Telegram dan cari bot **@userinfobot**, lalu ketik `/start` untuk mendapatkan User ID Anda.
-        """)
+        
+        **Lock Target**: Masukkan harga target dan Chat ID Telegram Anda.
+        
+        **Sensor Active**: Sistem akan terus memantau harga di latar belakang dan mengirim notifikasi saat target tercapai.
+        
+        **Cara Mendapatkan User ID**: Buka Telegram dan cari bot **@userinfobot**, lalu ketik `/start` untuk mendapatkan User ID Anda.
+        """, unsafe_allow_html=True)
 
     with st.expander("🧠 6. CHATBOT AI"):
         st.markdown("""
+        <div style="text-align: center; margin-bottom: 15px;">
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">🧠</div>
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">COGNITIVE AI ASSISTANT</div>
+        </div>
         Asisten AI pribadi yang memahami konteks pasar Anda.
-        - Anda bisa bertanya tentang strategi, penjelasan indikator, atau status alert Anda.
-        - AI memiliki akses ke data harga live dan daftar alert aktif Anda.
-        """)
+        
+        Anda bisa bertanya tentang strategi, penjelasan indikator, atau status alert Anda.
+        
+        AI memiliki akses ke data harga live dan daftar alert aktif Anda.
+        """, unsafe_allow_html=True)
 
-    with st.expander("💼 7. RISK MANAGEMENT"):
+    with st.expander("📡 7. ECONOMIC RADAR"):
         st.markdown("""
-        Framework untuk menjaga kelangsungan akun trading Anda.
-        - **Four Pillars**: Trading Rules, Position Sizing, Confidence Scores, dan Risk Strategy.
-        - **RR Simulator**: Hitung proyeksi keuntungan mingguan, bulanan, dan tahunan berdasarkan rasio Risk-to-Reward dan Win Rate Anda.
-        """)
+        <div style="text-align: center; margin-bottom: 15px;">
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">📡</div>
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">ECONOMIC RADAR SYSTEM</div>
+        </div>
+        Sistem pemantauan kalender ekonomi global yang mendeteksi peristiwa berdampak tinggi secara real-time.
+        
+        **High Impact Events**: Menampilkan rilis data ekonomi penting seperti NFP, CPI, dan keputusan suku bunga yang dapat memicu volatilitas besar.
+        
+        **Real-time Updates**: Data diperbarui secara otomatis untuk memastikan Anda tidak melewatkan momentum pasar yang krusial.
+        """, unsafe_allow_html=True)
 
-    st.info("💡 **Tips**: Gunakan menu **Settings** untuk mengganti bahasa (ID/EN) atau membersihkan cache jika data terasa lambat diperbarui.")
+    with st.expander("8. RISK MANAGEMENT"):
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 15px;">
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">💼</div>
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">RISK MANAGEMENT PROTOCOL</div>
+        </div>
+        Framework untuk menjaga kelangsungan akun trading Anda.
+        
+        **Four Pillars**: Trading Rules, Position Sizing, Confidence Scores, dan Risk Strategy.
+        
+        **RR Simulator**: Hitung proyeksi keuntungan mingguan, bulanan, dan tahunan berdasarkan rasio Risk-to-Reward dan Win Rate Anda.
+        """, unsafe_allow_html=True)
+
+    st.info("**Tips**: Gunakan menu **Settings** untuk mengganti bahasa (ID/EN) atau membersihkan cache jika data terasa lambat diperbarui.")
     
     st.markdown("<div class='glass-card' style='margin-top:20px;'>", unsafe_allow_html=True)
     st.markdown("""
-    ### 📞 Hubungi Dukungan Teknis
+    ### Hubungi Dukungan Teknis
     Jika Anda mengalami kendala teknis atau memiliki pertanyaan lebih lanjut, silakan hubungi kami melalui:
     - **Telegram**: [@AeroVulpisSupport](https://t.me/)
     - **Email**: support@aerovulpis.com
-    - **Status Sistem**: 🟢 Operasional (v3.3 Ultimate)
+    - **Status Sistem**: Operasional (v3.3 Ultimate)
     """)
     st.markdown("</div>", unsafe_allow_html=True)
 

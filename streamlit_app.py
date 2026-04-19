@@ -427,18 +427,6 @@ else:
     st.sidebar.error("⚠️ GROQ_API_KEY NOT FOUND")
 
 # ====================== FUNGSI DATA & INDIKATOR ======================
-def get_fed_rate():
-    try:
-        ticker = yf.Ticker("^IRX")
-        data = ticker.history(period="5d")
-        if not data.empty:
-            rate = data['Close'].iloc[-1]
-            date = data.index[-1]
-            return rate, date
-        return None, None
-    except:
-        return None, None
-
 def get_market_data(ticker_symbol):
     # Logika Khusus untuk Emas dan Perak menggunakan Twelve Data
     if ticker_symbol in ["GC=F", "SI=F", "XAUUSD", "XAGUSD"]:
@@ -1220,12 +1208,7 @@ elif menu_selection == "Live Dashboard":
             change_color = '#00ff88' if price_change >= 0 else '#ff2a6d'
             change_arrow = '▲' if price_change >= 0 else '▼'
             bg_color = '0, 255, 136' if price_change >= 0 else '255, 42, 109'
-            fed_rate, fed_date = get_fed_rate()
-            if fed_rate:
-                fed_date_str = fed_date.strftime('%d %B %Y')
-                st.markdown(f'<div class="glass-card" style="background: rgba(0, 212, 255, 0.05); border-left: 4px solid var(--electric-blue);"><p style="color:#888; margin:0; font-size:10px;">THE FED\'S INTEREST RATE ({fed_date_str})</p><p class="digital-font" style="font-size:18px; margin:0; color:var(--electric-blue);">{fed_rate:.2f}%</p></div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="glass-card" style="background: rgba({bg_color}, 0.05); border-left: 4px solid {change_color};"><p style="color:#888; margin:0; font-size:10px;">PRICE DIFFERENCE</p><p class="digital-font" style="font-size:18px; margin:0; color:{change_color};">{change_arrow} {price_change:+.4f} ({price_change_pct:+.2f}%)</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="glass-card" style="background: rgba({bg_color}, 0.05); border-left: 4px solid {change_color};"><p style="color:#888; margin:0; font-size:10px;">PRICE DIFFERENCE</p><p class="digital-font" style="font-size:18px; margin:0; color:{change_color};">{change_arrow} {price_change:+.4f} ({price_change_pct:+.2f}%)</p></div>', unsafe_allow_html=True)
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))
@@ -1524,7 +1507,13 @@ elif menu_selection == "Help & Support":
     with st.expander("1. AEROVULPIS SENTINEL (PRO)", expanded=True):
         st.markdown("""
         <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">🏛️</div>
+            <div style="width: 60px; height: 60px; margin: 0 auto; border: 2px solid var(--electric-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px var(--electric-blue);">
+                <div style="width: 30px; height: 20px; border-top: 3px solid var(--electric-blue); border-bottom: 3px solid var(--electric-blue); position: relative;">
+                    <div style="width: 3px; height: 100%; background: var(--electric-blue); position: absolute; left: 5px;"></div>
+                    <div style="width: 3px; height: 100%; background: var(--electric-blue); position: absolute; left: 13px;"></div>
+                    <div style="width: 3px; height: 100%; background: var(--electric-blue); position: absolute; left: 21px;"></div>
+                </div>
+            </div>
             <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">INSTITUTIONAL SENTINEL SYSTEM</div>
         </div>
         **Sentinel** adalah dashboard utama tingkat lanjut yang dirancang untuk analisis institusional.
@@ -1539,7 +1528,11 @@ elif menu_selection == "Help & Support":
     with st.expander("2. LIVE DASHBOARD"):
         st.markdown("""
         <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">📊</div>
+            <div style="width: 60px; height: 60px; margin: 0 auto; border: 2px solid var(--electric-blue); border-radius: 50%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; padding-bottom: 15px; box-shadow: 0 0 15px var(--electric-blue);">
+                <div style="width: 6px; height: 15px; background: var(--electric-blue);"></div>
+                <div style="width: 6px; height: 25px; background: var(--electric-blue);"></div>
+                <div style="width: 6px; height: 20px; background: var(--electric-blue);"></div>
+            </div>
             <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">LIVE DASHBOARD SYSTEM</div>
         </div>
         Pusat pemantauan harga dan sinyal teknikal cepat.
@@ -1554,7 +1547,11 @@ elif menu_selection == "Help & Support":
     with st.expander("3. SIGNAL ANALYSIS"):
         st.markdown("""
         <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">📈</div>
+            <div style="width: 60px; height: 60px; margin: 0 auto; border: 2px solid var(--electric-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px var(--electric-blue);">
+                <div style="width: 30px; height: 20px; border-left: 2px solid var(--electric-blue); border-bottom: 2px solid var(--electric-blue); position: relative;">
+                    <div style="width: 100%; height: 2px; background: var(--electric-blue); position: absolute; bottom: 5px; transform: rotate(-30deg); transform-origin: left;"></div>
+                </div>
+            </div>
             <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">TECHNICAL SIGNAL GRID</div>
         </div>
         Grid indikator teknikal lengkap untuk konfirmasi manual.
@@ -1567,18 +1564,26 @@ elif menu_selection == "Help & Support":
     with st.expander("4. MARKET SESSIONS & NEWS"):
         st.markdown("""
         <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">🌍</div>
+            <div style="width: 60px; height: 60px; margin: 0 auto; border: 2px solid var(--electric-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px var(--electric-blue); position: relative; overflow: hidden;">
+                <div style="width: 100%; height: 2px; background: rgba(0, 212, 255, 0.3); position: absolute; top: 30%;"></div>
+                <div style="width: 100%; height: 2px; background: rgba(0, 212, 255, 0.3); position: absolute; top: 70%;"></div>
+                <div style="width: 2px; height: 100%; background: rgba(0, 212, 255, 0.3); position: absolute; left: 30%;"></div>
+                <div style="width: 2px; height: 100%; background: rgba(0, 212, 255, 0.3); position: absolute; left: 70%;"></div>
+            </div>
             <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">GLOBAL MARKET INTELLIGENCE</div>
         </div>
         **Market Sessions**: Menampilkan status sesi pasar (Tokyo, London, New York) dan *Golden Time* (volatilitas tinggi).
         
-        **Market News**: Berita real-time tentang geopolitik, konflik, dan peristiwa ekonomi global dari berbagai media keuangan resmi dan terpercaya. Diperbarui setiap 20 menit dengan rotasi berita terbaru dari Marketaux dan Tiingo.
+        **Market News**: Berita real-time tentang geopolitik, konflik, dan peristiwa ekonomi global dari berbagai media keuangan resmi dan terpercaya. Diperbarui setiap 20 menit dengan rotasi berita terbaru dari media resmi dan terpercaya.
         """, unsafe_allow_html=True)
 
     with st.expander("5. SMART ALERT CENTER"):
         st.markdown("""
         <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">📡</div>
+            <div style="width: 60px; height: 60px; margin: 0 auto; border: 2px solid var(--electric-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px var(--electric-blue); position: relative;">
+                <div style="width: 20px; height: 20px; border: 2px solid var(--electric-blue); border-radius: 50%;"></div>
+                <div style="width: 35px; height: 35px; border: 2px solid rgba(0, 212, 255, 0.5); border-radius: 50%; position: absolute;"></div>
+            </div>
             <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">SMART SENSOR NETWORK</div>
         </div>
         Sistem sensor harga otomatis yang terhubung ke Telegram.
@@ -1590,10 +1595,17 @@ elif menu_selection == "Help & Support":
         **Cara Mendapatkan User ID**: Buka Telegram dan cari bot **@userinfobot**, lalu ketik `/start` untuk mendapatkan User ID Anda.
         """, unsafe_allow_html=True)
 
-    with st.expander("🧠 6. CHATBOT AI"):
+    with st.expander("6. CHATBOT AI"):
         st.markdown("""
         <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">🧠</div>
+            <div style="width: 60px; height: 60px; margin: 0 auto; border: 2px solid var(--electric-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px var(--electric-blue);">
+                <div style="width: 25px; height: 25px; border: 2px solid var(--electric-blue); border-radius: 5px; position: relative; display: flex; flex-wrap: wrap; gap: 2px; padding: 3px;">
+                    <div style="width: 6px; height: 6px; background: var(--electric-blue);"></div>
+                    <div style="width: 6px; height: 6px; background: var(--electric-blue);"></div>
+                    <div style="width: 6px; height: 6px; background: var(--electric-blue);"></div>
+                    <div style="width: 6px; height: 6px; background: var(--electric-blue);"></div>
+                </div>
+            </div>
             <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">COGNITIVE AI ASSISTANT</div>
         </div>
         Asisten AI pribadi yang memahami konteks pasar Anda.
@@ -1603,10 +1615,13 @@ elif menu_selection == "Help & Support":
         AI memiliki akses ke data harga live dan daftar alert aktif Anda.
         """, unsafe_allow_html=True)
 
-    with st.expander("📡 7. ECONOMIC RADAR"):
+    with st.expander("7. ECONOMIC RADAR"):
         st.markdown("""
         <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">📡</div>
+            <div style="width: 60px; height: 60px; margin: 0 auto; border: 2px solid var(--electric-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px var(--electric-blue); position: relative;">
+                <div style="width: 20px; height: 20px; border: 2px solid var(--electric-blue); border-radius: 50%;"></div>
+                <div style="width: 35px; height: 35px; border: 2px solid rgba(0, 212, 255, 0.5); border-radius: 50%; position: absolute;"></div>
+            </div>
             <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">ECONOMIC RADAR SYSTEM</div>
         </div>
         Sistem pemantauan kalender ekonomi global yang mendeteksi peristiwa berdampak tinggi secara real-time.
@@ -1619,7 +1634,11 @@ elif menu_selection == "Help & Support":
     with st.expander("8. RISK MANAGEMENT"):
         st.markdown("""
         <div style="text-align: center; margin-bottom: 15px;">
-            <div style="font-family: 'Orbitron', sans-serif; font-size: 40px; color: var(--electric-blue); text-shadow: 0 0 20px var(--electric-blue);">💼</div>
+            <div style="width: 60px; height: 60px; margin: 0 auto; border: 2px solid var(--electric-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px var(--electric-blue);">
+                <div style="width: 30px; height: 20px; border: 2px solid var(--electric-blue); border-radius: 3px; position: relative;">
+                    <div style="width: 10px; height: 5px; border: 2px solid var(--electric-blue); border-bottom: none; border-radius: 3px 3px 0 0; position: absolute; top: -7px; left: 8px;"></div>
+                </div>
+            </div>
             <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">RISK MANAGEMENT PROTOCOL</div>
         </div>
         Framework untuk menjaga kelangsungan akun trading Anda.

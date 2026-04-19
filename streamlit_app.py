@@ -863,7 +863,7 @@ instruments = {
 st.markdown(f"""
 <div class="main-title-container">
     <div class="main-logo-container">
-        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663574425191/XOezQELHpSeVrDno.png" alt="AeroVulpis Logo" class="custom-logo">
+        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png" alt="AeroVulpis Logo" class="custom-logo">
     </div>
     <h1 class="main-title">AEROVULPIS v3.4</h1>
     <p style="text-align: center; color: #aaa; font-family: 'Rajdhani', sans-serif; margin-top: -5px; padding: 0;">ULTIMATE DIGITAL EDITION</p>
@@ -872,7 +872,7 @@ st.markdown(f"""
 
 # Sidebar
 with st.sidebar:
-    st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663574425191/XOezQELHpSeVrDno.png' alt='AeroVulpis Logo' style='width:55px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:55px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
     st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px; margin-bottom: 0;'>{t['control_center']}</h2>", unsafe_allow_html=True)
     st.markdown("**AeroVulpis V3.4** — **DYNAMIHATCH**")
     st.caption("2026 • Powered by Real-Time AI")
@@ -1298,7 +1298,12 @@ elif menu_selection == "Market Sessions":
     market_session_status()
 
 elif menu_selection == "Market News":
-    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">🌐 {t["market_news"]}</h2>', unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663574425191/XiolcmXitfndhkYb.png" alt="Market News Logo" style="width: 50px; filter: drop-shadow(0 0 10px var(--electric-blue));">
+        <h2 class="digital-font" style="font-size: 24px; margin: 0;">{t["market_news"]}</h2>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown('<p style="font-size:12px; color:#888; margin-bottom:15px;">📡 Berita real-time dari Marketaux & Tiingo | Diperbarui secara cerdas setiap 20 menit</p>', unsafe_allow_html=True)
     
     # Inisialisasi news cache

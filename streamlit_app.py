@@ -912,8 +912,8 @@ with st.sidebar:
     )
 
 # ====================== FUNGSI MARKET NEWS (MARKETAUX & TIINGO) ======================
-@st.cache_data(ttl=1200) # Update otomatis tiap 20 menit
-def get_news_data(query, max_articles=10):
+@st.cache_data(ttl=1200)
+def get_news_data(query, max_articles=20):
     """Mengambil berita dari Marketaux dan Tiingo, menampilkan max 10 artikel terbaru dengan rotasi otomatis."""
     berita_final = []
     urls_terpakai = set()
@@ -1287,16 +1287,10 @@ elif menu_selection == "Market Sessions":
 
 elif menu_selection == "Market News":
     st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
-    st.markdown('<p style="font-size:12px; color:#888; margin-bottom:15px;">📡 Berita real-time dari Marketaux & Tiingo | Update otomatis setiap 20 menit</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:12px; color:#888; margin-bottom:15px;">📡 Berita real-time dari Marketaux & Tiingo | Diperbarui secara cerdas setiap 20 menit</p>', unsafe_allow_html=True)
     
     # Inisialisasi news cache
     initialize_news_cache()
-    
-    # Cek apakah perlu update (untuk memicu rerun setiap 20 menit)
-    from news_cache_manager import should_update_news
-    if should_update_news():
-        st.cache_data.clear()
-        st.rerun()
     
     # Ambil berita terbaru
     articles, error = get_news_data(f"{asset_name}", 20)  # Ambil lebih banyak untuk buffer rotasi

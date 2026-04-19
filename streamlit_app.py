@@ -1,3 +1,4 @@
+from supabase import create_client, Client
 import streamlit as st
 from groq import Groq
 from news_cache_manager import initialize_news_cache, rotate_news_articles
@@ -19,8 +20,22 @@ from streamlit_option_menu import option_menu
 from dotenv import load_dotenv
 load_dotenv()
 
+# Konfigurasi Supabase
+url = st.secrets["supabase_url"]
+key = st.secrets["supabase_key"]
+
+def send_log(pesan):
+    try:
+        supabase: Client = create_client(url, key)
+        supabase.table("logs_aktivitas").insert({"keterangan": pesan}).execute()
+    except Exception:
+        pass
+
 # ====================== KONFIGURASI ======================
 st.set_page_config(layout="wide", page_title="AeroVulpis v3.4 Ultimate", page_icon="🦅", initial_sidebar_state="expanded")
+
+# Eksekusi Awal Logging
+send_log("AeroVulpis Online")
 
 # Inisialisasi Session State untuk Bahasa
 if "lang" not in st.session_state:

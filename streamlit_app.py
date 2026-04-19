@@ -137,17 +137,32 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    .session-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 15px;
-        margin-bottom: 10px;
-        transition: all 0.3s ease;
+      .news-card {
+        background: rgba(0, 212, 255, 0.02);
+        border: 1px solid rgba(0, 212, 255, 0.1);
+        padding: 18px;
+        border-radius: 12px;
+        margin-bottom: 15px;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        position: relative;
+        overflow: hidden;
     }
 
-    .session-card:hover {
-        background: rgba(255, 255, 255, 0.05);
+    .news-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 3px;
+        height: 100%;
+        background: linear-gradient(to bottom, var(--electric-blue), transparent);
+    }
+
+    .news-card:hover {
+        background: rgba(0, 212, 255, 0.05);
         border-color: var(--electric-blue);
+        box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+        transform: scale(1.01);
     }
 
     .main-title-container {
@@ -921,7 +936,8 @@ def get_news_data(query, max_articles=20):
     # --- 1. AMBIL DARI MARKETAUX (Prioritas Utama) ---
     if marketaux_key:
         try:
-            url_m = f"https://api.marketaux.com/v1/news/all?api_token={marketaux_key}&language=en&limit=20"
+            # Mengambil lebih banyak dari Marketaux sebagai fallback jika Tiingo bermasalah
+            url_m = f"https://api.marketaux.com/v1/news/all?api_token={marketaux_key}&language=en&limit=25"
             res_m = requests.get(url_m, timeout=10).json()
             for item in res_m.get('data', []):
                 if item.get('url') and item['url'] not in urls_terpakai:
@@ -1298,13 +1314,8 @@ elif menu_selection == "Market Sessions":
     market_session_status()
 
 elif menu_selection == "Market News":
-    st.markdown(f"""
-    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663574425191/XiolcmXitfndhkYb.png" alt="Market News Logo" style="width: 50px; filter: drop-shadow(0 0 10px var(--electric-blue));">
-        <h2 class="digital-font" style="font-size: 24px; margin: 0;">{t["market_news"]}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown('<p style="font-size:12px; color:#888; margin-bottom:15px;">📡 Berita real-time dari Marketaux & Tiingo | Diperbarui secara cerdas setiap 20 menit</p>', unsafe_allow_html=True)
+    st.markdown(f'<h2 class="digital-font" style="font-size: 24px; margin-bottom: 15px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:12px; color:#888; margin-bottom:15px;">Berita real-time dari media-media resmi dan terpercaya | Diperbarui secara cerdas setiap 20 menit</p>', unsafe_allow_html=True)
     
     # Inisialisasi news cache
     initialize_news_cache()
@@ -1324,12 +1335,9 @@ elif menu_selection == "Market News":
                 time_str = a.get("publishedAt", "N/A")
                 source_name = a.get("source", "Market News")
                 
-                # Tambahkan visual indicator untuk berita baru (top 3)
-                is_new = "🆕" if idx <= 3 else ""
-                
                 st.markdown(f"""
                 <div class="news-card">
-                    <h3 style="color:var(--electric-blue); font-size:16px; margin-bottom:5px;">{is_new} {a["title"]}</h3>
+                    <h3 style="color:var(--electric-blue); font-size:16px; margin-bottom:5px;">{a["title"]}</h3>
                     <p style="font-size:11px; color:#888; margin-bottom:8px;">🌐 {source_name} | 📅 {time_str}</p>
                     <p style="font-size:13px; color:#ccc;">{a["description"]}</p>
                     <a href="{a["url"]}" target="_blank" style="color:var(--neon-green); font-size:12px; font-weight:bold;">READ MORE →</a>

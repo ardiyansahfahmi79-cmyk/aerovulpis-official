@@ -1201,14 +1201,7 @@ elif menu_selection == "Live Dashboard":
         atr_val = df["ATR"].iloc[-1] if "ATR" in df.columns else 0.0
         with c3: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["rsi"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{rsi_val:.2f}</p></div>', unsafe_allow_html=True)
         with c4: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["atr"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{atr_val:.4f}</p></div>', unsafe_allow_html=True)
-        # Price Difference Display
-        if market:
-            price_change = market.get('change', 0)
-            price_change_pct = market.get('change_pct', 0)
-            change_color = '#00ff88' if price_change >= 0 else '#ff2a6d'
-            change_arrow = '▲' if price_change >= 0 else '▼'
-            bg_color = '0, 255, 136' if price_change >= 0 else '255, 42, 109'
-            st.markdown(f'<div class="glass-card" style="background: rgba({bg_color}, 0.05); border-left: 4px solid {change_color};"><p style="color:#888; margin:0; font-size:10px;">PRICE DIFFERENCE</p><p class="digital-font" style="font-size:18px; margin:0; color:{change_color};">{change_arrow} {price_change:+.4f} ({price_change_pct:+.2f}%)</p></div>', unsafe_allow_html=True)
+        # Price Difference Display Removed
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))
@@ -1299,8 +1292,14 @@ elif menu_selection == "Market News":
     # Inisialisasi news cache
     initialize_news_cache()
     
+    # Cek apakah perlu update (untuk memicu rerun setiap 20 menit)
+    from news_cache_manager import should_update_news
+    if should_update_news():
+        st.cache_data.clear()
+        st.rerun()
+    
     # Ambil berita terbaru
-    articles, error = get_news_data(f"{asset_name}", 15)  # Ambil 15 untuk buffer rotasi
+    articles, error = get_news_data(f"{asset_name}", 20)  # Ambil lebih banyak untuk buffer rotasi
     
     if error: 
         st.error(error)

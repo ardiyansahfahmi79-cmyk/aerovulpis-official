@@ -29,21 +29,37 @@ def should_update_news():
 
 def rotate_news_articles(articles, max_articles=10):
     """
-    Rotasi berita: hapus 1 berita lama, tambah 1 berita baru
-    Menjaga total 10 berita
+    Rotasi berita: Memastikan selalu ada 10 berita.
+    Jika cache kosong atau perlu update, isi dengan berita terbaru.
     """
     initialize_news_cache()
     
-    if should_update_news():
-        # Hapus 1 berita paling lama (dari belakang)
-        if len(st.session_state.news_cache["articles"]) >= max_articles:
-            st.session_state.news_cache["articles"].pop()
+    # Jika cache kosong, isi pertama kali dengan berita yang tersedia (hingga max_articles)
+    if not st.session_state.news_cache["articles"] and articles:
+        st.session_state.news_cache["articles"] = articles[:max_articles]
+        st.session_state.news_cache["last_update"] = datetime.now(pytz.timezone('Asia/Jakarta'))
+    
+    # Jika sudah waktunya update (20 menit)
+    elif should_update_news() and articles:
+        # Ambil berita yang belum ada di cache untuk rotasi
+        existing_urls = {a['url'] for a in st.session_state.news_cache["articles"]}
+        new_articles = [a for a in articles if a['url'] not in existing_urls]
         
-        # Tambah berita baru di depan
-        if articles:
-            st.session_state.news_cache["articles"].insert(0, articles[0])
+        if new_articles:
+            # Hapus 1 berita paling lama (dari belakang)
+            if len(st.session_state.news_cache["articles"]) >= max_articles:
+                st.session_state.news_cache["articles"].pop()
+            
+            # Tambah 1 berita terbaru di depan
+            st.session_state.news_cache["articles"].insert(0, new_articles[0])
         
+        # Jika tidak ada berita baru yang benar-benar unik, 
+        # kita tetap update listnya dari data terbaru untuk menjaga kesegaran
+        elif len(articles) >= max_articles:
+            st.session_state.news_cache["articles"] = articles[:max_articles]
+            
         # Update waktu terakhir
         st.session_state.news_cache["last_update"] = datetime.now(pytz.timezone('Asia/Jakarta'))
     
+    # Selalu pastikan kita mengembalikan tepat max_articles jika tersedia cukup banyak berita
     return st.session_state.news_cache["articles"][:max_articles]

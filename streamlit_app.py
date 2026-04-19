@@ -430,6 +430,7 @@ st.markdown("""
 groq_api_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
 marketaux_key = st.secrets.get("MARKETAUX_KEY") or os.getenv("MARKETAUX_KEY")
 tiingo_key = st.secrets.get("TIINGO_KEY") or os.getenv("TIINGO_KEY")
+eodhd_key = st.secrets.get("EODHD_KEY") or os.getenv("EODHD_KEY")
 twelve_api_key = st.secrets.get("TWELVE_API_KEY") or os.getenv("TWELVE_API_KEY")
 
 client = None
@@ -926,17 +927,16 @@ with st.sidebar:
         }
     )
 
-# ====================== FUNGSI MARKET NEWS (MARKETAUX & TIINGO) ======================
+# ====================== FUNGSI MARKET NEWS (HYBRID: MARKETAUX & EODHD) ======================
 @st.cache_data(ttl=1200)
 def get_news_data(query, max_articles=20):
-    """Mengambil berita dari Marketaux dan Tiingo, menampilkan max 10 artikel terbaru dengan rotasi otomatis."""
+    """Mengambil berita dari Marketaux dan EODHD, memastikan 10 berita muncul dengan fallback cerdas."""
     berita_final = []
     urls_terpakai = set()
 
     # --- 1. AMBIL DARI MARKETAUX (Prioritas Utama) ---
     if marketaux_key:
         try:
-            # Mengambil lebih banyak dari Marketaux sebagai fallback jika Tiingo bermasalah
             url_m = f"https://api.marketaux.com/v1/news/all?api_token={marketaux_key}&language=en&limit=25"
             res_m = requests.get(url_m, timeout=10).json()
             for item in res_m.get('data', []):
@@ -950,21 +950,35 @@ def get_news_data(query, max_articles=20):
                     })
                     urls_terpakai.add(item['url'])
         except Exception as e:
-            st.warning(f"Marketaux Error: {str(e)}")
+            pass # Silent fail to proceed to fallback
 
-    # --- 2. AMBIL DARI TIINGO (Tambahan) ---
-    if tiingo_key:
+    # --- 2. AMBIL DARI EODHD (Fallback Utama & Tambahan) ---
+    # Jika Marketaux gagal atau berita kurang dari 10, ambil dari EODHD
+    if eodhd_key:
         try:
-            # Ekstrak ticker dari query dengan lebih robust
+            # EODHD General News API
+            url_e = f"https://eodhd.com/api/news?api_token={eodhd_key}&s=general&limit=20&fmt=json"
+            res_e = requests.get(url_e, timeout=10).json()
+            if isinstance(res_e, list):
+                for item in res_e:
+                    if item.get('link') and item['link'] not in urls_terpakai:
+                        berita_final.append({
+                            'publishedAt': item.get('date', ''),
+                            'title': item.get('title', 'No Title'),
+                            'description': item.get('content', item.get('title', '')),
+                            'source': 'EODHD News',
+                            'url': item['link']
+                        })
+                        urls_terpakai.add(item['link'])
+        except Exception as e:
+            pass
+
+    # --- 3. AMBIL DARI TIINGO (Opsi Terakhir) ---
+    if tiingo_key and len(berita_final) < 10:
+        try:
             ticker_query = query.replace("/", "").replace("-USD", "").replace("=X", "").replace(".JK", "").split(".")[0]
-            # Tiingo terkadang gagal jika ticker terlalu spesifik, coba ambil berita umum jika ticker gagal
-            url_t = f"https://api.tiingo.com/tiingo/news?tickers={ticker_query}&token={tiingo_key}&limit=20"
+            url_t = f"https://api.tiingo.com/tiingo/news?tickers={ticker_query}&token={tiingo_key}&limit=10"
             res_t = requests.get(url_t, timeout=10).json()
-            
-            # Jika tidak ada hasil untuk ticker spesifik, ambil berita pasar umum
-            if not res_t or (isinstance(res_t, list) and len(res_t) == 0):
-                url_t_general = f"https://api.tiingo.com/tiingo/news?token={tiingo_key}&limit=20"
-                res_t = requests.get(url_t_general, timeout=10).json()
             if isinstance(res_t, list):
                 for item in res_t:
                     if item.get('url') and item['url'] not in urls_terpakai:
@@ -976,25 +990,20 @@ def get_news_data(query, max_articles=20):
                             'url': item['url']
                         })
                         urls_terpakai.add(item['url'])
-        except Exception as e:
-            st.warning(f"Tiingo Error: {str(e)}")
+        except:
+            pass
 
     if not berita_final:
-        return [], t['no_news'] + " (Cek API Key Marketaux/Tiingo Anda)"
+        return [], t['no_news'] + " (Cek API Key Marketaux/EODHD Anda)"
 
-    # Urutkan berdasarkan waktu terbaru (yang terbaru di atas)
+    # Urutkan berdasarkan waktu terbaru
     try:
-        berita_final = sorted(berita_final, key=lambda x: x['publishedAt'], reverse=True)
-    except:
-        pass
-    
-    # Urutkan ulang setelah penggabungan untuk memastikan yang terbaru di atas
-    try:
+        # Normalisasi format tanggal untuk sorting jika perlu, namun asumsikan ISO format dari API
         berita_final = sorted(berita_final, key=lambda x: x['publishedAt'], reverse=True)
     except:
         pass
 
-    # Batasi hasil sesuai permintaan (biasanya 20 untuk buffer rotasi menjadi 10)
+    # Batasi hasil
     berita_final = berita_final[:max_articles]
     
     # Format waktu untuk tampilan AeroVulpis (Konversi ke WIB)

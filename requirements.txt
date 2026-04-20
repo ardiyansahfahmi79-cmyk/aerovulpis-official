@@ -1,4 +1,4 @@
-Streamlit
+streamlit
 streamlit-option-menu
 groq
 yfinance
@@ -7,8 +7,6 @@ numpy
 plotly
 python-dotenv
 pytz
-requests
+requests 
 ta
 supabase
-pandas_ta
-git+https://github.com/shilewenuw/tvdatafeed.git

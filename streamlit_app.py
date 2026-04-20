@@ -39,29 +39,45 @@ def cleanup_logs():
     except Exception:
         pass
 
-def cache_market_price(symbol, price):
+def cache_market_price(symbol, price, change_pct=0.0):
     try:
         supabase: Client = create_client(url, key)
-        data = {"symbol": symbol, "price": price, "updated_at": datetime.now().isoformat()}
-        supabase.table("market_prices").upsert(data, on_conflict="symbol").execute()
+        # Menggunakan struktur tabel baru: instrument, price, change_pct, updated_at
+        data = {
+            "instrument": symbol, 
+            "price": price, 
+            "change_pct": change_pct,
+            "updated_at": datetime.now(pytz.timezone('Asia/Jakarta')).isoformat()
+        }
+        supabase.table("market_prices").upsert(data, on_conflict="instrument").execute()
     except Exception:
         pass
 
 def get_cached_market_price(symbol):
     try:
         supabase: Client = create_client(url, key)
-        res = supabase.table("market_prices").select("price").eq("symbol", symbol).execute()
+        res = supabase.table("market_prices").select("price").eq("instrument", symbol).execute()
         if res.data:
             return res.data[0]["price"]
     except Exception:
         pass
     return None
 
+def cleanup_old_data():
+    """Menghapus data market_prices yang lebih lama dari 24 jam"""
+    try:
+        supabase: Client = create_client(url, key)
+        cutoff = (datetime.now(pytz.timezone('Asia/Jakarta')) - timedelta(hours=24)).isoformat()
+        supabase.table("market_prices").delete().lt("updated_at", cutoff).execute()
+    except Exception:
+        pass
+
 # ====================== KONFIGURASI ======================
 st.set_page_config(layout="wide", page_title="AeroVulpis v3.4 Ultimate", page_icon="🦅", initial_sidebar_state="expanded")
 
 # Eksekusi Awal Logging & Cleanup
 cleanup_logs()
+cleanup_old_data() # Hapus data market_prices lama (>24 jam)
 send_log("AeroVulpis Online")
 
 # Inisialisasi Session State untuk Bahasa
@@ -499,8 +515,8 @@ def get_market_data(ticker_symbol):
             change = price - prev_close
             change_pct = (change / prev_close) * 100
             
-            # Tetap jalankan penyimpanan ke tabel market_prices di Supabase
-            cache_market_price(ticker_symbol, price)
+            # Otomatis melakukan upsert harga terbaru ke tabel market_prices di Supabase
+            cache_market_price(ticker_symbol, price, change_pct)
             
             return {"price": price, "change": change, "change_pct": change_pct}
         return None
@@ -1091,16 +1107,21 @@ def check_smart_alerts():
         for name, ticker in cat.items():
             instrument_to_ticker[name] = ticker
 
-    # Cek harga untuk setiap instrumen
+    # Cek harga untuk setiap instrumen (Referensi dari tabel market_prices Supabase)
     current_prices = {}
     for inst in unique_instruments:
-        ticker = instrument_to_ticker.get(inst)
-        if ticker:
-            m_data = get_market_data(ticker)
-            if m_data:
-                price = m_data["price"]
-                current_prices[inst] = price
-                cache_market_price(inst, price)
+        # Coba ambil dari cache Supabase dulu untuk kecepatan
+        price = get_cached_market_price(inst)
+        if price is None:
+            # Jika tidak ada di cache, ambil live dari yfinance
+            ticker = instrument_to_ticker.get(inst)
+            if ticker:
+                m_data = get_market_data(ticker)
+                if m_data:
+                    price = m_data["price"]
+        
+        if price is not None:
+            current_prices[inst] = price
 
     for alert in st.session_state.active_alerts:
         if not alert.get("triggered", False):

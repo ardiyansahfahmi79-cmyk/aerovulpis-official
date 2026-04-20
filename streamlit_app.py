@@ -485,20 +485,28 @@ else:
 
 # ====================== FUNGSI DATA & INDIKATOR ======================
 def get_market_data(ticker_symbol):
-    # Logika Khusus untuk Emas dan Perak menggunakan Twelve Data
-    if ticker_symbol in ["GC=F", "SI=F", "XAUUSD", "XAGUSD"]:
-        # Gunakan simbol standar Twelve Data untuk sinkronisasi harga yang lebih baik
-        symbol = "XAU/USD" if ticker_symbol in ["GC=F", "XAUUSD"] else "XAG/USD"
-        if twelve_api_key:
-            # Tambahkan parameter exchange jika perlu, tapi default Twelve Data biasanya cukup akurat
-            url = f"https://api.twelvedata.com/price?symbol={symbol}&apikey={twelve_api_key}"
-            try:
-                response = requests.get(url)
-                data = response.json()
-                if "price" in data:
-                    price = float(data["price"])
-                    return {"price": price, "change": 0.0, "change_pct": 0.0}
-            except: pass
+    # Logika Khusus Twelve Data untuk Akurasi Tinggi (Emas, Perak, Crypto, Major Forex)
+    twelve_map = {
+        "GC=F": "XAU/USD", "XAUUSD": "XAU/USD",
+        "SI=F": "XAG/USD", "XAGUSD": "XAG/USD",
+        "BTC-USD": "BTC/USD", "BTCUSD": "BTC/USD",
+        "EURUSD=X": "EUR/USD", "EURUSD": "EUR/USD",
+        "GBPUSD=X": "GBP/USD", "GBPUSD": "GBP/USD",
+        "USDJPY=X": "USD/JPY", "USDJPY": "USD/JPY"
+    }
+
+    if ticker_symbol in twelve_map and twelve_api_key:
+        symbol = twelve_map[ticker_symbol]
+        url = f"https://api.twelvedata.com/price?symbol={symbol}&apikey={twelve_api_key}"
+        try:
+            response = requests.get(url, timeout=10)
+            data = response.json()
+            if "price" in data:
+                price = float(data["price"])
+                cache_market_price(ticker_symbol, price)
+                return {"price": price, "change": 0.0, "change_pct": 0.0}
+        except:
+            pass
             
     try:
         ticker = yf.Ticker(ticker_symbol)

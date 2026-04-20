@@ -15,8 +15,6 @@ import time
 import requests
 import json
 from streamlit_option_menu import option_menu
-from tvdatafeed import TvDatafeed, Interval
-import pandas_ta as ta_lib
 
 # Memuat variabel lingkungan dari file .env
 from dotenv import load_dotenv
@@ -1087,58 +1085,29 @@ def check_smart_alerts():
     if not unique_instruments:
         return
 
-    # Inisialisasi TVDatafeed
-    try:
-        tv = TvDatafeed()
-    except:
-        tv = None
-
-    # Map nama instrumen ke ticker yfinance/twelve dan TVDatafeed config
-    instrument_to_ticker = {}
+    # Map nama instrumen ke ticker yfinance/twelve
+    instrument_to_ticker = {
+        "XAUUSD": "GC=F",
+        "BTCUSD": "BTC-USD",
+        "XAGUSD": "SI=F",
+        "EURUSD": "EURUSD=X",
+        "GBPUSD": "GBPUSD=X",
+        "USDJPY": "USDJPY=X"
+    }
     for cat in instruments.values():
         for name, ticker in cat.items():
             instrument_to_ticker[name] = ticker
 
-    tv_configs = {
-        "XAUUSD": ("XAUUSD", "OANDA"),
-        "Gold (XAUUSD)": ("XAUUSD", "OANDA"),
-        "BTCUSD": ("BTCUSD", "BINANCE"),
-        "Bitcoin": ("BTCUSD", "BINANCE"),
-        "XAGUSD": ("XAGUSD", "OANDA"),
-        "Silver (XAGUSD)": ("XAGUSD", "OANDA"),
-        "EURUSD": ("EURUSD", "FX_IDC"),
-        "EUR/USD": ("EURUSD", "FX_IDC"),
-        "GBPUSD": ("GBPUSD", "FX_IDC"),
-        "GBP/USD": ("GBPUSD", "FX_IDC"),
-        "USDJPY": ("USDJPY", "FX_IDC"),
-        "USD/JPY": ("USDJPY", "FX_IDC")
-    }
-
     # Cek harga untuk setiap instrumen
     current_prices = {}
     for inst in unique_instruments:
-        price = None
-        # Coba ambil dari TVDatafeed jika tersedia
-        if tv and inst in tv_configs:
-            try:
-                symbol, exchange = tv_configs[inst]
-                tv_data = tv.get_hist(symbol=symbol, exchange=exchange, interval=Interval.in_1_minute, n_bars=1)
-                if not tv_data.empty:
-                    price = float(tv_data['close'].iloc[-1])
-            except:
-                pass
-
-        # Fallback ke get_market_data (yfinance/twelve)
-        if price is None:
-            ticker = instrument_to_ticker.get(inst)
-            if ticker:
-                m_data = get_market_data(ticker)
-                if m_data:
-                    price = m_data["price"]
-
-        if price is not None:
-            current_prices[inst] = price
-            cache_market_price(inst, price)
+        ticker = instrument_to_ticker.get(inst)
+        if ticker:
+            m_data = get_market_data(ticker)
+            if m_data:
+                price = m_data["price"]
+                current_prices[inst] = price
+                cache_market_price(inst, price)
 
     for alert in st.session_state.active_alerts:
         if not alert.get("triggered", False):

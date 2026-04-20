@@ -10,5 +10,3 @@ pytz
 requests 
 ta
 supabase
-tvdatafeed
-pandas_ta

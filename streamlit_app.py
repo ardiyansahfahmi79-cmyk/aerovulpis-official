@@ -8,13 +8,15 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 import pytz
 import ta
 import time
 import requests
 import json
 from streamlit_option_menu import option_menu
+from tvdatafeed import TvDatafeed, Interval
+import pandas_ta as ta_lib
 
 # Memuat variabel lingkungan dari file .env
 from dotenv import load_dotenv
@@ -31,10 +33,37 @@ def send_log(pesan):
     except Exception:
         pass
 
+def cleanup_logs():
+    try:
+        supabase: Client = create_client(url, key)
+        cutoff = (datetime.now() - timedelta(hours=24)).isoformat()
+        supabase.table("logs_aktivitas").delete().lt("created_at", cutoff).execute()
+    except Exception:
+        pass
+
+def cache_market_price(symbol, price):
+    try:
+        supabase: Client = create_client(url, key)
+        data = {"symbol": symbol, "price": price, "updated_at": datetime.now().isoformat()}
+        supabase.table("market_prices").upsert(data, on_conflict="symbol").execute()
+    except Exception:
+        pass
+
+def get_cached_market_price(symbol):
+    try:
+        supabase: Client = create_client(url, key)
+        res = supabase.table("market_prices").select("price").eq("symbol", symbol).execute()
+        if res.data:
+            return res.data[0]["price"]
+    except Exception:
+        pass
+    return None
+
 # ====================== KONFIGURASI ======================
 st.set_page_config(layout="wide", page_title="AeroVulpis v3.4 Ultimate", page_icon="🦅", initial_sidebar_state="expanded")
 
-# Eksekusi Awal Logging
+# Eksekusi Awal Logging & Cleanup
+cleanup_logs()
 send_log("AeroVulpis Online")
 
 # Inisialisasi Session State untuk Bahasa
@@ -481,6 +510,7 @@ def get_market_data(ticker_symbol):
             prev_close = hist["Open"].iloc[-1]
             change = price - prev_close
             change_pct = (change / prev_close) * 100
+            cache_market_price(ticker_symbol, price)
             return {"price": price, "change": change, "change_pct": change_pct}
         return None
     except:
@@ -1057,20 +1087,58 @@ def check_smart_alerts():
     if not unique_instruments:
         return
 
-    # Map nama instrumen ke ticker yfinance/twelve
+    # Inisialisasi TVDatafeed
+    try:
+        tv = TvDatafeed()
+    except:
+        tv = None
+
+    # Map nama instrumen ke ticker yfinance/twelve dan TVDatafeed config
     instrument_to_ticker = {}
     for cat in instruments.values():
         for name, ticker in cat.items():
             instrument_to_ticker[name] = ticker
 
+    tv_configs = {
+        "XAUUSD": ("XAUUSD", "OANDA"),
+        "Gold (XAUUSD)": ("XAUUSD", "OANDA"),
+        "BTCUSD": ("BTCUSD", "BINANCE"),
+        "Bitcoin": ("BTCUSD", "BINANCE"),
+        "XAGUSD": ("XAGUSD", "OANDA"),
+        "Silver (XAGUSD)": ("XAGUSD", "OANDA"),
+        "EURUSD": ("EURUSD", "FX_IDC"),
+        "EUR/USD": ("EURUSD", "FX_IDC"),
+        "GBPUSD": ("GBPUSD", "FX_IDC"),
+        "GBP/USD": ("GBPUSD", "FX_IDC"),
+        "USDJPY": ("USDJPY", "FX_IDC"),
+        "USD/JPY": ("USDJPY", "FX_IDC")
+    }
+
     # Cek harga untuk setiap instrumen
     current_prices = {}
     for inst in unique_instruments:
-        ticker = instrument_to_ticker.get(inst)
-        if ticker:
-            m_data = get_market_data(ticker)
-            if m_data:
-                current_prices[inst] = m_data["price"]
+        price = None
+        # Coba ambil dari TVDatafeed jika tersedia
+        if tv and inst in tv_configs:
+            try:
+                symbol, exchange = tv_configs[inst]
+                tv_data = tv.get_hist(symbol=symbol, exchange=exchange, interval=Interval.in_1_minute, n_bars=1)
+                if not tv_data.empty:
+                    price = float(tv_data['close'].iloc[-1])
+            except:
+                pass
+
+        # Fallback ke get_market_data (yfinance/twelve)
+        if price is None:
+            ticker = instrument_to_ticker.get(inst)
+            if ticker:
+                m_data = get_market_data(ticker)
+                if m_data:
+                    price = m_data["price"]
+
+        if price is not None:
+            current_prices[inst] = price
+            cache_market_price(inst, price)
 
     for alert in st.session_state.active_alerts:
         if not alert.get("triggered", False):

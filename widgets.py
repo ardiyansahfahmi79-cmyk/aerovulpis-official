@@ -1,6 +1,11 @@
 import streamlit as st
 import requests
 import os
+from supabase import create_client, Client
+
+# Konfigurasi Supabase dari Secrets
+url = st.secrets["supabase_url"]
+key = st.secrets["supabase_key"]
 
 def economic_calendar_widget():
     """
@@ -351,21 +356,29 @@ def smart_alert_widget():
             import pytz
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
 
-            # Alert hanya disimpan di session state, tidak langsung dikirim ke Telegram
+            # 1. Simpan ke Session State (untuk tampilan instan di UI)
             if "active_alerts" not in st.session_state:
                 st.session_state.active_alerts = []
             
-            # Tambahkan alert baru ke daftar aktif
-            st.session_state.active_alerts.append({
+            alert_data = {
                 "instrument": selected_instrument,
                 "target": price_target,
                 "condition": condition_options[selected_condition_label],
                 "chat_id": telegram_chat_id,
                 "time_created": now_wib,
                 "triggered": False
-            })
+            }
+            st.session_state.active_alerts.append(alert_data)
             
-            st.success(f"✅ SENSOR AKTIF: Memantau {selected_instrument} di harga {price_target:,.2f}. Notifikasi akan dikirim saat target tercapai.")
+            # 2. Simpan ke Supabase (untuk Background Worker 24/7)
+            try:
+                supabase: Client = create_client(url, key)
+                # Pastikan nama tabel sesuai: active_alerts
+                supabase.table("active_alerts").insert(alert_data).execute()
+                st.success(f"✅ SENSOR AKTIF & TERKUNCI: Memantau {selected_instrument} di harga {price_target:,.2f}. Notifikasi akan dikirim ke Telegram Anda.")
+            except Exception as e:
+                st.error(f"⚠️ Gagal sinkronisasi ke database: {str(e)}")
+                st.info("Alert tetap aktif di sesi ini, namun tidak akan berjalan di latar belakang.")
         else:
             st.warning("⚠️ Harap masukkan Target Harga dan Telegram Chat ID yang valid.")
 

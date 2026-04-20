@@ -485,41 +485,26 @@ else:
 
 # ====================== FUNGSI DATA & INDIKATOR ======================
 def get_market_data(ticker_symbol):
-    # Logika Khusus Twelve Data untuk Akurasi Tinggi (Emas, Perak, Crypto, Major Forex)
-    twelve_map = {
-        "GC=F": "XAU/USD", "XAUUSD": "XAU/USD",
-        "SI=F": "XAG/USD", "XAGUSD": "XAG/USD",
-        "BTC-USD": "BTC/USD", "BTCUSD": "BTC/USD",
-        "EURUSD=X": "EUR/USD", "EURUSD": "EUR/USD",
-        "GBPUSD=X": "GBP/USD", "GBPUSD": "GBP/USD",
-        "USDJPY=X": "USD/JPY", "USDJPY": "USD/JPY"
-    }
-
-    if ticker_symbol in twelve_map and twelve_api_key:
-        symbol = twelve_map[ticker_symbol]
-        url = f"https://api.twelvedata.com/price?symbol={symbol}&apikey={twelve_api_key}"
-        try:
-            response = requests.get(url, timeout=10)
-            data = response.json()
-            if "price" in data:
-                price = float(data["price"])
-                cache_market_price(ticker_symbol, price)
-                return {"price": price, "change": 0.0, "change_pct": 0.0}
-        except:
-            pass
-            
+    # Downgrade Data Source: Menggunakan yfinance sebagai sumber data utama (XAUUSD, BTCUSD, dan Major Pairs)
     try:
         ticker = yf.Ticker(ticker_symbol)
-        hist = ticker.history(period="1d")
+        hist = ticker.history(period="2d") # Ambil 2 hari untuk mendapatkan harga penutupan sebelumnya
         if not hist.empty:
             price = hist["Close"].iloc[-1]
-            prev_close = hist["Open"].iloc[-1]
+            if len(hist) > 1:
+                prev_close = hist["Close"].iloc[-2]
+            else:
+                prev_close = hist["Open"].iloc[-1]
+            
             change = price - prev_close
             change_pct = (change / prev_close) * 100
+            
+            # Tetap jalankan penyimpanan ke tabel market_prices di Supabase
             cache_market_price(ticker_symbol, price)
+            
             return {"price": price, "change": change, "change_pct": change_pct}
         return None
-    except:
+    except Exception as e:
         return None
 
 def get_historical_data(ticker_symbol, period="1mo", interval="1h"):

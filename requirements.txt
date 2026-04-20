@@ -9,4 +9,3 @@ python-dotenv
 pytz
 requests 
 ta
-supabase

@@ -951,7 +951,6 @@ with st.sidebar:
 
     st.markdown("---")
     tf_options = {
-        "5m": {"period": "5d", "interval": "5m"},
         "15m": {"period": "5d", "interval": "15m"},
         "30m": {"period": "5d", "interval": "30m"},
         "1h": {"period": "1mo", "interval": "1h"},

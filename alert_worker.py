@@ -112,11 +112,14 @@ def run_worker():
             # Kirim Telegram
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
             msg = (
-                f"<b>🚨 AEROVULPIS ALERT: {inst}</b>\n"
-                f"Target: {target}\n"
-                f"Harga Sekarang: {current_price:.2f}\n"
-                f"Waktu: {now_wib}\n"
-                f"🦅 <i>AeroVulpis Sentinel System</i>"
+                f"<b>🦅 AEROVULPIS SENTINEL ALERT</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"<b>INSTRUMENT:</b> {inst}\n"
+                f"<b>TARGET:</b> {target:.4f}\n"
+                f"<b>CURRENT:</b> {current_price:.4f}\n"
+                f"<b>TIME:</b> {now_wib}\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"<i>[STATUS]: TARGET REACHED</i>"
             )
             if send_telegram(chat_id, msg):
                 print("SUCCESS: Telegram message sent.")

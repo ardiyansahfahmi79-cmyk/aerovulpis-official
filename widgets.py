@@ -373,12 +373,34 @@ def smart_alert_widget():
             # 2. Simpan ke Supabase (untuk Background Worker 24/7)
             try:
                 supabase: Client = create_client(url, key)
-                # Pastikan nama tabel sesuai: active_alerts
                 supabase.table("active_alerts").insert(alert_data).execute()
-                st.success(f"✅ SENSOR AKTIF & TERKUNCI: Memantau {selected_instrument} di harga {price_target:,.2f}. Notifikasi akan dikirim ke Telegram Anda.")
+                
+                # Tampilan Sukses Bergaya Digital Terminal
+                st.markdown(f"""
+                <div style="
+                    background: rgba(0, 212, 255, 0.1);
+                    border-left: 5px solid #00d4ff;
+                    padding: 15px;
+                    border-radius: 5px;
+                    font-family: 'Rajdhani', sans-serif;
+                    color: #00d4ff;
+                    margin-top: 20px;
+                    box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+                ">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png" style="width: 20px;">
+                        <span style="font-weight: bold; letter-spacing: 1px;">AEROVULPIS SENTINEL SYSTEM</span>
+                    </div>
+                    <div style="font-size: 14px; opacity: 0.9;">
+                        [STATUS]: SENSOR LOCKED & ACTIVE<br>
+                        [TARGET]: {selected_instrument} @ {price_target:.4f}<br>
+                        [ACTION]: MONITORING 24/7 VIA SATELLITE SYNC
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
             except Exception as e:
-                st.error(f"⚠️ Gagal sinkronisasi ke database: {str(e)}")
-                st.info("Alert tetap aktif di sesi ini, namun tidak akan berjalan di latar belakang.")
+                st.error(f"SYSTEM ERROR: DATABASE SYNC FAILED")
+                st.caption(f"Details: {str(e)}")
         else:
             st.warning("⚠️ Harap masukkan Target Harga dan Telegram Chat ID yang valid.")
 

@@ -501,26 +501,61 @@ else:
 
 # ====================== FUNGSI DATA & INDIKATOR ======================
 def get_market_data(ticker_symbol):
-    # Downgrade Data Source: Menggunakan yfinance sebagai sumber data utama (XAUUSD, BTCUSD, dan Major Pairs)
+    """
+    Sistem Centralized Caching:
+    Mengambil data dari Supabase (Cache) jika masih segar (< 3 detik).
+    Jika sudah basi, ambil dari yfinance (atau cTrader) dan update cache.
+    """
     try:
+        # 1. Cek Cache Supabase (Global untuk semua user)
+        from datetime import datetime, timedelta
+        import pytz
+        
+        # Mapping nama instrumen dari ticker
+        inst_name = ticker_symbol
+        for cat in instruments.values():
+            for name, tick in cat.items():
+                if tick == ticker_symbol:
+                    inst_name = name
+                    break
+        
+        # Ambil data terakhir dari Supabase
+        supabase_url = st.secrets.get("SUPABASE_URL")
+        supabase_key = st.secrets.get("SUPABASE_KEY")
+        if supabase_url and supabase_key:
+            from supabase import create_client
+            supabase = create_client(supabase_url, supabase_key)
+            res = supabase.table("market_prices").select("*").eq("instrument", inst_name).execute()
+            
+            if res.data:
+                cached = res.data[0]
+                updated_at = datetime.fromisoformat(cached['updated_at'].replace('Z', '+00:00'))
+                now = datetime.now(pytz.UTC)
+                
+                # Jika data masih segar (< 3 detik), gunakan cache
+                if (now - updated_at).total_seconds() < 3:
+                    return {
+                        "price": cached['price'],
+                        "change": cached['price'] * (cached['change_pct']/100),
+                        "change_pct": cached['change_pct'],
+                        "source": "Cache"
+                    }
+
+        # 2. Jika Cache Basi/Kosong, Ambil Live (yfinance)
+        # Catatan: Integrasi cTrader OpenAPI akan ditambahkan di sini setelah Client ID/Secret dikonfigurasi
         ticker = yf.Ticker(ticker_symbol)
-        hist = ticker.history(period="2d") # Ambil 2 hari untuk mendapatkan harga penutupan sebelumnya
+        hist = ticker.history(period="2d")
         if not hist.empty:
             price = hist["Close"].iloc[-1]
-            if len(hist) > 1:
-                prev_close = hist["Close"].iloc[-2]
-            else:
-                prev_close = hist["Open"].iloc[-1]
+            prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else hist["Open"].iloc[-1]
+            change_pct = ((price - prev_close) / prev_close) * 100
             
-            change = price - prev_close
-            change_pct = (change / prev_close) * 100
+            # Update Cache Global di Supabase
+            cache_market_price(inst_name, price, change_pct)
             
-            # Otomatis melakukan upsert harga terbaru ke tabel market_prices di Supabase
-            cache_market_price(ticker_symbol, price, change_pct)
-            
-            return {"price": price, "change": change, "change_pct": change_pct}
+            return {"price": price, "change": price - prev_close, "change_pct": change_pct, "source": "Live"}
         return None
-    except Exception as e:
+    except:
         return None
 
 def get_historical_data(ticker_symbol, period="1mo", interval="1h"):
@@ -665,16 +700,17 @@ def get_groq_response(question, context=""):
     except Exception as e:
         return f"⚠️ Error: {str(e)}"
 
-# ====================== FUNGSI SENTINEL ANALYSIS (Model 405B) ======================
+# ====================== FUNGSI SENTINEL ANALYSIS (Model 405B + Backup) ======================
 def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
-    """Fungsi khusus untuk AeroVulpis Sentinel menggunakan Hermes 3 405B via OpenRouter"""
+    """Fungsi khusus untuk AeroVulpis Sentinel menggunakan Hermes 3 405B dengan Backup Qwen 2.5"""
     openrouter_api_key = st.secrets.get("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
     
     if not openrouter_api_key:
-        return "⚠️ OpenRouter API Key tidak ditemukan. Harap tambahkan OPENROUTER_API_KEY di secrets Streamlit."
+        return "⚠️ OpenRouter API Key tidak ditemukan."
     
-    # Menggunakan model Hermes 3 405B dari OpenRouter
-    MODEL_NAME = 'nousresearch/hermes-3-llama-3.1-405b' 
+    # Model Utama & Backup
+    PRIMARY_MODEL = 'nousresearch/hermes-3-llama-3.1-405b'
+    BACKUP_MODEL = 'qwen/qwen-2.5-72b-instruct' # Model Qwen 2.5 sebagai pendamping/backup
     
     latest = df.iloc[-1]
     price = market_data['price']
@@ -735,30 +771,41 @@ def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
     - Buat sangat ringkas.
     """
     
-    try:
-        response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {openrouter_api_key}",
-                "Content-Type": "application/json",
-            },
-            data=json.dumps({
-                "model": MODEL_NAME,
-                "messages": [
-                    {"role": "system", "content": "Anda adalah AeroVulpis Sentinel Pro Intelligence yang didukung oleh Hermes 3 405B."},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.6,
-                "max_tokens": 1500
-            })
-        )
-        result = response.json()
-        if "choices" in result:
-            return result["choices"][0]["message"]["content"]
+    def call_openrouter(model_name, system_msg):
+        try:
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {openrouter_api_key}",
+                    "Content-Type": "application/json",
+                },
+                data=json.dumps({
+                    "model": model_name,
+                    "messages": [
+                        {"role": "system", "content": system_msg},
+                        {"role": "user", "content": prompt}
+                    ]
+                }),
+                timeout=45
+            )
+            if response.status_code == 200:
+                return response.json()['choices'][0]['message']['content']
+            return None
+        except:
+            return None
+
+    # Coba Model Utama (Hermes 405B)
+    analysis = call_openrouter(PRIMARY_MODEL, "Anda adalah AeroVulpis Sentinel Pro Intelligence (Hermes 405B).")
+    
+    # Jika Gagal/Limit, Coba Model Backup (Qwen 2.5)
+    if not analysis:
+        analysis = call_openrouter(BACKUP_MODEL, "Anda adalah AeroVulpis Sentinel Pro Intelligence (Qwen 2.5 Backup).")
+        if analysis:
+            analysis = "⚠️ [SYSTEM]: PRIMARY MODEL LIMIT REACHED. SWITCHING TO BACKUP (Qwen 2.5)\n\n" + analysis
         else:
-            return f"⚠️ OpenRouter Error: {result.get('error', {}).get('message', 'Unknown error')}"
-    except Exception as e:
-        return f"⚠️ Sentinel Error: {str(e)}"
+            return "⚠️ Sentinel Error: Semua model AI (Utama & Backup) sedang sibuk atau limit habis."
+            
+    return analysis
 
 # ====================== FUNGSI DEEP ANALYSIS (Model 70B) ======================
 def get_deep_analysis(asset_name, market_data, df, signal, reasons):
@@ -932,7 +979,7 @@ st.markdown(f"""
     <div class="main-logo-container">
         <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png" alt="AeroVulpis Logo" class="custom-logo">
     </div>
-    <h1 class="main-title">AEROVULPIS v3.4</h1>
+    <h1 class="main-title">AEROVULPIS v3.5</h1>
     <p style="text-align: center; color: #aaa; font-family: 'Rajdhani', sans-serif; margin-top: -5px; padding: 0;">ULTIMATE DIGITAL EDITION</p>
 </div>
 """, unsafe_allow_html=True)
@@ -941,7 +988,7 @@ st.markdown(f"""
 with st.sidebar:
     st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:55px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
     st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px; margin-bottom: 0;'>{t['control_center']}</h2>", unsafe_allow_html=True)
-    st.markdown("**AeroVulpis V3.4** — **DYNAMIHATCH**")
+    st.markdown("**AeroVulpis V3.5** — **SENTINEL CORE**")
     st.caption("2026 • Powered by Real-Time AI")
 
     category = st.selectbox(t['category'], list(instruments.keys()))
@@ -977,22 +1024,36 @@ with st.sidebar:
         }
     )
 
-# ====================== FUNGSI MARKET NEWS (HYBRID: MARKETAUX & EODHD) ======================
-@st.cache_data(ttl=1200)
-def get_news_data(query, max_articles=10):
-    """Mengambil berita dengan komposisi: 8 Marketaux + 2 EODHD."""
-    berita_marketaux = []
-    berita_eodhd = []
-    urls_terpakai = set()
+# ====================== FUNGSI MARKET NEWS (HYBRID: MARKETAUX & TIINGO) ======================
+def get_news_data(category="General", max_articles=10):
+    """Mengambil berita dengan filter kategori dan update setiap 1 jam."""
+    from news_cache_manager import should_update_news, get_cached_news, update_news_cache
+    
+    # Cek Cache (Update setiap 1 jam)
+    if not should_update_news(category):
+        return get_cached_news(category), None
 
-    # --- 1. AMBIL DARI MARKETAUX (Target 8) ---
+    berita_final = []
+    urls_terpakai = set()
+    
+    # Mapping Kategori ke Query API
+    category_map = {
+        "Stock": "stocks,equities,earnings",
+        "Konflik": "geopolitics,war,conflict,sanctions",
+        "Gold & Silver": "gold,silver,precious metals,commodities",
+        "Forex": "forex,currency,central banks,interest rates",
+        "General": "finance,economy,market"
+    }
+    api_query = category_map.get(category, "finance")
+
+    # --- 1. AMBIL DARI MARKETAUX ---
     if marketaux_key:
         try:
-            url_m = f"https://api.marketaux.com/v1/news/all?api_token={marketaux_key}&language=en&limit=15"
+            url_m = f"https://api.marketaux.com/v1/news/all?api_token={marketaux_key}&language=en&search={api_query}&limit=15"
             res_m = requests.get(url_m, timeout=10).json()
             for item in res_m.get('data', []):
                 if item.get('url') and item['url'] not in urls_terpakai:
-                    berita_marketaux.append({
+                    berita_final.append({
                         'publishedAt': item.get('published_at', ''),
                         'title': item.get('title', 'No Title'),
                         'description': item.get('description', ''),
@@ -1000,79 +1061,55 @@ def get_news_data(query, max_articles=10):
                         'url': item['url']
                     })
                     urls_terpakai.add(item['url'])
-        except:
-            pass
+        except: pass
 
-    # --- 2. AMBIL DARI EODHD (Target 2) ---
-    if eodhd_key:
+    # --- 2. AMBIL DARI TIINGO ---
+    if tiingo_key:
         try:
-            url_e = f"https://eodhd.com/api/news?api_token={eodhd_key}&s=general&limit=10&fmt=json"
-            res_e = requests.get(url_e, timeout=10).json()
-            if isinstance(res_e, list):
-                for item in res_e:
-                    if item.get('link') and item['link'] not in urls_terpakai:
-                        berita_eodhd.append({
-                            'publishedAt': item.get('date', ''),
+            url_t = f"https://api.tiingo.com/tiingo/news?token={tiingo_key}&limit=15"
+            if category == "Stock": url_t += "&tags=stocks"
+            elif category == "Forex": url_t += "&tags=forex"
+            
+            res_t = requests.get(url_t, timeout=10).json()
+            if isinstance(res_t, list):
+                for item in res_t:
+                    if item.get('url') and item['url'] not in urls_terpakai:
+                        berita_final.append({
+                            'publishedAt': item.get('publishedDate', ''),
                             'title': item.get('title', 'No Title'),
-                            'description': item.get('content', item.get('title', '')),
-                            'source': 'EODHD News',
-                            'url': item['link']
+                            'description': item.get('description', item.get('title', '')),
+                            'source': 'Tiingo',
+                            'url': item['url']
                         })
-                        urls_terpakai.add(item['link'])
-        except:
-            pass
+                        urls_terpakai.add(item['url'])
+        except: pass
 
-    # --- 3. KOMPOSISI HYBRID (8 Marketaux + 2 EODHD) ---
-    # Ambil 8 dari Marketaux
-    final_list = berita_marketaux[:8]
-    
-    # Ambil 2 dari EODHD
-    final_list.extend(berita_eodhd[:2])
-    
-    # Fallback: Jika total masih kurang dari 10, isi dari sumber yang masih punya sisa berita
-    if len(final_list) < 10:
-        sisa_marketaux = berita_marketaux[8:]
-        sisa_eodhd = berita_eodhd[2:]
-        
-        while len(final_list) < 10 and (sisa_marketaux or sisa_eodhd):
-            if sisa_marketaux:
-                final_list.append(sisa_marketaux.pop(0))
-            if len(final_list) < 10 and sisa_eodhd:
-                final_list.append(sisa_eodhd.pop(0))
+    if not berita_final:
+        return get_cached_news(category), "Gagal mengambil berita baru, menampilkan cache."
 
-    if not final_list:
-        return [], t['no_news'] + " (Cek API Key Marketaux/EODHD Anda)"
-
-    # Urutkan berdasarkan waktu terbaru agar tetap segar tampilannya
+    # Urutkan & Format
     try:
-        final_list = sorted(final_list, key=lambda x: x['publishedAt'], reverse=True)
-    except:
-        pass
-
-    berita_final = final_list[:max_articles]
+        berita_final = sorted(berita_final, key=lambda x: x['publishedAt'], reverse=True)
+    except: pass
     
-    # Format waktu untuk tampilan AeroVulpis (Konversi ke WIB)
-    import pytz
+    berita_final = berita_final[:max_articles]
+    
     tz_wib = pytz.timezone('Asia/Jakarta')
-    
     for b in berita_final:
         try:
             raw_date = b['publishedAt'].replace('Z', '+00:00') if b['publishedAt'] else ''
             if raw_date:
-                try:
-                    dt_utc = datetime.fromisoformat(raw_date)
+                try: dt_utc = datetime.fromisoformat(raw_date)
                 except:
-                    # Fallback untuk format yang mungkin tidak standar
                     dt_utc = datetime.strptime(raw_date[:19], "%Y-%m-%dT%H:%M:%S")
                     dt_utc = dt_utc.replace(tzinfo=pytz.UTC)
-                    
                 dt_wib = dt_utc.astimezone(tz_wib)
                 b['publishedAt'] = dt_wib.strftime("%d-%m-%Y %H.%M")
-            else:
-                b['publishedAt'] = 'N/A'
-        except:
-            b['publishedAt'] = 'N/A'
+            else: b['publishedAt'] = 'N/A'
+        except: b['publishedAt'] = 'N/A'
             
+    # Update Cache
+    update_news_cache(category, berita_final)
     return berita_final, None
 
 # ====================== FUNGSI PENGECEKAN SMART ALERT ======================
@@ -1383,34 +1420,32 @@ elif menu_selection == "Market Sessions":
 
 elif menu_selection == "Market News":
     st.markdown(f'<h2 class="digital-font" style="font-size: 24px; margin-bottom: 15px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
-    st.markdown('<p style="font-size:12px; color:#888; margin-bottom:15px;">Berita real-time dari media-media resmi dan terpercaya | Diperbarui secara cerdas setiap 20 menit</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:12px; color:#888; margin-bottom:15px;">Berita real-time dari media-media resmi dan terpercaya | Diperbarui secara cerdas setiap 1 jam</p>', unsafe_allow_html=True)
     
-    # Inisialisasi news cache
-    initialize_news_cache()
+    # Filter Kategori Berita
+    news_categories = ["General", "Stock", "Konflik", "Gold & Silver", "Forex"]
+    selected_news_cat = st.segmented_control("FILTER BERITA", news_categories, default="General")
     
-    # Ambil berita terbaru
-    articles, error = get_news_data(f"{asset_name}", 20)  # Ambil lebih banyak untuk buffer rotasi
+    # Ambil berita terbaru berdasarkan kategori
+    articles, error = get_news_data(selected_news_cat, 10)
     
-    if error: 
+    if error and not articles: 
         st.error(error)
     elif articles:
-        # Tampilkan berita (8 Marketaux + 2 EODHD)
-        for idx, a in enumerate(articles, 1):
-                time_str = a.get("publishedAt", "N/A")
-                source_name = a.get("source", "Market News")
-                
-                st.markdown(f"""
-                <div class="news-card">
-                    <h3 style="color:var(--electric-blue); font-size:16px; margin-bottom:5px;">{a["title"]}</h3>
-                    <p style="font-size:11px; color:#888; margin-bottom:8px;">🌐 {source_name} | 📅 {time_str}</p>
-                    <p style="font-size:13px; color:#ccc;">{a["description"]}</p>
-                    <a href="{a["url"]}" target="_blank" style="color:var(--neon-green); font-size:12px; font-weight:bold;">READ MORE →</a>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("Tidak ada berita tersedia saat ini. Sistem akan memperbarui berita dalam 20 menit.")
+        for a in articles:
+            time_str = a.get("publishedAt", "N/A")
+            source_name = a.get("source", "Market News")
+            
+            st.markdown(f"""
+            <div class="news-card">
+                <h3 style="color:var(--electric-blue); font-size:16px; margin-bottom:5px;">{a["title"]}</h3>
+                <p style="font-size:11px; color:#888; margin-bottom:8px;">🌐 {source_name} | 📅 {time_str}</p>
+                <p style="font-size:13px; color:#ccc;">{a["description"]}</p>
+                <a href="{a["url"]}" target="_blank" style="color:var(--neon-green); font-size:12px; font-weight:bold;">READ MORE →</a>
+            </div>
+            """, unsafe_allow_html=True)
     else:
-        st.warning("Tidak dapat memuat berita. Pastikan API Key Marketaux dan Tiingo sudah dikonfigurasi dengan benar.")
+        st.info(f"Tidak ada berita tersedia untuk kategori {selected_news_cat} saat ini.")
 
 
 elif menu_selection == "Economic Radar":

@@ -333,8 +333,32 @@ def smart_alert_widget():
     st.markdown("<h3 class='alert-title' style='text-align: center; font-size: 20px; margin-bottom: 20px;'>SMART ALERT CENTER V3.3</h3>", unsafe_allow_html=True)
 
     # Instrument Selector
-    instruments = ["XAUUSD", "XAGUSD", "BTCUSD", "EURUSD", "GBPUSD", "USDJPY", "WTI", "US100", "Palladium", "Platinum", "GOOGL", "AAPL", "BBCA.JK", "TLKM.JK"]
-    selected_instrument = st.selectbox("**INSTRUMENT SELECTOR**", instruments, key="alert_instrument")
+    instruments_list = ["XAUUSD", "XAGUSD", "BTCUSD", "EURUSD", "GBPUSD", "USDJPY", "WTI", "US100", "Palladium", "Platinum", "GOOGL", "AAPL", "BBCA.JK", "TLKM.JK"]
+    selected_instrument = st.selectbox("**INSTRUMENT SELECTOR**", instruments_list, key="alert_instrument")
+
+    # Menampilkan Harga Sekarang (Real-time)
+    try:
+        supabase: Client = create_client(url, key)
+        res = supabase.table("market_prices").select("price").eq("instrument", selected_instrument).execute()
+        current_price = res.data[0]["price"] if res.data else 0.0
+        
+        st.markdown(f"""
+        <div style="
+            background: rgba(0, 212, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        ">
+            <span style="font-family: 'Rajdhani', sans-serif; font-size: 12px; color: #888;">CURRENT PRICE</span><br>
+            <span style="font-family: 'Orbitron', sans-serif; font-size: 18px; color: #00ff88; text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);">
+                {current_price:,.4f}
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+    except:
+        st.caption("Gagal memuat harga real-time.")
 
     # Digital Price Target - Menggunakan format %.4f untuk presisi lebih tinggi (XAUUSD dll)
     price_target = st.number_input("**DIGITAL PRICE TARGET**", min_value=0.0, format="%.4f", step=0.0001, key="alert_price_target")

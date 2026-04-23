@@ -1,7 +1,7 @@
 from supabase import create_client, Client
 import streamlit as st
 from groq import Groq
-from news_cache_manager import initialize_news_cache, rotate_news_articles
+from news_cache_manager import initialize_news_cache, should_update_news, get_cached_news, update_news_cache
 from widgets import economic_calendar_widget, smart_alert_widget
 import os
 import yfinance as yf

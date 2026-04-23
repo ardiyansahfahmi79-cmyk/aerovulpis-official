@@ -708,9 +708,16 @@ def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
     if not openrouter_api_key:
         return "⚠️ OpenRouter API Key tidak ditemukan."
     
-    # Model Utama & Backup
+    # Model Utama & Pendamping (Gratis)
     PRIMARY_MODEL = 'nousresearch/hermes-3-llama-3.1-405b'
-    BACKUP_MODEL = 'qwen/qwen-2.5-72b-instruct' # Model Qwen 2.5 sebagai pendamping/backup
+    COMPANION_MODEL = 'qwen/qwen-2-72b-instruct' # Qwen sebagai pendamping untuk detail ekstra
+    
+    # Model Cadangan (Jika Utama & Pendamping Limit)
+    BACKUP_MODELS = [
+        'deepseek/deepseek-chat', # Ling-2.6-flash / DeepSeek alternatif
+        'minimax/minimax-01',     # Minimax M2.5
+        'google/gemini-flash-1.5' # Alternatif stabil lainnya
+    ]
     
     latest = df.iloc[-1]
     price = market_data['price']
@@ -794,16 +801,25 @@ def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
         except:
             return None
 
-    # Coba Model Utama (Hermes 405B)
+    # 1. Coba Model Utama (Hermes 405B)
     analysis = call_openrouter(PRIMARY_MODEL, "Anda adalah AeroVulpis Sentinel Pro Intelligence (Hermes 405B).")
     
-    # Jika Gagal/Limit, Coba Model Backup (Qwen 2.5)
+    # 2. Jika Sukses, Tambahkan Detail dari Model Pendamping (Qwen)
+    if analysis:
+        companion_detail = call_openrouter(COMPANION_MODEL, "Berikan detail teknis tambahan untuk analisis ini.")
+        if companion_detail:
+            analysis += "\n\n---\n**SENTINEL COMPANION (Qwen) ADDITIONAL INSIGHTS:**\n" + companion_detail
+    
+    # 3. Jika Utama Gagal, Coba Model Cadangan satu per satu
     if not analysis:
-        analysis = call_openrouter(BACKUP_MODEL, "Anda adalah AeroVulpis Sentinel Pro Intelligence (Qwen 2.5 Backup).")
-        if analysis:
-            analysis = "⚠️ [SYSTEM]: PRIMARY MODEL LIMIT REACHED. SWITCHING TO BACKUP (Qwen 2.5)\n\n" + analysis
-        else:
-            return "⚠️ Sentinel Error: Semua model AI (Utama & Backup) sedang sibuk atau limit habis."
+        for model in BACKUP_MODELS:
+            analysis = call_openrouter(model, "Anda adalah AeroVulpis Sentinel Backup Intelligence.")
+            if analysis:
+                analysis = f"⚠️ [SYSTEM]: PRIMARY MODELS LIMIT REACHED. SWITCHING TO BACKUP ({model})\n\n" + analysis
+                break
+                
+    if not analysis:
+        return "⚠️ Sentinel Error: Semua model AI (Utama, Pendamping, & Cadangan) sedang sibuk atau limit habis."
             
     return analysis
 
@@ -979,7 +995,7 @@ st.markdown(f"""
     <div class="main-logo-container">
         <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png" alt="AeroVulpis Logo" class="custom-logo">
     </div>
-    <h1 class="main-title">AEROVULPIS v3.5</h1>
+    <h1 class="main-title">AEROVULPIS v3.4</h1>
     <p style="text-align: center; color: #aaa; font-family: 'Rajdhani', sans-serif; margin-top: -5px; padding: 0;">ULTIMATE DIGITAL EDITION</p>
 </div>
 """, unsafe_allow_html=True)
@@ -987,9 +1003,7 @@ st.markdown(f"""
 # Sidebar
 with st.sidebar:
     st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:55px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
-    st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px; margin-bottom: 0;'>{t['control_center']}</h2>", unsafe_allow_html=True)
-    st.markdown("**AeroVulpis V3.5** — **SENTINEL CORE**")
-    st.caption("2026 • Powered by Real-Time AI")
+    st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px; margin-bottom: 0;'>{t['control_center']}</h2>", unsafe_allow_html=True)    st.markdown("**AeroVulpis V3.4** — **DYNAMIHATCH**")    st.caption("2026 • Powered by Real-Time AI")
 
     category = st.selectbox(t['category'], list(instruments.keys()))
     asset_name = st.selectbox(t['asset'], list(instruments[category].keys()))

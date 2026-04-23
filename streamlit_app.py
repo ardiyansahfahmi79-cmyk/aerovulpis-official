@@ -1003,7 +1003,9 @@ st.markdown(f"""
 # Sidebar
 with st.sidebar:
     st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='AeroVulpis Logo' style='width:55px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
-    st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px; margin-bottom: 0;'>{t['control_center']}</h2>", unsafe_allow_html=True)    st.markdown("**AeroVulpis V3.4** — **DYNAMIHATCH**")    st.caption("2026 • Powered by Real-Time AI")
+    st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px; margin-bottom: 0;'>{t['control_center']}</h2>", unsafe_allow_html=True)
+    st.markdown("**AeroVulpis V3.4** — **DYNAMIHATCH**")
+    st.caption("2026 • Powered by Real-Time AI")
 
     category = st.selectbox(t['category'], list(instruments.keys()))
     asset_name = st.selectbox(t['asset'], list(instruments[category].keys()))

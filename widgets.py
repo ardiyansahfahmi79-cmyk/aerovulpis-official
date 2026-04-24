@@ -214,7 +214,7 @@ def economic_calendar_widget():
 
 def smart_alert_widget():
     """
-    Menampilkan AeroVulpis Smart Alert Center V3.3 dengan gaya UI cyber-tech/terminal.
+    Menampilkan AeroVulpis Smart Alert Center V3.4 dengan gaya UI cyber-tech/terminal.
     """
 
     # Custom CSS for Smart Alert Center
@@ -330,7 +330,7 @@ def smart_alert_widget():
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("<h3 class='alert-title' style='text-align: center; font-size: 20px; margin-bottom: 20px;'>SMART ALERT CENTER V3.3</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 class='alert-title' style='text-align: center; font-size: 20px; margin-bottom: 20px;'>SMART ALERT CENTER V3.4</h3>", unsafe_allow_html=True)
 
     # Instrument Selector
     instruments_list = ["XAUUSD", "XAGUSD", "BTCUSD", "EURUSD", "GBPUSD", "USDJPY", "WTI", "US100", "Palladium", "Platinum", "GOOGL", "AAPL", "BBCA.JK", "TLKM.JK"]
@@ -341,6 +341,10 @@ def smart_alert_widget():
         supabase: Client = create_client(url, key)
         res = supabase.table("market_prices").select("price").eq("instrument", selected_instrument).execute()
         current_price = res.data[0]["price"] if res.data else 0.0
+        
+        # Format harga khusus XAUUSD (2 desimal) vs lainnya (4 desimal)
+        price_format = "{:,.2f}" if selected_instrument == "XAUUSD" else "{:,.4f}"
+        display_price = price_format.format(current_price)
         
         st.markdown(f"""
         <div style="
@@ -353,7 +357,7 @@ def smart_alert_widget():
         ">
             <span style="font-family: 'Rajdhani', sans-serif; font-size: 12px; color: #888;">CURRENT PRICE</span><br>
             <span style="font-family: 'Orbitron', sans-serif; font-size: 18px; color: #00ff88; text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);">
-                {current_price:,.4f}
+                {display_price}
             </span>
         </div>
         """, unsafe_allow_html=True)
@@ -417,7 +421,7 @@ def smart_alert_widget():
                     </div>
                     <div style="font-size: 14px; opacity: 0.9;">
                         [STATUS]: SENSOR LOCKED & ACTIVE<br>
-                        [TARGET]: {selected_instrument} @ {price_target:.4f}<br>
+                        [TARGET]: {selected_instrument} @ {display_price}<br>
                         [ACTION]: MONITORING 24/7 VIA SATELLITE SYNC
                     </div>
                 </div>

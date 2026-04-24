@@ -541,19 +541,29 @@ def get_market_data(ticker_symbol):
                         "source": "Cache"
                     }
 
-        # 2. Jika Cache Basi/Kosong, Ambil Live (yfinance)
-        # Catatan: Integrasi cTrader OpenAPI akan ditambahkan di sini setelah Client ID/Secret dikonfigurasi
-        ticker = yf.Ticker(ticker_symbol)
-        hist = ticker.history(period="2d")
-        if not hist.empty:
-            price = hist["Close"].iloc[-1]
-            prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else hist["Open"].iloc[-1]
-            change_pct = ((price - prev_close) / prev_close) * 100
+    # 2. Jika Cache Basi/Kosong, Ambil Live (yfinance)
+    # Catatan: Integrasi cTrader OpenAPI akan ditambahkan di sini setelah Client ID/Secret dikonfigurasi
+    
+    # Khusus Gold/Silver, gunakan ticker spot jika memungkinkan untuk akurasi lebih tinggi
+    fetch_ticker = ticker_symbol
+    if ticker_symbol == "GC=F": fetch_ticker = "GC=F" # Tetap futures tapi kita bisa optimasi pembacaan
+    
+    ticker = yf.Ticker(fetch_ticker)
+    hist = ticker.history(period="2d")
+    if not hist.empty:
+        price = hist["Close"].iloc[-1]
+        
+        # Khusus XAUUSD, pastikan tidak ada pembulatan kasar
+        if ticker_symbol == "GC=F":
+            price = round(float(price), 2)
             
-            # Update Cache Global di Supabase
-            cache_market_price(inst_name, price, change_pct)
-            
-            return {"price": price, "change": price - prev_close, "change_pct": change_pct, "source": "Live"}
+        prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else hist["Open"].iloc[-1]
+        change_pct = ((price - prev_close) / prev_close) * 100
+        
+        # Update Cache Global di Supabase
+        cache_market_price(inst_name, price, change_pct)
+        
+        return {"price": price, "change": price - prev_close, "change_pct": change_pct, "source": "Live"}
         return None
     except:
         return None
@@ -1080,6 +1090,7 @@ def get_news_data(category="General", max_articles=10):
         except: pass
 
     # --- 2. AMBIL DARI TIINGO ---
+    tiingo_key = st.secrets.get("TIINGO_KEY") or os.getenv("TIINGO_KEY")
     if tiingo_key:
         try:
             url_t = f"https://api.tiingo.com/tiingo/news?token={tiingo_key}&limit=15"
@@ -1474,7 +1485,7 @@ elif menu_selection == "Chatbot AI":
     if "messages" not in st.session_state: st.session_state.messages = []
     for message in st.session_state.messages:
         with st.chat_message(message["role"]): st.markdown(message["content"])
-    if prompt := st.chat_input("Tanya AeroVulpis v3.3 Ultimate..."):
+    if prompt := st.chat_input("Tanya AeroVulpis v3.4 Ultimate..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.markdown(prompt)
         with st.chat_message("assistant"):
@@ -1703,11 +1714,11 @@ elif menu_selection == "Help & Support":
                 <div style="width: 2px; height: 100%; background: rgba(0, 212, 255, 0.3); position: absolute; left: 30%;"></div>
                 <div style="width: 2px; height: 100%; background: rgba(0, 212, 255, 0.3); position: absolute; left: 70%;"></div>
             </div>
-            <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">GLOBAL MARKET INTELLIGENCE</div>
+            <div style="font-family: 'Orbitron', sans-serif; font-size: 14px; color: var(--electric-blue); margin-top: 5px;">GLOBAL MARKET INTELLIGENCE V3.4</div>
         </div>
         **Market Sessions**: Menampilkan status sesi pasar (Tokyo, London, New York) dan *Golden Time* (volatilitas tinggi).
         
-        **Market News**: Berita real-time tentang geopolitik, konflik, dan peristiwa ekonomi global dari berbagai media keuangan resmi dan terpercaya. Diperbarui setiap 20 menit dengan rotasi berita terbaru dari media resmi dan terpercaya.
+        **Market News**: Berita real-time tentang geopolitik, konflik, dan peristiwa ekonomi global dari berbagai media keuangan resmi dan terpercaya. Diperbarui setiap 1 jam dengan rotasi berita terbaru dari media resmi dan terpercaya.
         """, unsafe_allow_html=True)
 
     with st.expander("5. SMART ALERT CENTER"):

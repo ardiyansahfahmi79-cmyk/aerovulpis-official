@@ -26,13 +26,16 @@ key = st.secrets["supabase_key"]
 service_role_key = st.secrets.get("supabase_service_role_key", key)
 
 def get_supabase_client():
+    """Mendapatkan Supabase client dengan anon key"""
     return create_client(url, key)
 
 def get_supabase_admin():
+    """Mendapatkan Supabase client dengan service_role key (untuk operasi admin)"""
     return create_client(url, service_role_key)
 
 # ====================== FUNGSI LOGGING & CLEANUP ======================
 def send_log(pesan):
+    """Mencatat log aktivitas ke Supabase"""
     try:
         supabase = get_supabase_client()
         supabase.table("logs_aktivitas").insert({"keterangan": pesan}).execute()
@@ -40,6 +43,7 @@ def send_log(pesan):
         pass
 
 def cleanup_logs():
+    """Menghapus log yang lebih lama dari 24 jam"""
     try:
         supabase = get_supabase_client()
         cutoff = (datetime.now() - timedelta(hours=24)).isoformat()
@@ -48,6 +52,7 @@ def cleanup_logs():
         pass
 
 def cache_market_price(symbol, price, change_pct=0.0):
+    """Menyimpan harga pasar terbaru ke Supabase cache"""
     try:
         supabase = get_supabase_client()
         data = {
@@ -61,6 +66,7 @@ def cache_market_price(symbol, price, change_pct=0.0):
         pass
 
 def get_cached_market_price(symbol):
+    """Mengambil harga pasar dari cache Supabase"""
     try:
         supabase = get_supabase_client()
         res = supabase.table("market_prices").select("price").eq("instrument", symbol).execute()
@@ -71,6 +77,7 @@ def get_cached_market_price(symbol):
     return None
 
 def cleanup_old_data():
+    """Menghapus data market_prices yang lebih lama dari 24 jam"""
     try:
         supabase = get_supabase_client()
         cutoff = (datetime.now(pytz.timezone('Asia/Jakarta')) - timedelta(hours=24)).isoformat()
@@ -80,6 +87,11 @@ def cleanup_old_data():
 
 # ====================== FUNGSI USER & TIER ======================
 def get_user_tier(user_id):
+    """
+    Cek tier user dari tabel user_tiers
+    Return: (tier, expired_at)
+    Jika expired, return 'free'
+    """
     if not user_id:
         return "free", None
     try:
@@ -89,20 +101,35 @@ def get_user_tier(user_id):
             tier = res.data[0]["tier"]
             expired_at = res.data[0].get("expired_at")
             if expired_at:
-                expired_date = datetime.fromisoformat(expired_at.replace('Z', '+00:00'))
-                if datetime.now(pytz.UTC) > expired_date:
-                    return "free", None
+                try:
+                    expired_date = datetime.fromisoformat(expired_at.replace('Z', '+00:00'))
+                    if datetime.now(pytz.UTC) > expired_date:
+                        # Tier expired, update ke free
+                        get_supabase_admin().table("user_tiers").update({"tier": "free"}).eq("user_id", user_id).execute()
+                        return "free", None
+                except Exception:
+                    pass
             return tier, expired_at
     except Exception:
         pass
     return "free", None
 
 def activate_key(user_id, key_code):
+    """
+    Validasi dan aktivasi kunci premium
+    1. Cek kunci di tabel activation_keys (is_used = false)
+    2. Update user_tiers dengan tier baru
+    3. Tandai kunci sebagai used
+    """
     if not user_id or not key_code:
         return False, "User ID dan kunci harus diisi"
+    
     try:
         supabase = get_supabase_client()
+        
+        # Cari kunci yang valid dan belum digunakan
         res = supabase.table("activation_keys").select("*").eq("key_code", key_code).eq("is_used", False).execute()
+        
         if not res.data:
             return False, "Kunci tidak valid atau sudah digunakan"
         
@@ -110,9 +137,13 @@ def activate_key(user_id, key_code):
         tier = key_data.get("tier", "monthly")
         duration_days = key_data.get("duration_days", 30)
         
+        # Hitung expired date
         expired_at = (datetime.now(pytz.UTC) + timedelta(days=duration_days)).isoformat()
         
+        # Gunakan service_role untuk update (bypass RLS)
         supabase_admin = get_supabase_admin()
+        
+        # Update/Create user tier
         supabase_admin.table("user_tiers").upsert({
             "user_id": user_id,
             "tier": tier,
@@ -120,32 +151,61 @@ def activate_key(user_id, key_code):
             "activated_at": datetime.now(pytz.UTC).isoformat()
         }).execute()
         
+        # Tandai kunci sebagai sudah digunakan
         supabase.table("activation_keys").update({
             "is_used": True,
             "used_by": user_id,
             "used_at": datetime.now(pytz.UTC).isoformat()
         }).eq("key_code", key_code).execute()
         
-        return True, f"Aktivasi berhasil! Tier: {tier.upper()}"
+        return True, f"Aktivasi berhasil! Tier: {tier.upper()}, Expired: {expired_at[:10]}"
+    
     except Exception as e:
-        return False, f"Error: {str(e)}"
+        return False, f"Error aktivasi: {str(e)}"
 
 def sync_user_to_supabase(user_id, email, name, avatar=""):
-    """Sinkronisasi data user dari Google ke Supabase"""
+    """
+    Sinkronisasi data user dari Google OAuth ke tabel users
+    Insert jika belum ada, update jika sudah ada
+    """
     try:
         supabase = get_supabase_client()
-        supabase.table("users").upsert({
-            "id": user_id,
-            "email": email,
-            "name": name,
-            "avatar": avatar,
-            "last_login": datetime.now(pytz.UTC).isoformat()
-        }).execute()
+        existing = supabase.table("users").select("id").eq("id", user_id).execute()
+        
+        if existing.data:
+            # Update last_login
+            supabase.table("users").update({
+                "email": email,
+                "name": name,
+                "avatar": avatar,
+                "last_login": datetime.now(pytz.UTC).isoformat()
+            }).eq("id", user_id).execute()
+        else:
+            # Insert user baru
+            supabase.table("users").insert({
+                "id": user_id,
+                "email": email,
+                "name": name,
+                "avatar": avatar,
+                "created_at": datetime.now(pytz.UTC).isoformat(),
+                "last_login": datetime.now(pytz.UTC).isoformat()
+            }).execute()
+            
+            # Kasih tier free untuk user baru
+            supabase.table("user_tiers").insert({
+                "user_id": user_id,
+                "tier": "free",
+                "activated_at": datetime.now(pytz.UTC).isoformat()
+            }).execute()
     except Exception:
         pass
 
-# ====================== CACHE AI ======================
+# ====================== CACHE AI ANALYSIS ======================
 def get_cached_ai_analysis(asset_name, timeframe):
+    """
+    Mengambil cache analisis AI dari Supabase
+    Cache berlaku 5 menit untuk menghemat API calls
+    """
     try:
         supabase = get_supabase_client()
         cutoff = (datetime.now(pytz.UTC) - timedelta(minutes=5)).isoformat()
@@ -153,6 +213,8 @@ def get_cached_ai_analysis(asset_name, timeframe):
             .eq("asset_name", asset_name)\
             .eq("timeframe", timeframe)\
             .gte("created_at", cutoff)\
+            .order("created_at", desc=True)\
+            .limit(1)\
             .execute()
         if res.data:
             return res.data[0]["analysis"]
@@ -161,6 +223,10 @@ def get_cached_ai_analysis(asset_name, timeframe):
     return None
 
 def cache_ai_analysis(asset_name, timeframe, analysis):
+    """
+    Menyimpan cache analisis AI ke Supabase
+    Untuk berbagi hasil analisis antar user (hemat API)
+    """
     try:
         supabase = get_supabase_client()
         data = {
@@ -175,72 +241,91 @@ def cache_ai_analysis(asset_name, timeframe, analysis):
 
 # ====================== GOOGLE OAUTH HANDLER ======================
 def handle_google_oauth():
-    """Menangani redirect dari Google OAuth via Supabase"""
+    """
+    Menangani redirect dari Google OAuth via Supabase Auth
+    1. Cek query params untuk 'code' (dari Google redirect)
+    2. Exchange code untuk session
+    3. Sync user ke Supabase
+    4. Cek tier user
+    """
     query_params = st.query_params
     
+    # Handle OAuth callback (ada 'code' di URL)
     if "code" in query_params:
         code = query_params["code"]
         try:
             supabase = get_supabase_client()
-            # Exchange code for session
-            auth_response = supabase.auth.exchange_code_for_session({"code": code})
+            # Exchange authorization code for session
+            auth_response = supabase.auth.exchange_code_for_session({"auth_code": code})
             
             if auth_response and auth_response.user:
                 user = auth_response.user
                 user_id = user.id
-                user_email = user.email
-                user_name = user.user_metadata.get("full_name", user_email.split("@")[0])
-                user_avatar = user.user_metadata.get("avatar_url", "")
+                user_email = user.email or ""
+                user_name = user.user_metadata.get("full_name", "") or user.user_metadata.get("name", "") or (user_email.split("@")[0] if user_email else "User")
+                user_avatar = user.user_metadata.get("avatar_url", "") or user.user_metadata.get("picture", "")
                 
                 # Sync ke tabel users
                 sync_user_to_supabase(user_id, user_email, user_name, user_avatar)
                 
                 # Simpan ke session state
-                st.session_state.auth_session = auth_response.session.access_token
+                st.session_state.auth_session = auth_response.session.access_token if auth_response.session else "active"
                 st.session_state.user_id = user_id
                 st.session_state.user_name = user_name
                 st.session_state.user_email = user_email
                 st.session_state.user_avatar = user_avatar
                 
-                # Ambil tier
+                # Ambil tier user
                 st.session_state.user_tier, _ = get_user_tier(user_id)
                 
-                # Bersihkan query params
+                # Bersihkan query params & rerun
                 st.query_params.clear()
+                send_log(f"User login: {user_name} ({user_email})")
                 st.rerun()
                 
         except Exception as e:
             st.sidebar.error(f"OAuth Error: {str(e)}")
+            send_log(f"OAuth Error: {str(e)}")
     
-    # Cek session existing
-    try:
-        supabase = get_supabase_client()
-        session = supabase.auth.get_session()
-        if session and session.user:
-            user = session.user
-            st.session_state.auth_session = session.access_token
-            st.session_state.user_id = user.id
-            st.session_state.user_name = user.user_metadata.get("full_name", user.email.split("@")[0] if user.email else "User")
-            st.session_state.user_email = user.email
-            st.session_state.user_avatar = user.user_metadata.get("avatar_url", "")
-            st.session_state.user_tier, _ = get_user_tier(user.id)
-    except:
-        pass
+    # Cek existing session (user sudah login sebelumnya)
+    if not st.session_state.get("auth_session"):
+        try:
+            supabase = get_supabase_client()
+            session = supabase.auth.get_session()
+            if session and session.user:
+                user = session.user
+                st.session_state.auth_session = session.access_token
+                st.session_state.user_id = user.id
+                st.session_state.user_name = user.user_metadata.get("full_name", user.email.split("@")[0] if user.email else "User")
+                st.session_state.user_email = user.email or ""
+                st.session_state.user_avatar = user.user_metadata.get("avatar_url", "")
+                st.session_state.user_tier, _ = get_user_tier(user.id)
+        except Exception:
+            pass
 
 # ====================== KONFIGURASI APLIKASI ======================
-st.set_page_config(layout="wide", page_title="AeroVulpis v3.4 Ultimate", page_icon="🦅", initial_sidebar_state="expanded")
+st.set_page_config(
+    layout="wide",
+    page_title="AeroVulpis v3.4 Ultimate",
+    page_icon="🦅",
+    initial_sidebar_state="expanded"
+)
 
+# Eksekusi Awal
 cleanup_logs()
 cleanup_old_data()
 send_log("AeroVulpis Online")
 
 # ====================== SESSION STATE ======================
+# Bahasa
 if "lang" not in st.session_state:
     st.session_state.lang = "ID"
 
+# Cache AI
 if "cached_analysis" not in st.session_state:
     st.session_state.cached_analysis = {}
 
+# User & Auth
 if "user_tier" not in st.session_state:
     st.session_state.user_tier = "free"
 if "user_id" not in st.session_state:
@@ -254,6 +339,7 @@ if "user_avatar" not in st.session_state:
 if "auth_session" not in st.session_state:
     st.session_state.auth_session = None
 
+# Daily Limits
 if "daily_analysis_count" not in st.session_state:
     st.session_state.daily_analysis_count = 0
 if "daily_chatbot_count" not in st.session_state:
@@ -261,20 +347,21 @@ if "daily_chatbot_count" not in st.session_state:
 if "last_reset_date" not in st.session_state:
     st.session_state.last_reset_date = datetime.now().date()
 
+# Aktivasi
 if "show_activation" not in st.session_state:
     st.session_state.show_activation = False
 if "activation_result" not in st.session_state:
     st.session_state.activation_result = None
 
+# Analisis & Chat
 if "sentinel_analysis" not in st.session_state:
     st.session_state.sentinel_analysis = None
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 if "active_alerts" not in st.session_state:
     st.session_state.active_alerts = []
 
+# Reset daily limits jika sudah ganti hari
 if st.session_state.last_reset_date < datetime.now().date():
     st.session_state.daily_analysis_count = 0
     st.session_state.daily_chatbot_count = 0
@@ -283,7 +370,7 @@ if st.session_state.last_reset_date < datetime.now().date():
 # Handle Google OAuth Redirect
 handle_google_oauth()
 
-# ====================== LIMITS ======================
+# ====================== LIMIT KONFIGURASI PER TIER ======================
 LIMITS = {
     "free": {"analysis_per_day": 5, "chatbot_per_day": 20},
     "trial": {"analysis_per_day": 10, "chatbot_per_day": 50},
@@ -293,7 +380,7 @@ LIMITS = {
     "yearly": {"analysis_per_day": 999999, "chatbot_per_day": 999999}
 }
 
-# ====================== KAMUS BAHASA ======================
+# ====================== KAMUS BAHASA (LENGKAP ID & EN) ======================
 translations = {
     "ID": {
         "control_center": "CONTROL CENTER",
@@ -330,17 +417,26 @@ translations = {
         "limit_reached": "⚠️ Limit harian tercapai! Upgrade ke Premium untuk akses unlimited.",
         "daily_limit": "Limit Harian",
         "upgrade_premium": "UPGRADE PREMIUM",
-        "login_google": "SIGN IN WITH GOOGLE",
-        "logout": "LOGOUT",
+        "login_google": "MASUK DENGAN GOOGLE",
+        "logout": "KELUAR",
         "activate_key": "AKTIVASI KUNCI PREMIUM",
         "enter_key": "Masukkan Kunci Aktivasi",
         "activate_btn": "AKTIVASI",
         "welcome": "Selamat Datang",
-        "tier_free": "FREE",
-        "processing": "Memproses...",
+        "tier_free": "GRATIS",
+        "processing": "Memproses aktivasi...",
         "activation_success": "Aktivasi Berhasil!",
         "activation_failed": "Aktivasi Gagal!",
-        "sign_in_prompt": "MASUK UNTUK MEMBUKA FITUR PREMIUM"
+        "sign_in_prompt": "MASUK UNTUK MEMBUKA FITUR PREMIUM",
+        "sign_in_desc": "Login dengan Google untuk menyimpan data dan mengakses fitur eksklusif.",
+        "already_logged_in": "Anda sudah masuk sebagai",
+        "tier_badge": "Tier",
+        "activate_title": "AKTIVASI KUNCI PREMIUM",
+        "activate_desc": "Masukkan kunci aktivasi yang Anda dapatkan untuk upgrade tier.",
+        "activate_placeholder": "XXXX-XXXX-XXXX-XXXX",
+        "activate_success_msg": "Selamat! Tier Anda sekarang: ",
+        "activate_failed_msg": "Aktivasi gagal. Periksa kunci Anda.",
+        "market_overview": "MARKET OVERVIEW"
     },
     "EN": {
         "control_center": "CONTROL CENTER",
@@ -384,16 +480,25 @@ translations = {
         "activate_btn": "ACTIVATE",
         "welcome": "Welcome",
         "tier_free": "FREE",
-        "processing": "Processing...",
+        "processing": "Processing activation...",
         "activation_success": "Activation Successful!",
         "activation_failed": "Activation Failed!",
-        "sign_in_prompt": "SIGN IN TO UNLOCK PREMIUM FEATURES"
+        "sign_in_prompt": "SIGN IN TO UNLOCK PREMIUM FEATURES",
+        "sign_in_desc": "Login with Google to save data and access exclusive features.",
+        "already_logged_in": "You are logged in as",
+        "tier_badge": "Tier",
+        "activate_title": "ACTIVATE PREMIUM KEY",
+        "activate_desc": "Enter the activation key you received to upgrade your tier.",
+        "activate_placeholder": "XXXX-XXXX-XXXX-XXXX",
+        "activate_success_msg": "Congratulations! Your tier is now: ",
+        "activate_failed_msg": "Activation failed. Check your key.",
+        "market_overview": "MARKET OVERVIEW"
     }
 }
 
 t = translations[st.session_state.lang]
 
-# ====================== CSS LENGKAP ======================
+# ====================== CSS LENGKAP (~600 BARIS) ======================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
@@ -499,6 +604,9 @@ st.markdown("""
         100% { transform: rotateY(0deg); }
     }
 
+    /* ============================================================
+       ANIMASI LOADING 3D SMOOTH - SENTINEL PRO (HERMES 405B + QWEN)
+       ============================================================ */
     .loading-3d-pro-container {
         display: flex;
         flex-direction: column;
@@ -658,6 +766,9 @@ st.markdown("""
         100% { opacity: 1; }
     }
 
+    /* ============================================================
+       RADAR CYBER-TECH
+       ============================================================ */
     .radar-cyber-container {
         position: relative;
         display: flex;
@@ -668,8 +779,7 @@ st.markdown("""
     }
     
     .radar-cyber-disc {
-        width: 50px;
-        height: 50px;
+        width: 50px; height: 50px;
         position: relative;
         flex-shrink: 0;
     }
@@ -677,34 +787,28 @@ st.markdown("""
     .radar-cyber-disc::before {
         content: '';
         position: absolute;
-        width: 100%;
-        height: 100%;
+        width: 100%; height: 100%;
         border: 2px solid rgba(0, 212, 255, 0.4);
         border-radius: 50%;
-        top: 0;
-        left: 0;
+        top: 0; left: 0;
         animation: radarDiscPulse 2s infinite;
     }
     
     .radar-cyber-disc::after {
         content: '';
         position: absolute;
-        width: 60%;
-        height: 60%;
+        width: 60%; height: 60%;
         border: 1px solid rgba(0, 255, 136, 0.3);
         border-radius: 50%;
-        top: 20%;
-        left: 20%;
+        top: 20%; left: 20%;
         animation: radarDiscPulse 2s infinite 0.5s;
     }
     
     .radar-cyber-sweep {
         position: absolute;
-        width: 50%;
-        height: 2px;
+        width: 50%; height: 2px;
         background: linear-gradient(to right, transparent, #00d4ff);
-        top: 50%;
-        left: 50%;
+        top: 50%; left: 50%;
         transform-origin: left center;
         animation: radarSweep 2s linear infinite;
         box-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
@@ -712,8 +816,7 @@ st.markdown("""
     
     .radar-cyber-dot {
         position: absolute;
-        width: 4px;
-        height: 4px;
+        width: 4px; height: 4px;
         background: #00ff88;
         border-radius: 50%;
         box-shadow: 0 0 8px #00ff88;
@@ -739,6 +842,9 @@ st.markdown("""
         50% { opacity: 1; transform: scale(1.5); }
     }
 
+    /* ============================================================
+       SMART ALERT CYBER GLOW
+       ============================================================ */
     .alert-cyber-text {
         font-family: 'Orbitron', sans-serif;
         color: #00d4ff;
@@ -757,6 +863,9 @@ st.markdown("""
         100% { text-shadow: 0 0 20px rgba(0, 212, 255, 1), 0 0 40px rgba(0, 212, 255, 0.6), 0 0 80px rgba(0, 85, 255, 0.4); }
     }
 
+    /* ============================================================
+       FINTECH RESULT CARDS
+       ============================================================ */
     .fintech-result-card {
         background: linear-gradient(145deg, rgba(0, 212, 255, 0.08), rgba(0, 85, 255, 0.05));
         border: 1px solid rgba(0, 212, 255, 0.3);
@@ -770,10 +879,8 @@ st.markdown("""
     .fintech-result-card::before {
         content: '';
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 2px;
+        top: 0; left: 0;
+        width: 100%; height: 2px;
         background: linear-gradient(90deg, transparent, #00d4ff, transparent);
         animation: scanLine 2s infinite;
     }
@@ -799,40 +906,52 @@ st.markdown("""
         text-align: center;
     }
 
-    /* ==================== GOOGLE LOGIN BUTTON ==================== */
+    /* ============================================================
+       GOOGLE LOGIN BUTTON STYLING
+       ============================================================ */
+    .google-login-wrapper {
+        text-align: center;
+        padding: 10px 0;
+    }
+    
     .google-login-btn {
-        display: flex;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 10px;
-        background: linear-gradient(145deg, #ffffff, #f0f0f0);
-        border: 2px solid rgba(0, 212, 255, 0.4);
-        color: #333;
-        padding: 12px 20px;
-        border-radius: 10px;
+        gap: 12px;
+        background: #ffffff;
+        border: 2px solid #e0e0e0;
+        color: #333333;
+        padding: 14px 28px;
+        border-radius: 12px;
         font-family: 'Orbitron', sans-serif;
         font-weight: 700;
-        font-size: 12px;
+        font-size: 13px;
         cursor: pointer;
         letter-spacing: 1px;
         width: 100%;
         transition: all 0.3s ease;
-        box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
-        text-decoration: none;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        text-decoration: none !important;
     }
     
     .google-login-btn:hover {
-        border-color: #00d4ff;
-        box-shadow: 0 0 25px rgba(0, 212, 255, 0.6);
+        border-color: #4285F4;
+        box-shadow: 0 6px 25px rgba(66, 133, 244, 0.4);
         transform: translateY(-2px);
-        color: #000;
+        color: #000000;
+        text-decoration: none !important;
     }
     
-    .google-login-btn img {
-        width: 20px;
-        height: 20px;
+    .google-login-btn svg {
+        width: 22px;
+        height: 22px;
+        flex-shrink: 0;
     }
 
+    /* ============================================================
+       MAIN STYLES
+       ============================================================ */
     .main-title {
         font-family: 'Orbitron', sans-serif;
         font-size: 32px;
@@ -841,8 +960,7 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
-        margin: 0;
-        padding: 0;
+        margin: 0; padding: 0;
     }
 
     .digital-font {
@@ -856,9 +974,7 @@ st.markdown("""
         text-shadow: 0 0 10px var(--electric-blue);
     }
 
-    .rajdhani-font {
-        font-family: 'Rajdhani', sans-serif;
-    }
+    .rajdhani-font { font-family: 'Rajdhani', sans-serif; }
 
     .stButton>button {
         background: linear-gradient(145deg, #00d4ff, #0055ff) !important;
@@ -1002,12 +1118,10 @@ st.markdown("""
     }
 
     .pillar-icon {
-        width: 35px !important;
-        height: 35px !important;
+        width: 35px !important; height: 35px !important;
         object-fit: contain !important;
         margin-bottom: 8px !important;
         filter: drop-shadow(0 0 10px #00d4ff) !important;
-        -webkit-filter: drop-shadow(0 0 10px #00d4ff) !important;
         overflow: visible !important;
     }
 
@@ -1042,6 +1156,7 @@ st.markdown("""
         box-shadow: 0 0 30px rgba(0, 212, 255, 0.15);
         margin-bottom: 20px;
     }
+    
     .sentinel-header {
         display: flex;
         justify-content: space-between;
@@ -1050,6 +1165,7 @@ st.markdown("""
         border-bottom: 1px solid rgba(0, 212, 255, 0.2);
         padding-bottom: 10px;
     }
+    
     .sentinel-title {
         font-family: 'Orbitron', sans-serif;
         font-size: 24px;
@@ -1057,6 +1173,7 @@ st.markdown("""
         text-shadow: 0 0 10px var(--electric-blue);
         margin: 0;
     }
+    
     .intelligence-panel {
         background: rgba(0, 0, 0, 0.3);
         border: 1px solid var(--glass-border);
@@ -1064,6 +1181,7 @@ st.markdown("""
         padding: 15px;
         height: 100%;
     }
+    
     .intel-header {
         font-family: 'Orbitron', sans-serif;
         font-size: 16px;
@@ -1072,11 +1190,13 @@ st.markdown("""
         border-left: 3px solid var(--electric-blue);
         padding-left: 10px;
     }
+    
     .intel-content {
         font-family: 'Rajdhani', sans-serif;
         font-size: 14px;
         color: #e0e0e0;
     }
+    
     .status-badge {
         padding: 4px 10px;
         border-radius: 20px;
@@ -1084,12 +1204,13 @@ st.markdown("""
         font-family: 'Orbitron', sans-serif;
         text-transform: uppercase;
     }
+    
     .status-open { background: rgba(0, 255, 136, 0.1); color: var(--neon-green); border: 1px solid var(--neon-green); }
     .status-ai { background: rgba(0, 212, 255, 0.1); color: var(--electric-blue); border: 1px solid var(--electric-blue); }
 </style>
 """, unsafe_allow_html=True)
 
-# ====================== API KEYS ======================
+# ====================== API KEYS & KONFIGURASI ======================
 groq_api_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
 marketaux_key = st.secrets.get("MARKETAUX_KEY") or os.getenv("MARKETAUX_KEY")
 
@@ -1098,13 +1219,19 @@ if groq_api_key:
     try:
         client = Groq(api_key=groq_api_key)
     except Exception as e:
-        st.sidebar.error(f"⚠️ Error: {str(e)}")
+        st.sidebar.error(f"⚠️ Groq Error: {str(e)}")
 else:
     st.sidebar.error("⚠️ GROQ_API_KEY NOT FOUND")
 
-# ====================== FUNGSI DATA & INDIKATOR ======================
+# ====================== FUNGSI DATA PASAR ======================
 def get_market_data(ticker_symbol):
+    """
+    Sistem Centralized Caching:
+    Mengambil data dari Supabase (Cache) jika masih segar (< 3 detik).
+    Jika sudah basi, ambil dari yfinance dan update cache.
+    """
     try:
+        # Mapping nama instrumen dari ticker
         inst_name = ticker_symbol
         for cat in instruments.values():
             for name, tick in cat.items():
@@ -1112,17 +1239,22 @@ def get_market_data(ticker_symbol):
                     inst_name = name
                     break
         
+        # Cek Cache Supabase
         supabase_for_cache = create_client(url, key)
         res = supabase_for_cache.table("market_prices").select("*").eq("instrument", inst_name).execute()
         
         if res.data:
             cached = res.data[0]
-            updated_at_str = cached['updated_at']
-            if isinstance(updated_at_str, str):
+            updated_at_str = cached.get('updated_at', '')
+            
+            if isinstance(updated_at_str, str) and updated_at_str:
                 updated_at_str = updated_at_str.replace('Z', '+00:00')
-                updated_at = datetime.fromisoformat(updated_at_str)
+                try:
+                    updated_at = datetime.fromisoformat(updated_at_str)
+                except:
+                    updated_at = datetime.now(pytz.UTC) - timedelta(seconds=10)
             else:
-                updated_at = updated_at_str
+                updated_at = datetime.now(pytz.UTC) - timedelta(seconds=10)
             
             if updated_at.tzinfo is None:
                 updated_at = updated_at.replace(tzinfo=pytz.UTC)
@@ -1131,74 +1263,105 @@ def get_market_data(ticker_symbol):
             
             now = datetime.now(pytz.UTC)
             
+            # Jika data masih segar (< 3 detik), gunakan cache
             if (now - updated_at).total_seconds() < 3:
                 return {
-                    "price": cached['price'],
-                    "change": cached['price'] * (cached.get('change_pct', 0)/100),
+                    "price": cached.get('price', 0),
+                    "change": cached.get('price', 0) * (cached.get('change_pct', 0)/100),
                     "change_pct": cached.get('change_pct', 0),
                     "source": "Cache"
                 }
 
+        # Jika Cache Basi/Kosong, Ambil Live dari yfinance
         fetch_ticker = ticker_symbol
         
         ticker = yf.Ticker(fetch_ticker)
         hist = ticker.history(period="2d")
+        
         if not hist.empty:
-            price = hist["Close"].iloc[-1]
-            if ticker_symbol == "GC=F":
-                price = round(float(price), 2)
-            prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else hist["Open"].iloc[-1]
-            change_pct = ((price - prev_close) / prev_close) * 100
+            price = float(hist["Close"].iloc[-1])
+            
+            # Khusus Gold/Silver, bulatkan 2 desimal
+            if ticker_symbol in ["GC=F", "SI=F"]:
+                price = round(price, 2)
+                
+            prev_close = float(hist["Close"].iloc[-2]) if len(hist) > 1 else float(hist["Open"].iloc[-1])
+            change_pct = ((price - prev_close) / prev_close) * 100 if prev_close > 0 else 0
+            
+            # Update Cache Global di Supabase
             cache_market_price(inst_name, price, change_pct)
-            return {"price": price, "change": price - prev_close, "change_pct": change_pct, "source": "Live"}
+            
+            return {
+                "price": price,
+                "change": price - prev_close,
+                "change_pct": change_pct,
+                "source": "Live"
+            }
         return None
     except Exception:
         return None
 
 def get_historical_data(ticker_symbol, period="1mo", interval="1h"):
+    """Mengambil data historis dari yfinance"""
     try:
         ticker = yf.Ticker(ticker_symbol)
         df = ticker.history(period=period, interval=interval)
-        if df.empty: return pd.DataFrame()
+        if df.empty:
+            return pd.DataFrame()
         return df.sort_index().dropna()
-    except:
+    except Exception:
         return pd.DataFrame()
 
 def add_technical_indicators(df):
-    if len(df) < 50: return df
+    """
+    Menambahkan 20+ indikator teknikal ke dataframe
+    SMA, EMA, RSI, MACD, Bollinger Bands, Stochastic, ATR, ADX,
+    CCI, Williams %R, MFI, TRIX, ROC, Awesome Oscillator,
+    KAMA, Ichimoku, Parabolic SAR, Volume SMA, Base Line
+    """
+    if len(df) < 50:
+        return df
+    
+    # Moving Averages
     df["SMA20"] = df["Close"].rolling(window=20).mean()
     df["SMA50"] = df["Close"].rolling(window=50).mean()
     df["SMA200"] = df["Close"].rolling(window=min(len(df), 200)).mean()
     df["EMA9"] = df["Close"].ewm(span=9, adjust=False).mean()
     df["EMA21"] = df["Close"].ewm(span=21, adjust=False).mean()
     
+    # RSI (14)
     delta = df["Close"].diff()
     gain = delta.where(delta > 0, 0).rolling(window=14).mean()
     loss = -delta.where(delta < 0, 0).rolling(window=14).mean()
     rs = gain / loss.replace(0, 0.001)
     df["RSI"] = 100 - (100 / (1 + rs))
     
+    # MACD
     exp1 = df["Close"].ewm(span=12, adjust=False).mean()
     exp2 = df["Close"].ewm(span=26, adjust=False).mean()
     df["MACD"] = exp1 - exp2
     df["Signal_Line"] = df["MACD"].ewm(span=9, adjust=False).mean()
     
+    # Bollinger Bands (20, 2)
     df["BB_Mid"] = df["Close"].rolling(window=20).mean()
     df["BB_Std"] = df["Close"].rolling(window=20).std()
     df["BB_Upper"] = df["BB_Mid"] + (df["BB_Std"] * 2)
     df["BB_Lower"] = df["BB_Mid"] - (df["BB_Std"] * 2)
     
+    # Stochastic Oscillator (14, 3)
     low_14 = df["Low"].rolling(window=14).min()
     high_14 = df["High"].rolling(window=14).max()
     df["Stoch_K"] = 100 * ((df["Close"] - low_14) / (high_14 - low_14).replace(0, 0.001))
     df["Stoch_D"] = df["Stoch_K"].rolling(window=3).mean()
     
+    # ATR (14)
     high_low = df["High"] - df["Low"]
     high_cp = np.abs(df["High"] - df["Close"].shift())
     low_cp = np.abs(df["Low"] - df["Close"].shift())
     df["TR"] = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
     df["ATR"] = df["TR"].rolling(window=14).mean()
     
+    # ADX (14)
     df["UpMove"] = df["High"] - df["High"].shift()
     df["DownMove"] = df["Low"].shift() - df["Low"]
     df["+DM"] = np.where((df["UpMove"] > df["DownMove"]) & (df["UpMove"] > 0), df["UpMove"], 0)
@@ -1208,25 +1371,53 @@ def add_technical_indicators(df):
     df["DX"] = 100 * np.abs(df["+DI"] - df["-DI"]) / (df["+DI"] + df["-DI"]).replace(0, 0.001)
     df["ADX"] = df["DX"].rolling(14).mean()
     
+    # CCI (20)
     df["CCI"] = ta.trend.cci(df["High"], df["Low"], df["Close"], window=20)
+    
+    # Williams %R (14)
     df["WPR"] = ta.momentum.williams_r(df["High"], df["Low"], df["Close"], lbp=14)
+    
+    # MFI (14)
     df["MFI"] = ta.volume.money_flow_index(df["High"], df["Low"], df["Close"], df["Volume"], window=14)
+    
+    # TRIX (15)
     df["TRIX"] = ta.trend.trix(df["Close"], window=15)
+    
+    # ROC (12)
     df["ROC"] = ta.momentum.roc(df["Close"], window=12)
+    
+    # Awesome Oscillator (5, 34)
     df["AO"] = ta.momentum.awesome_oscillator(df["High"], df["Low"], window1=5, window2=34)
+    
+    # KAMA (10)
     df["KAMA"] = ta.momentum.kama(df["Close"], window=10, pow1=2, pow2=30)
+    
+    # Ichimoku Cloud
     df["Ichimoku_A"] = ta.trend.ichimoku_a(df["High"], df["Low"], window1=9, window2=26)
     df["Ichimoku_B"] = ta.trend.ichimoku_b(df["High"], df["Low"], window2=26, window3=52)
-    df["Parabolic_SAR"] = ta.trend.psar_up(df["High"], df["Low"], df["Close"]).fillna(ta.trend.psar_down(df["High"], df["Low"], df["Close"]))
+    
+    # Parabolic SAR
+    psar_up = ta.trend.psar_up(df["High"], df["Low"], df["Close"])
+    psar_down = ta.trend.psar_down(df["High"], df["Low"], df["Close"])
+    df["Parabolic_SAR"] = psar_up.fillna(psar_down)
+    
+    # Volume SMA (20)
     df["Vol_SMA"] = df["Volume"].rolling(window=20).mean()
+    
+    # Base Line (Ichimoku baseline)
     df["Base_Line"] = (df["High"].rolling(window=26).max() + df["Low"].rolling(window=26).min()) / 2
+    
     return df
 
 def get_weighted_signal(df):
+    """
+    Menghitung sinyal teknikal berdasarkan weighted scoring
+    Return: (score, signal, reasons, bullish_count, bearish_count, neutral_count)
+    """
     required_cols = ["RSI", "MACD", "Signal_Line", "SMA50", "SMA200"]
     for col in required_cols:
         if col not in df.columns:
-            return 0, "WAITING DATA", ["Data indicator loading..."], 0, 0, 100
+            return 0, "WAITING DATA", ["Data indikator sedang dimuat..."], 0, 0, 100
 
     latest = df.iloc[-1]
     bullish_count = 0
@@ -1234,918 +1425,347 @@ def get_weighted_signal(df):
     neutral_count = 0
     reasons = []
     
-    if latest["RSI"] < 30: bullish_count += 1; reasons.append(f"RSI Oversold ({latest['RSI']:.2f})")
-    elif latest["RSI"] > 70: bearish_count += 1; reasons.append(f"RSI Overbought ({latest['RSI']:.2f})")
-    else: neutral_count += 1; reasons.append(f"RSI Neutral ({latest['RSI']:.2f})")
+    # 1. RSI (14)
+    rsi_val = latest["RSI"]
+    if rsi_val < 30:
+        bullish_count += 1
+        reasons.append(f"RSI Oversold ({rsi_val:.2f})")
+    elif rsi_val > 70:
+        bearish_count += 1
+        reasons.append(f"RSI Overbought ({rsi_val:.2f})")
+    else:
+        neutral_count += 1
+        reasons.append(f"RSI Neutral ({rsi_val:.2f})")
     
-    if latest["MACD"] > latest["Signal_Line"]: bullish_count += 1; reasons.append("MACD Bullish")
-    else: bearish_count += 1; reasons.append("MACD Bearish")
+    # 2. MACD
+    if latest["MACD"] > latest["Signal_Line"]:
+        bullish_count += 1
+        reasons.append("MACD Bullish Cross")
+    else:
+        bearish_count += 1
+        reasons.append("MACD Bearish Cross")
     
-    if latest["Close"] > latest["SMA50"]: bullish_count += 1; reasons.append("SMA 50 Bullish")
-    else: bearish_count += 1; reasons.append("SMA 50 Bearish")
+    # 3. SMA 50
+    if latest["Close"] > latest["SMA50"]:
+        bullish_count += 1
+        reasons.append("Price > SMA 50 (Bullish)")
+    else:
+        bearish_count += 1
+        reasons.append("Price < SMA 50 (Bearish)")
 
-    if latest["Close"] > latest["SMA200"]: bullish_count += 1; reasons.append("SMA 200 Bullish")
-    else: bearish_count += 1; reasons.append("SMA 200 Bearish")
+    # 4. SMA 200
+    if latest["Close"] > latest["SMA200"]:
+        bullish_count += 1
+        reasons.append("Price > SMA 200 (Long-term Bullish)")
+    else:
+        bearish_count += 1
+        reasons.append("Price < SMA 200 (Long-term Bearish)")
     
+    # Hitung score
     total = bullish_count + bearish_count + neutral_count
     score = (bullish_count / total) * 100 if total > 0 else 50
     
-    if score > 70: signal = "STRONG BUY"
-    elif score > 55: signal = "BUY"
-    elif score < 30: signal = "STRONG SELL"
-    elif score < 45: signal = "SELL"
-    else: signal = "NEUTRAL"
+    # Tentukan sinyal
+    if score > 70:
+        signal = "STRONG BUY"
+    elif score > 55:
+        signal = "BUY"
+    elif score < 30:
+        signal = "STRONG SELL"
+    elif score < 45:
+        signal = "SELL"
+    else:
+        signal = "NEUTRAL"
     
     return score, signal, reasons, bullish_count, bearish_count, neutral_count
 
 # ====================== FUNGSI AI ======================
 def get_groq_response(question, context=""):
-    if not client: return "⚠️ Chatbot Inactive"
+    """Chatbot AI menggunakan Llama 3.3 70B via Groq"""
+    if not client:
+        return "⚠️ Chatbot Inactive - Groq API Key not configured"
+    
+    # Cek limit harian
+    user_limits = LIMITS.get(st.session_state.user_tier, LIMITS["free"])
+    if st.session_state.daily_chatbot_count >= user_limits["chatbot_per_day"]:
+        return f"⚠️ {t['limit_reached']} ({st.session_state.daily_chatbot_count}/{user_limits['chatbot_per_day']})"
+    
     MODEL_NAME = 'llama-3.3-70b-versatile'
-    system_prompt = f"Anda adalah AeroVulpis AI Assistant. Waktu: {datetime.now().strftime('%d %B %Y, %H:%M:%S WIB')}. Konteks: {context}"
+    system_prompt = f"""
+    Anda adalah AeroVulpis, asisten AI Trading Profesional.
+    Waktu: {datetime.now().strftime('%d %B %Y, %H:%M:%S WIB')}
+    Bahasa: {st.session_state.lang}
+    
+    TUGAS UTAMA:
+    1. Membantu user menganalisis data trading dan berita.
+    2. Berikan level ENTRY, STOP LOSS, dan TAKE PROFIT yang spesifik.
+    3. Jawab dengan singkat, padat, dan teknis.
+    4. JANGAN menyarankan perubahan kode website.
+    5. Konteks: {context}
+    """
     try:
         chat_completion = client.chat.completions.create(
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": question}],
-            model=MODEL_NAME, temperature=0.7, max_tokens=1024,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": question}
+            ],
+            model=MODEL_NAME,
+            temperature=0.7,
+            max_tokens=1024,
         )
+        st.session_state.daily_chatbot_count += 1
         return chat_completion.choices[0].message.content
     except Exception as e:
         return f"⚠️ Error: {str(e)}"
 
 def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
+    """
+    AeroVulpis Sentinel PRO - Hermes 3 405B + Qwen 2 72B via OpenRouter
+    Dengan backup model jika primary limit
+    """
     openrouter_api_key = st.secrets.get("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
-    if not openrouter_api_key:
-        return "⚠️ OpenRouter API Key not found."
     
+    if not openrouter_api_key:
+        return "⚠️ OpenRouter API Key tidak ditemukan. Tambahkan OPENROUTER_API_KEY di secrets."
+    
+    # Cek cache dulu (hemat API)
     cached = get_cached_ai_analysis(asset_name, "sentinel")
     if cached:
-        return cached + "\n\n*[Cache < 5 min]*"
+        return cached + "\n\n*[Data dari cache, diperbarui < 5 menit yang lalu]*"
     
+    # Cek limit harian
+    user_limits = LIMITS.get(st.session_state.user_tier, LIMITS["free"])
+    if st.session_state.daily_analysis_count >= user_limits["analysis_per_day"]:
+        return f"⚠️ {t['limit_reached']} ({st.session_state.daily_analysis_count}/{user_limits['analysis_per_day']})"
+    
+    # Model Utama & Pendamping
     PRIMARY_MODEL = 'nousresearch/hermes-3-llama-3.1-405b'
     COMPANION_MODEL = 'qwen/qwen-2-72b-instruct'
-    BACKUP_MODELS = ['deepseek/deepseek-chat', 'google/gemini-flash-1.5']
+    
+    # Model Cadangan
+    BACKUP_MODELS = [
+        'deepseek/deepseek-chat',
+        'minimax/minimax-01',
+        'google/gemini-flash-1.5'
+    ]
     
     latest = df.iloc[-1]
     price = market_data['price']
     
-    prompt = f"""AeroVulpis Sentinel Intelligence Report for {asset_name}.
-    Price: {price:,.4f} | Signal: {signal}
-    RSI: {latest.get('RSI', 0):.2f} | MACD: {latest.get('MACD', 0):.4f} | ATR: {latest.get('ATR', 0):.4f}
-    Reasons: {", ".join(reasons)}
+    # Ambil berita untuk konteks fundamental
+    news_list, _ = get_news_data(asset_name, max_articles=5)
+    if news_list:
+        news_context = "\n".join([f"- {n['title']} ({n['source']})" for n in news_list])
+    else:
+        news_context = "Tidak ada berita terbaru."
     
-    OUTPUT: KEY LEVELS (Support/Resistance), FUNDAMENTAL INSIGHT, TRADE SCENARIOS (Bullish/Bearish with Entry/Target/SL/R:R), FINAL VERDICT.
-    Bahasa Indonesia, max 320 words, balanced."""
+    # Prompt untuk analisis
+    prompt = f"""
+    Anda adalah AeroVulpis Sentinel Intelligence, sistem AI Pro tingkat lanjut (AeroVulpis Core V3.4).
+    Tugas Anda adalah memberikan analisis institusional mendalam untuk {asset_name}.
+    
+    INFO DASAR:
+    Instrumen: {asset_name}
+    Tanggal: {datetime.now().strftime('%d %B %Y')}
+    Harga saat ini: {price:,.4f}
+    
+    DATA PASAR TEKNIS:
+    - Sinyal Teknis: {signal}
+    - RSI (14): {latest.get('RSI', 0):.2f}
+    - MACD: {latest.get('MACD', 0):.4f}
+    - ATR (14): {latest.get('ATR', 0):.4f}
+    - ADX (14): {latest.get('ADX', 0):.2f}
+    - Stochastic K: {latest.get('Stoch_K', 0):.2f}
+    - Bollinger Upper: {latest.get('BB_Upper', 0):.4f}
+    - Bollinger Lower: {latest.get('BB_Lower', 0):.4f}
+    - Alasan Teknis: {", ".join(reasons)}
+    
+    BERITA & FUNDAMENTAL:
+    {news_context}
+    
+    STRUKTUR OUTPUT (WAJIB):
+    
+    🔮 SENTINEL INTELLIGENCE REPORT
+    
+    📊 KEY LEVELS:
+    Support: [2-3 level + alasan singkat]
+    Resistance: [2-3 level + alasan singkat]
+    
+    🌍 FUNDAMENTAL INSIGHT:
+    [Ringkas faktor utama yang mempengaruhi instrumen ini saat ini (suku bunga, inflasi, geopolitik)]
+    
+    📈 TRADE SCENARIOS:
+    
+    🟢 Bullish:
+    - Entry: [level]
+    - Target: [level]
+    - Stop Loss: [level]
+    - R:R: [ratio]
+    
+    🔴 Bearish:
+    - Entry: [level]
+    - Target: [level]
+    - Stop Loss: [level]
+    - R:R: [ratio]
+    
+    ⚡ FINAL VERDICT:
+    [Kesimpulan netral (Buy/Sell/Wait) + risiko utama]
+    
+    ATURAN:
+    - Bahasa Indonesia jelas dan ringkas
+    - Total maksimal 320 kata
+    - Seimbang antara bullish dan bearish
+    """
     
     def call_openrouter(model_name, system_msg):
+        """Panggil OpenRouter API"""
         try:
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {openrouter_api_key}", "Content-Type": "application/json"},
-                data=json.dumps({"model": model_name, "messages": [{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}]}),
+                headers={
+                    "Authorization": f"Bearer {openrouter_api_key}",
+                    "Content-Type": "application/json",
+                },
+                data=json.dumps({
+                    "model": model_name,
+                    "messages": [
+                        {"role": "system", "content": system_msg},
+                        {"role": "user", "content": prompt}
+                    ]
+                }),
                 timeout=45
             )
             if response.status_code == 200:
                 return response.json()['choices'][0]['message']['content']
             return None
-        except:
+        except Exception:
             return None
-
-    analysis = call_openrouter(PRIMARY_MODEL, "AeroVulpis Sentinel Pro (Hermes 405B).")
-    if analysis:
-        companion_detail = call_openrouter(COMPANION_MODEL, "Additional technical details.")
-        if companion_detail:
-            analysis += "\n\n---\n**Qwen 2 72B Insights:**\n" + companion_detail
     
+    # 1. Coba Model Utama (Hermes 405B)
+    analysis = call_openrouter(PRIMARY_MODEL, "Anda adalah AeroVulpis Sentinel Pro Intelligence (Hermes 405B).")
+    
+    # 2. Jika Sukses, Tambahkan Detail dari Model Pendamping (Qwen)
+    if analysis:
+        companion_detail = call_openrouter(COMPANION_MODEL, "Berikan detail teknis tambahan untuk analisis trading ini.")
+        if companion_detail:
+            analysis += "\n\n---\n**🔬 SENTINEL COMPANION (Qwen 2 72B) ADDITIONAL INSIGHTS:**\n" + companion_detail
+    
+    # 3. Jika Utama Gagal, Coba Model Cadangan
     if not analysis:
         for model in BACKUP_MODELS:
-            analysis = call_openrouter(model, "AeroVulpis Backup.")
+            analysis = call_openrouter(model, "Anda adalah AeroVulpis Sentinel Backup Intelligence.")
             if analysis:
-                analysis = f"⚠️ [BACKUP: {model}]\n\n" + analysis
+                analysis = f"⚠️ **[SYSTEM] PRIMARY MODELS LIMIT REACHED. SWITCHING TO BACKUP ({model})**\n\n" + analysis
                 break
     
     if not analysis:
-        return "⚠️ All AI models busy."
+        return "⚠️ Sentinel Error: Semua model AI (Utama, Pendamping, & Cadangan) sedang sibuk atau limit habis. Coba lagi nanti."
     
+    # Update counter & cache
+    st.session_state.daily_analysis_count += 1
     cache_ai_analysis(asset_name, "sentinel", analysis)
+    
     return analysis
 
 def get_deep_analysis(asset_name, market_data, df, signal, reasons):
-    if not client: return "⚠️ Deep Analysis Inactive"
+    """
+    Generate Deep Analysis menggunakan Llama 3.3 70B via Groq
+    Untuk analisis teknikal mendalam dengan entry, SL, TP
+    """
+    if not client:
+        return "⚠️ Deep Analysis Inactive - Groq API Key not configured"
     
+    # Cek cache dulu
     cached = get_cached_ai_analysis(asset_name, "deep")
     if cached:
-        return cached + "\n\n*[Cache < 5 min]*"
+        return cached + "\n\n*[Data dari cache, diperbarui < 5 menit yang lalu]*"
+    
+    # Cek limit harian
+    user_limits = LIMITS.get(st.session_state.user_tier, LIMITS["free"])
+    if st.session_state.daily_analysis_count >= user_limits["analysis_per_day"]:
+        return f"⚠️ {t['limit_reached']} ({st.session_state.daily_analysis_count}/{user_limits['analysis_per_day']})"
     
     MODEL_NAME = 'llama-3.3-70b-versatile'
+    
     latest = df.iloc[-1]
     price = market_data['price']
     
     technical_data = f"""
-    INSTRUMENT: {asset_name} | Price: {price:,.4f} | Signal: {signal}
-    RSI: {latest['RSI']:.2f} | MACD: {latest['MACD']:.4f} | SMA50: {latest['SMA50']:.4f} | SMA200: {latest['SMA200']:.4f}
-    ATR: {latest['ATR']:.4f} | ADX: {latest['ADX']:.2f}
-    Reasons: {', '.join(reasons)}
+    INSTRUMEN: {asset_name}
+    HARGA SAAT INI: {price:,.4f}
+    SINYAL: {signal}
+    
+    INDIKATOR TEKNIKAL:
+    - RSI (14): {latest.get('RSI', 0):.2f}
+    - MACD: {latest.get('MACD', 0):.4f} (Signal: {latest.get('Signal_Line', 0):.4f})
+    - SMA 50: {latest.get('SMA50', 0):.4f}
+    - SMA 200: {latest.get('SMA200', 0):.4f}
+    - ATR (14): {latest.get('ATR', 0):.4f}
+    - Stochastic K: {latest.get('Stoch_K', 0):.2f}
+    - ADX (14): {latest.get('ADX', 0):.2f}
+    - Bollinger Bands: Upper {latest.get('BB_Upper', 0):.4f} / Lower {latest.get('BB_Lower', 0):.4f}
+    - CCI (20): {latest.get('CCI', 0):.2f}
+    - Volume: {df['Volume'].iloc[-1]:,.0f}
+    
+    ALASAN TEKNIS:
+    {', '.join(reasons)}
     """
     
-    system_prompt = "You are AeroVulpis Deep Analysis Engine. Provide technical analysis with Entry, SL, TP levels. Bahasa Indonesia, max 2000 chars."
-    user_prompt = f"Deep analysis:\n{technical_data}\n\nInclude: RSI interpretation, SMA200 position, Entry (2-3 levels), SL (ATR-based), TP (1:2+), Risk management, Scenarios."
+    system_prompt = f"""
+    Anda adalah AeroVulpis Deep Analysis Engine - AI Trading Analyst Profesional.
+    Waktu: {datetime.now().strftime('%d %B %Y, %H:%M:%S WIB')}
+    Bahasa: {st.session_state.lang}
+    
+    ANDA ADALAH EXPERT DALAM:
+    1. Analisis Teknikal Mendalam (Support/Resistance, Trend Analysis, Pattern Recognition)
+    2. Korelasi Fundamental (The Fed, Geopolitik, Berita Pasar)
+    3. Money Management & Risk-Reward Ratio
+    4. Market Microstructure & Order Flow
+    
+    INSTRUKSI ANALISIS WAJIB:
+    1. ANALISIS TEKNIKAL: Interpretasi mendalam RSI (14) dan SMA 200. Jelaskan apakah RSI menunjukkan jenuh beli/jual dan apakah harga di atas/bawah SMA 200.
+    2. LEVEL ENTRY: Tentukan 2-3 level entry dengan alasan spesifik (support, breakout, retracement).
+    3. STOP LOSS: Tentukan level SL berdasarkan ATR dan struktur pasar (jangan lebih dari 2% dari entry).
+    4. TAKE PROFIT: Tentukan 2-3 level TP dengan risk-reward ratio minimal 1:2.
+    5. RISK MANAGEMENT: Berikan ukuran posisi dan manajemen risiko optimal.
+    6. SCENARIO: Jelaskan kondisi bearish dan bullish yang mungkin terjadi.
+    
+    FORMAT OUTPUT:
+    - Gunakan markdown dan emoji
+    - Maksimal 2000 karakter
+    - Fokus pada actionable insights
+    """
+    
+    user_prompt = f"""Berikan analisis teknikal mendalam dengan level entry, stop loss, dan take profit:
+    
+    {technical_data}
+    
+    WAJIB mencakup:
+    1. Interpretasi RSI (14): {latest.get('RSI', 0):.2f}
+    2. Posisi harga vs SMA 200: {latest.get('SMA200', 0):.4f}
+    3. Level entry spesifik (2-3 pilihan)
+    4. Stop loss (berdasarkan ATR: {latest.get('ATR', 0):.4f})
+    5. Take profit (ratio minimal 1:2)
+    6. Risk management & position sizing
+    7. Skenario bullish dan bearish
+    """
     
     try:
         chat_completion = client.chat.completions.create(
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
-            model=MODEL_NAME, temperature=0.6, max_tokens=2000,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            model=MODEL_NAME,
+            temperature=0.6,
+            max_tokens=2000,
         )
         analysis = chat_completion.choices[0].message.content
+        
+        # Update counter & cache
+        st.session_state.daily_analysis_count += 1
         cache_ai_analysis(asset_name, "deep", analysis)
+        
         return analysis
     except Exception as e:
         return f"⚠️ Error: {str(e)}"
-
-# ====================== MARKET SESSIONS ======================
-def market_session_status():
-    tz = pytz.timezone('Asia/Jakarta')
-    now = datetime.now(tz)
-    current_time = now.time()
-    
-    sessions = [
-        {"name": "Asian Session (Tokyo)", "start": dt_time(6, 0), "end": dt_time(15, 0), "color": "#00ff88"},
-        {"name": "European Session (London)", "start": dt_time(14, 0), "end": dt_time(23, 0), "color": "#00d4ff"},
-        {"name": "American Session (New York)", "start": dt_time(19, 0), "end": dt_time(4, 0), "color": "#ff2a6d"}
-    ]
-    
-    st.markdown('<div class="session-container">', unsafe_allow_html=True)
-    st.markdown('<h2 class="cyan-neon" style="text-align:center; font-family:Orbitron; font-size:24px; margin-bottom:20px;">MARKET SESSIONS STATUS</h2>', unsafe_allow_html=True)
-    
-    active_sessions = []
-    for sess in sessions:
-        is_active = False
-        if sess["start"] < sess["end"]: is_active = sess["start"] <= current_time <= sess["end"]
-        else: is_active = current_time >= sess["start"] or current_time <= sess["end"]
-        
-        if is_active:
-            status_html = f'<span style="padding: 2px 8px; border-radius: 4px; background: rgba(0, 255, 136, 0.1); border: 1px solid #00ff88; color: #00ff88; font-size: 10px; box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);">ACTIVE</span>'
-        else:
-            status_html = f'<span style="padding: 2px 8px; border-radius: 4px; background: rgba(255, 42, 109, 0.1); border: 1px solid #ff2a6d; color: #ff2a6d; font-size: 10px; opacity: 0.6;">CLOSED</span>'
-            
-        if is_active: active_sessions.append(sess["name"])
-        progress = 0
-        if is_active:
-            now_minutes = now.hour * 60 + now.minute
-            start_minutes = sess["start"].hour * 60 + sess["start"].minute
-            end_minutes = sess["end"].hour * 60 + sess["end"].minute
-            if end_minutes < start_minutes: end_minutes += 24 * 60
-            if now_minutes < start_minutes: now_minutes += 24 * 60
-            total_duration = end_minutes - start_minutes
-            elapsed = now_minutes - start_minutes
-            progress = min(100, max(0, int((elapsed / total_duration) * 100)))
-            
-        st.markdown(f"""
-        <div class="session-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                <span style="font-family:Orbitron; font-weight:bold; color:{sess['color']}; flex:1; font-size: 14px;">{sess['name']}</span>
-                {status_html}
-            </div>
-            <div style="font-family:Rajdhani; font-size:12px; color:#888; margin-bottom:5px;">{sess['start'].strftime('%H:%M')} - {sess['end'].strftime('%H:%M')} WIB</div>
-            <div style="background:rgba(255,255,255,0.1); height:6px; border-radius:3px; overflow:hidden;">
-                <div style="background:{sess['color'] if is_active else '#444'}; width:{progress if is_active else 0}%; height:100%; transition:width 0.5s ease; box-shadow: 0 0 10px {sess['color'] if is_active else 'transparent'};"></div>
-            </div>
-            <div style="font-family:Rajdhani; font-size:11px; color:#aaa; margin-top:5px;">{ "Currently ACTIVE" if is_active else "Next session" }</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    is_golden = (dt_time(19, 0) <= current_time <= dt_time(23, 0))
-    if is_golden:
-        st.markdown('<div style="text-align:center; padding:10px; background:rgba(0,212,255,0.1); border:1px solid var(--electric-blue); border-radius:10px; margin-top:10px;"><h3 class="cyan-neon" style="margin:0; font-size:18px;">GOLDEN TIME: High Volatility! 🚀</h3></div>', unsafe_allow_html=True)
-    
-    strategy_text = "Waiting for Market Open..."
-    if "Asian Session (Tokyo)" in active_sessions and len(active_sessions) == 1: strategy_text = "Calm Market: Range Trading Mode."
-    elif is_golden: strategy_text = "High Volatility: Order Block Mitigations & FVG."
-    elif "European Session (London)" in active_sessions: strategy_text = "Trend Following: London Breakout patterns."
-    elif "American Session (New York)" in active_sessions: strategy_text = "Market Reversals: NY Open manipulation."
-    
-    st.markdown(f"""
-    <div style="margin-top:20px; padding:15px; border:1px solid var(--electric-blue); border-radius:10px; background:rgba(0,212,255,0.05); text-align:center;">
-        <p class="cyan-neon" style="font-family:Orbitron; font-size:14px; margin-bottom:5px;">CURRENT STRATEGY (SMC Focus)</p>
-        <p class="rajdhani-font" style="font-size:16px; color:#fff; margin:0;">{strategy_text}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ====================== INSTRUMEN ======================
-instruments = {
-    "Forex": {"EUR/USD": "EURUSD=X", "GBP/USD": "GBPUSD=X", "USD/JPY": "USDJPY=X", "AUD/USD": "AUDUSD=X", "USD/CHF": "USDCHF=X"},
-    "Crypto": {"Bitcoin": "BTC-USD", "Ethereum": "ETH-USD", "Solana": "SOL-USD", "Binance Coin": "BNB-USD", "Ripple": "XRP-USD"},
-    "Indices": {"NASDAQ-100": "^IXIC", "S&P 500": "^GSPC", "Dow Jones": "^DJI", "DAX": "^GDAXI", "IHSG": "^JKSE"},
-    "Stocks (AS)": {"NVIDIA": "NVDA", "Apple": "AAPL", "Tesla": "TSLA", "Microsoft": "MSFT", "Amazon": "AMZN"},
-    "Stocks (ID)": {"BBRI": "BBRI.JK", "BBCA": "BBCA.JK", "TLKM": "TLKM.JK", "ASII": "ASII.JK", "BMRI": "BMRI.JK"},
-    "Commodities": {"Gold (XAUUSD)": "GC=F", "Silver (XAGUSD)": "SI=F", "Crude Oil (WTI)": "CL=F", "Natural Gas": "NG=F", "Copper": "HG=F", "Palladium": "PA=F", "Platinum": "PL=F"}
-}
-
-# ====================== NEWS ======================
-def get_news_data(category="General", max_articles=10):
-    from news_cache_manager import should_update_news, get_cached_news, update_news_cache
-    
-    if not should_update_news(category):
-        return get_cached_news(category), None
-
-    berita_final = []
-    urls_terpakai = set()
-    
-    category_map = {
-        "Stock": "stocks,equities,earnings",
-        "Konflik": "geopolitics,war,conflict,sanctions",
-        "Gold & Silver": "gold,silver,precious metals,commodities",
-        "Forex": "forex,currency,central banks,interest rates",
-        "General": "finance,economy,market"
-    }
-    api_query = category_map.get(category, "finance")
-
-    if marketaux_key:
-        try:
-            url_m = f"https://api.marketaux.com/v1/news/all?api_token={marketaux_key}&language=en&search={api_query}&limit=15"
-            res_m = requests.get(url_m, timeout=10).json()
-            for item in res_m.get('data', []):
-                if item.get('url') and item['url'] not in urls_terpakai:
-                    berita_final.append({'publishedAt': item.get('published_at', ''), 'title': item.get('title', 'No Title'), 'description': item.get('description', ''), 'source': 'Marketaux', 'url': item['url']})
-                    urls_terpakai.add(item['url'])
-        except: pass
-
-    tiingo_key = st.secrets.get("TIINGO_KEY") or os.getenv("TIINGO_KEY")
-    if tiingo_key:
-        try:
-            url_t = f"https://api.tiingo.com/tiingo/news?token={tiingo_key}&limit=15"
-            if category == "Stock": url_t += "&tags=stocks"
-            elif category == "Forex": url_t += "&tags=forex"
-            res_t = requests.get(url_t, timeout=10).json()
-            if isinstance(res_t, list):
-                for item in res_t:
-                    if item.get('url') and item['url'] not in urls_terpakai:
-                        berita_final.append({'publishedAt': item.get('publishedDate', ''), 'title': item.get('title', 'No Title'), 'description': item.get('description', item.get('title', '')), 'source': 'Tiingo', 'url': item['url']})
-                        urls_terpakai.add(item['url'])
-        except: pass
-
-    if not berita_final:
-        return get_cached_news(category), "Failed to fetch news."
-
-    try:
-        berita_final = sorted(berita_final, key=lambda x: x['publishedAt'], reverse=True)
-    except: pass
-    
-    berita_final = berita_final[:max_articles]
-    
-    tz_wib = pytz.timezone('Asia/Jakarta')
-    for b in berita_final:
-        try:
-            raw_date = b['publishedAt'].replace('Z', '+00:00') if b['publishedAt'] else ''
-            if raw_date:
-                try: dt_utc = datetime.fromisoformat(raw_date)
-                except:
-                    dt_utc = datetime.strptime(raw_date[:19], "%Y-%m-%dT%H:%M:%S")
-                    dt_utc = dt_utc.replace(tzinfo=pytz.UTC)
-                dt_wib = dt_utc.astimezone(tz_wib)
-                b['publishedAt'] = dt_wib.strftime("%d-%m-%Y %H.%M")
-            else: b['publishedAt'] = 'N/A'
-        except: b['publishedAt'] = 'N/A'
-            
-    update_news_cache(category, berita_final)
-    return berita_final, None
-
-# ====================== SMART ALERT CHECK ======================
-def check_smart_alerts():
-    if "active_alerts" not in st.session_state or not st.session_state.active_alerts:
-        return
-
-    telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or st.secrets.get("TELEGRAM_BOT_TOKEN")
-    if not telegram_bot_token:
-        return
-
-    unique_instruments = list(set([a["instrument"] for a in st.session_state.active_alerts if not a.get("triggered")]))
-    if not unique_instruments:
-        return
-
-    instrument_to_ticker = {"XAUUSD": "GC=F", "BTCUSD": "BTC-USD", "XAGUSD": "SI=F", "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X"}
-    for cat in instruments.values():
-        for name, ticker in cat.items():
-            instrument_to_ticker[name] = ticker
-
-    current_prices = {}
-    for inst in unique_instruments:
-        price = get_cached_market_price(inst)
-        if price is None:
-            ticker = instrument_to_ticker.get(inst)
-            if ticker:
-                m_data = get_market_data(ticker)
-                if m_data:
-                    price = m_data["price"]
-        if price is not None:
-            current_prices[inst] = price
-
-    for alert in st.session_state.active_alerts:
-        if not alert.get("triggered", False):
-            inst_name = alert.get("instrument")
-            current_price = current_prices.get(inst_name)
-            if current_price is None:
-                continue
-            target = alert["target"]
-            condition = alert["condition"]
-            triggered = False
-            if condition == "bullish" and current_price >= target:
-                triggered = True
-            elif condition == "bearish" and current_price <= target:
-                triggered = True
-            if triggered:
-                alert["triggered"] = True
-                now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
-                alert_message = f"🚨 AEROVULPIS ALERT!\n{inst_name} @ ${current_price:,.2f}\nTarget: ${target:,.2f}\nTime: {now_wib}"
-                url = f"https://api.telegram.org/bot{telegram_bot_token}/sendMessage"
-                payload = {'chat_id': alert["chat_id"], 'text': alert_message}
-                try:
-                    requests.post(url, json=payload, timeout=10)
-                    st.toast(f"🚀 ALERT: {inst_name}!", icon="🚨")
-                except:
-                    pass
-
-# ====================== UI HEADER ======================
-st.markdown(f"""
-<div class="main-title-container">
-    <div class="main-logo-container">
-        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png" alt="AeroVulpis Logo" class="custom-logo">
-    </div>
-    <h1 class="main-title">AEROVULPIS v3.4</h1>
-    <p style="text-align: center; color: #aaa; font-family: 'Rajdhani', sans-serif; margin-top: -5px; padding: 0;">ULTIMATE DIGITAL EDITION</p>
-</div>
-""", unsafe_allow_html=True)
-
-# ====================== SIDEBAR ======================
-with st.sidebar:
-    st.markdown("<div style='text-align:center; margin-bottom: -10px;'><img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' alt='Logo' style='width:55px; filter:drop-shadow(0 0 8px var(--electric-blue));'></div>", unsafe_allow_html=True)
-    st.markdown(f"<h2 class='digital-font' style='text-align:center; font-size:18px; margin-bottom: 0;'>{t['control_center']}</h2>", unsafe_allow_html=True)
-    
-    # ====================== GOOGLE OAUTH LOGIN SECTION ======================
-    tier_colors = {"free": "#888", "trial": "#00d4ff", "weekly": "#00ff88", "monthly": "#ffcc00", "six_months": "#ff8800", "yearly": "#ff2a6d"}
-    tier_names = {"free": "FREE", "trial": "TRIAL", "weekly": "WEEKLY", "monthly": "MONTHLY", "six_months": "6M PRO", "yearly": "ULTIMATE"}
-    
-    if st.session_state.auth_session and st.session_state.user_name:
-        # USER SUDAH LOGIN
-        tier_color = tier_colors.get(st.session_state.user_tier, "#888")
-        tier_name = tier_names.get(st.session_state.user_tier, "FREE")
-        avatar_url = st.session_state.get('user_avatar', '')
-        
-        st.markdown(f"""
-        <div style="background:rgba(0,0,0,0.4); border:1px solid {tier_color}; border-radius:10px; padding:12px; margin:5px 0; text-align:center; box-shadow: 0 0 10px rgba(0,212,255,0.2);">
-            {f'<img src="{avatar_url}" style="width:40px; height:40px; border-radius:50%; margin-bottom:8px; border:2px solid {tier_color};">' if avatar_url else ''}
-            <p style="font-family:'Rajdhani',sans-serif; font-size:11px; color:#aaa; margin:0;">{t['welcome']},</p>
-            <p style="font-family:'Orbitron',sans-serif; font-size:12px; color:#fff; margin:3px 0;">{st.session_state.user_name}</p>
-            <p style="font-family:'Rajdhani',sans-serif; font-size:9px; color:#888; margin:2px 0;">{st.session_state.user_email}</p>
-            <span style="font-family:'Orbitron',sans-serif; font-size:9px; color:{tier_color}; letter-spacing:1px; border:1px solid {tier_color}; padding:2px 8px; border-radius:10px;">{tier_name}</span>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button(t['logout'], use_container_width=True, key="google_logout"):
-                try:
-                    supabase = get_supabase_client()
-                    supabase.auth.sign_out()
-                except:
-                    pass
-                st.session_state.auth_session = None
-                st.session_state.user_id = None
-                st.session_state.user_name = None
-                st.session_state.user_email = None
-                st.session_state.user_avatar = None
-                st.session_state.user_tier = "free"
-                st.session_state.show_activation = False
-                st.rerun()
-        with col2:
-            if st.button(t['activate_key'], use_container_width=True, key="show_activation_btn"):
-                st.session_state.show_activation = not st.session_state.show_activation
-        
-        # AKTIVASI KUNCI PREMIUM
-        if st.session_state.show_activation:
-            st.markdown(f"""
-            <div style="background:rgba(0,0,0,0.5); border:1px solid rgba(0,212,255,0.3); border-radius:12px; padding:15px; margin:10px 0; text-align:center;">
-                <p class="alert-cyber-text" style="font-size:12px; margin:0 0 10px 0;">{t['activate_key']}</p>
-            """, unsafe_allow_html=True)
-            
-            key_input = st.text_input(t['enter_key'], value="", key="activation_key_input", placeholder="XXXX-XXXX-XXXX-XXXX", label_visibility="collapsed")
-            st.markdown('<style>div[data-testid="stTextInput"] input { background: rgba(0,0,0,0.6) !important; border: 1px solid rgba(0,212,255,0.4) !important; color: #00ff88 !important; font-family: Orbitron, sans-serif !important; letter-spacing: 2px !important; text-align: center !important; }</style>', unsafe_allow_html=True)
-            
-            if st.button(t['activate_btn'], use_container_width=True, key="activate_btn_main", type="primary"):
-                if key_input and st.session_state.user_id:
-                    with st.spinner(t['processing']):
-                        time.sleep(1.5)
-                        success, message = activate_key(st.session_state.user_id, key_input)
-                    if success:
-                        st.session_state.user_tier, _ = get_user_tier(st.session_state.user_id)
-                        st.success(f"✅ {t['activation_success']} - {message}")
-                        st.balloons()
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error(f"❌ {t['activation_failed']}: {message}")
-                else:
-                    st.warning("Masukkan kunci aktivasi yang valid.")
-            
-            st.markdown("</div>", unsafe_allow_html=True)
-    else:
-        # USER BELUM LOGIN - TAMPILKAN TOMBOL GOOGLE LOGIN
-        st.markdown(f"""
-        <div style="text-align:center; padding:15px; margin:5px 0;">
-            <p style="font-family:'Orbitron',sans-serif; font-size:10px; color:#888; margin-bottom:12px; letter-spacing:1px;">{t['sign_in_prompt']}</p>
-        """, unsafe_allow_html=True)
-        
-        # GOOGLE OAUTH BUTTON VIA SUPABASE
-        try:
-            supabase_auth = get_supabase_client()
-            redirect_url = st.secrets.get("REDIRECT_URL", "https://aerovulpis.streamlit.app")
-            
-            # Generate OAuth URL
-            auth_url = supabase_auth.auth.sign_in_with_oauth({
-                "provider": "google",
-                "options": {
-                    "redirect_to": redirect_url,
-                    "query_params": {
-                        "prompt": "select_account"
-                    }
-                }
-            })
-            
-            if auth_url and hasattr(auth_url, 'url'):
-                google_auth_link = auth_url.url
-            else:
-                google_auth_link = f"{supabase_auth.auth.get_auth_url()}/authorize?provider=google&redirect_to={redirect_url}"
-                
-            st.markdown(f"""
-            <a href="{google_auth_link}" target="_self" class="google-login-btn" style="text-decoration:none;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                {t['login_google']}
-            </a>
-            """, unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"OAuth Error: {str(e)}")
-            st.info("Please check your Supabase Google OAuth configuration.")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    st.markdown("**AeroVulpis V3.4** — **DYNAMIHATCH**")
-    st.caption("2026 • Powered by Real-Time AI")
-
-    category = st.selectbox(t['category'], list(instruments.keys()))
-    asset_name = st.selectbox(t['asset'], list(instruments[category].keys()))
-    ticker_input = instruments[category][asset_name]
-    ticker_display = f"{asset_name} ({ticker_input})"
-
-    st.markdown("---")
-    tf_options = {
-        "15m": {"period": "5d", "interval": "15m"},
-        "30m": {"period": "5d", "interval": "30m"},
-        "1h": {"period": "1mo", "interval": "1h"},
-        "3h": {"period": "1mo", "interval": "1h"},
-        "4h": {"period": "1mo", "interval": "1h"},
-        "1D": {"period": "1y", "interval": "1d"},
-        "1W": {"period": "2y", "interval": "1wk"}
-    }
-    selected_tf_display = st.selectbox(t['timeframe'], list(tf_options.keys()), index=0)
-    period = tf_options[selected_tf_display]["period"]
-    interval = tf_options[selected_tf_display]["interval"]
-
-    menu_selection = option_menu(
-        menu_title=t['navigation'],
-        options=["Live Dashboard", "AeroVulpis Sentinel", "Signal Analysis", "Market Sessions", "Market News", "Economic Radar", "Smart Alert Center", "Chatbot AI", "Risk Management", "Settings", "Help & Support"],
-        icons=["activity", "shield-shaded", "graph-up-arrow", "globe", "newspaper", "calendar-event", "bell-fill", "chat-dots", "shield-fill", "gear", "question-circle"],
-        menu_icon="cast",
-        default_index=0,
-        styles={
-            "container": {"padding": "5!important", "background-color": "transparent"},
-            "icon": {"color": "#00d4ff", "font-size": "14px"},
-            "nav-link": {"font-size": "12px", "text-align": "left", "margin": "2px 0", "padding": "10px 12px", "border-radius": "8px", "font-family": "'Rajdhani', sans-serif", "font-weight": "600", "letter-spacing": "0.5px", "background": "rgba(0, 212, 255, 0.03)", "border": "1px solid rgba(0, 212, 255, 0.1)", "transition": "all 0.3s ease"},
-            "nav-link-selected": {"background": "linear-gradient(145deg, rgba(0, 212, 255, 0.2), rgba(0, 85, 255, 0.15))", "border": "1px solid #00d4ff", "color": "#00d4ff", "box-shadow": "0 0 15px rgba(0, 212, 255, 0.2), inset 0 0 10px rgba(0, 212, 255, 0.05)", "font-weight": "700"},
-        }
-    )
-    
-    user_limits = LIMITS.get(st.session_state.user_tier, LIMITS["free"])
-    st.markdown("---")
-    st.markdown(f"""
-    <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(0,212,255,0.2); border-radius:8px; padding:10px; margin-top:10px;">
-        <p style="font-family:'Orbitron',sans-serif; font-size:9px; color:#888; margin:0 0 5px 0; letter-spacing:1px;">{t['daily_limit']}</p>
-        <p style="font-family:'Rajdhani',sans-serif; font-size:11px; color:#00d4ff; margin:2px 0;">🤖 AI: {st.session_state.daily_analysis_count}/{user_limits['analysis_per_day']}</p>
-        <p style="font-family:'Rajdhani',sans-serif; font-size:11px; color:#00d4ff; margin:2px 0;">💬 Chat: {st.session_state.daily_chatbot_count}/{user_limits['chatbot_per_day']}</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ====================== LOGIKA HALAMAN ======================
-check_smart_alerts()
-
-if menu_selection == "AeroVulpis Sentinel":
-    st.markdown(f"""
-    <div class="sentinel-container">
-        <div class="sentinel-header" style="flex-direction: column; align-items: flex-start;">
-            <h2 class="sentinel-title">AEROVULPIS SENTINEL</h2>
-            <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <span class="status-badge status-open">MARKET: OPEN</span>
-                <span class="status-badge status-ai">AI: HERMES 405B + QWEN 72B</span>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    col_chart, col_intel = st.columns([2, 1])
-    
-    with col_chart:
-        tv_symbol = ticker_input.replace("-USD", "USD").replace("=X", "").replace(".JK", "")
-        if "GC=F" in ticker_input: tv_symbol = "COMEX:GC1!"
-        elif "SI=F" in ticker_input: tv_symbol = "COMEX:SI1!"
-        elif "CL=F" in ticker_input: tv_symbol = "NYMEX:CL1!"
-        
-        tv_html = f"""
-        <div class="tradingview-widget-container" style="height:500px; width:100%;">
-          <div id="tradingview_sentinel" style="height:500px;"></div>
-          <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-          <script type="text/javascript">
-          new TradingView.widget({{"autosize": true, "symbol": "{tv_symbol}", "interval": "D", "timezone": "Asia/Jakarta", "theme": "dark", "style": "1", "locale": "en", "enable_publishing": false, "allow_symbol_change": true, "container_id": "tradingview_sentinel"}});
-          </script>
-        </div>
-        """
-        st.components.v1.html(tv_html, height=500)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        loading_placeholder = st.empty()
-        
-        if st.button("GENERATE DEEP ANALYSIS PRO", key="sentinel_pro_btn", use_container_width=True):
-            market = get_market_data(ticker_input)
-            df = get_historical_data(ticker_input, period, interval)
-            if market and not df.empty:
-                df = add_technical_indicators(df)
-                score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
-                
-                loading_placeholder.markdown("""
-                <div class="loading-3d-pro-container">
-                    <div class="loading-3d-pro-scene">
-                        <div class="loading-3d-pro-core">
-                            <div class="loading-3d-pro-ring"></div>
-                            <div class="loading-3d-pro-ring"></div>
-                            <div class="loading-3d-pro-ring"></div>
-                            <div class="loading-3d-pro-ring"></div>
-                        </div>
-                        <div class="loading-3d-pro-center"></div>
-                        <div class="loading-3d-pro-particles">
-                            <div class="loading-3d-pro-particle"></div>
-                            <div class="loading-3d-pro-particle"></div>
-                            <div class="loading-3d-pro-particle"></div>
-                            <div class="loading-3d-pro-particle"></div>
-                            <div class="loading-3d-pro-particle"></div>
-                            <div class="loading-3d-pro-particle"></div>
-                        </div>
-                    </div>
-                    <p class="loading-3d-pro-text">SENTINEL PRO ANALYZING</p>
-                    <p class="loading-3d-pro-sub">Hermes 405B + Qwen 72B • Deep Market Scan</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                progress_bar = st.progress(0)
-                for i in range(100):
-                    time.sleep(0.03)
-                    progress_bar.progress(i + 1)
-                
-                analysis = get_sentinel_analysis(asset_name, market, df, signal, reasons)
-                st.session_state.sentinel_analysis = analysis
-                loading_placeholder.empty()
-                progress_bar.empty()
-            else:
-                st.error("Failed to fetch market data.")
-
-    with col_intel:
-        st.markdown('<div class="intelligence-panel"><div class="intel-header">SENTINEL INTELLIGENCE</div><div class="intel-content">', unsafe_allow_html=True)
-        if st.session_state.sentinel_analysis:
-            st.markdown(st.session_state.sentinel_analysis)
-        else:
-            st.info("Click GENERATE DEEP ANALYSIS PRO to start.")
-        st.markdown('</div></div>', unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-
-elif menu_selection == "Live Dashboard":
-    market = get_market_data(ticker_input)
-    df = get_historical_data(ticker_input, period, interval)
-    if market and not df.empty:
-        if selected_tf_display in ["3h", "4h"]:
-            rule = "3h" if selected_tf_display == "3h" else "4h"
-            df = df.resample(rule).agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
-        df = add_technical_indicators(df)
-        score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
-        c1, c2, c3, c4 = st.columns(4)
-        if "Gold" in asset_name or "XAU" in asset_name or "XAG" in asset_name:
-            formatted_price = f"{market['price']:,.2f}"
-        else:
-            formatted_price = f"{market['price']:,.4f}".rstrip('0').rstrip('.')
-            
-        with c1: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["live_price"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{formatted_price}</p></div>', unsafe_allow_html=True)
-        with c2:
-            color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
-            st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["signal"]}</p><p class="digital-font" style="font-size:20px; margin:0; color:{color}; text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
-        rsi_val = df["RSI"].iloc[-1] if "RSI" in df.columns else 0.0
-        atr_val = df["ATR"].iloc[-1] if "ATR" in df.columns else 0.0
-        with c3: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["rsi"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{rsi_val:.2f}</p></div>', unsafe_allow_html=True)
-        with c4: st.markdown(f'<div class="glass-card"><p style="color:#888; margin:0; font-size:10px;">{t["atr"]}</p><p class="digital-font" style="font-size:20px; margin:0;">{atr_val:.4f}</p></div>', unsafe_allow_html=True)
-        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='Price', line=dict(color='#00ff88', width=2)))
-        fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color='#00d4ff', width=1.5, dash='dot'), name='SMA 50'))
-        fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color='#bc13fe', width=1.5, dash='dash'), name='SMA 200'))
-        fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=10, b=10), height=350, showlegend=True, legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5))
-        st.plotly_chart(fig, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-        col_g, col_a = st.columns([1, 1])
-        with col_g:
-            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-            fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = score, title = {"text": "Technical Strength", "font": {"family": "Orbitron", "color": "#00d4ff", "size": 18}}, gauge = {"axis": {"range": [0, 100]}, "bar": {"color": color}, "bgcolor": "rgba(0,0,0,0)", "steps": [{"range": [0, 40], "color": "rgba(255, 42, 109, 0.2)"}, {"range": [60, 100], "color": "rgba(0, 255, 136, 0.2)"}]}))
-            fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={"color": "#e6edf3"}, height=250, margin=dict(l=20, r=20, t=40, b=20))
-            st.plotly_chart(fig_gauge, use_container_width=True)
-            if st.button(t['refresh'], use_container_width=True): st.cache_data.clear(); st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-        with col_a:
-            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-            st.subheader(t['ai_analysis'])
-            for r in reasons: st.write(f"💠 {r}")
-            if st.button(t['generate_ai'], use_container_width=True):
-                with st.spinner("Llama 3.3 70B analyzing..."):
-                    ai_anal = get_deep_analysis(asset_name, market, df, signal, reasons)
-                    st.info(ai_anal)
-            st.markdown("</div>", unsafe_allow_html=True)
-
-elif menu_selection == "Signal Analysis":
-    market = get_market_data(ticker_input)
-    df = get_historical_data(ticker_input, period, interval)
-    if not df.empty:
-        if selected_tf_display in ["3h", "4h"]:
-            rule = "3h" if selected_tf_display == "3h" else "4h"
-            df = df.resample(rule).agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()
-        df = add_technical_indicators(df)
-        latest = df.iloc[-1]
-        score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
-        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-        sig_color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
-        st.markdown(f"### {t['recommendation']}: <span style='color:{sig_color};'>{signal}</span>", unsafe_allow_html=True)
-        
-        c1, c2, c3 = st.columns(3)
-        c1.markdown(f'<div style="text-align:center; background:rgba(0,255,136,0.05); padding:10px; border-radius:10px; border:1px solid rgba(0,255,136,0.2);"><p style="color:#00ff88; font-size:12px; margin:0; font-weight:bold;">BULLISH</p><p class="digital-font" style="font-size:26px; margin:0;">{bull}</p></div>', unsafe_allow_html=True)
-        c2.markdown(f'<div style="text-align:center; background:rgba(255,42,109,0.05); padding:10px; border-radius:10px; border:1px solid rgba(255,42,109,0.2);"><p style="color:#ff2a6d; font-size:12px; margin:0; font-weight:bold;">BEARISH</p><p class="digital-font" style="font-size:26px; margin:0;">{bear}</p></div>', unsafe_allow_html=True)
-        c3.markdown(f'<div style="text-align:center; background:rgba(255,204,0,0.05); padding:10px; border-radius:10px; border:1px solid rgba(255,204,0,0.2);"><p style="color:#ffcc00; font-size:12px; margin:0; font-weight:bold;">NEUTRAL</p><p class="digital-font" style="font-size:26px; margin:0;">{neut}</p></div>', unsafe_allow_html=True)
-        
-        st.markdown('<div class="indicator-grid">', unsafe_allow_html=True)
-        indicators_data = [
-            ("RSI (14)", f"{latest['RSI']:.2f}", "Bullish" if latest['RSI'] < 30 else "Bearish" if latest['RSI'] > 70 else "Neutral"),
-            ("MACD", f"{latest['MACD']:.4f}", "Bullish" if latest['MACD'] > latest['Signal_Line'] else "Bearish"),
-            ("SMA 50", f"{latest['SMA50']:.4f}".rstrip('0').rstrip('.'), "Bullish" if latest['Close'] > latest['SMA50'] else "Bearish"),
-            ("SMA 200", f"{latest['SMA200']:.4f}".rstrip('0').rstrip('.'), "Bullish" if latest['Close'] > latest['SMA200'] else "Bearish"),
-            ("CCI (20)", f"{latest['CCI']:.2f}", "Bullish" if latest['CCI'] < -100 else "Bearish" if latest['CCI'] > 100 else "Neutral"),
-            ("WPR (14)", f"{latest['WPR']:.2f}", "Bullish" if latest['WPR'] < -80 else "Bearish" if latest['WPR'] > -20 else "Neutral"),
-            ("MFI (14)", f"{latest['MFI']:.2f}", "Bullish" if latest['MFI'] < 20 else "Bearish" if latest['MFI'] > 80 else "Neutral"),
-            ("EMA 9/21", "Cross", "Bullish" if latest['EMA9'] > latest['EMA21'] else "Bearish"),
-            ("ADX (14)", f"{latest['ADX']:.2f}", "Strong Trend" if latest['ADX'] > 25 else "Weak Trend"),
-            ("Stoch K", f"{latest['Stoch_K']:.2f}", "Bullish" if latest['Stoch_K'] < 20 else "Bearish" if latest['Stoch_K'] > 80 else "Neutral"),
-            ("ATR (14)", f"{latest['ATR']:.4f}", "High Vol" if latest['ATR'] > df['ATR'].mean() else "Low Vol"),
-            ("ROC (12)", f"{latest['ROC']:.2f}", "Bullish" if latest['ROC'] > 0 else "Bearish"),
-            ("TRIX (15)", f"{latest['TRIX']:.4f}", "Bullish" if latest['TRIX'] > 0 else "Bearish"),
-            ("AO (5/34)", f"{latest['AO']:.4f}", "Bullish" if latest['AO'] > 0 else "Bearish"),
-            ("KAMA (10)", f"{latest['KAMA']:.2f}", "Bullish" if latest['Close'] > latest['KAMA'] else "Bearish"),
-            ("Ichimoku A", f"{latest['Ichimoku_A']:.2f}", "Bullish" if latest['Close'] > latest['Ichimoku_A'] else "Bearish"),
-            ("Ichimoku B", f"{latest['Ichimoku_B']:.2f}", "Bullish" if latest['Close'] > latest['Ichimoku_B'] else "Bearish"),
-            ("PSAR", f"{latest['Parabolic_SAR']:.2f}", "Bullish" if latest['Close'] > latest['Parabolic_SAR'] else "Bearish"),
-            ("BB Upper", f"{latest['BB_Upper']:.2f}", "Overbought" if latest['Close'] > latest['BB_Upper'] else "Normal"),
-            ("BB Lower", f"{latest['BB_Lower']:.2f}", "Oversold" if latest['Close'] < latest['BB_Lower'] else "Normal")
-        ]
-        for name, val, sig in indicators_data:
-            sig_col = "#00ff88" if "Bullish" in sig or "Strong" in sig or "Oversold" in sig else "#ff2a6d" if "Bearish" in sig or "Overbought" in sig else "#ffcc00"
-            st.markdown(f'<div class="indicator-box"><div class="indicator-name">{name}</div><div class="indicator-value">{val}</div><div class="indicator-signal" style="color:{sig_col};">{sig}</div></div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-elif menu_selection == "Market Sessions":
-    market_session_status()
-
-elif menu_selection == "Market News":
-    st.markdown(f'<h2 class="digital-font" style="font-size: 24px; margin-bottom: 15px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
-    st.markdown('<p style="font-size:12px; color:#888; margin-bottom:15px;">Real-time news from trusted media | Updated every 1 hour</p>', unsafe_allow_html=True)
-    
-    news_categories = ["General", "Stock", "Konflik", "Gold & Silver", "Forex"]
-    selected_news_cat = st.segmented_control("FILTER BERITA", news_categories, default="General")
-    
-    articles, error = get_news_data(selected_news_cat, 10)
-    
-    if error and not articles: 
-        st.error(error)
-    elif articles:
-        for a in articles:
-            time_str = a.get("publishedAt", "N/A")
-            source_name = a.get("source", "Market News")
-            st.markdown(f"""
-            <div class="news-card">
-                <h3 style="color:var(--electric-blue); font-size:16px; margin-bottom:5px;">{a["title"]}</h3>
-                <p style="font-size:11px; color:#888; margin-bottom:8px;">🌐 {source_name} | 📅 {time_str}</p>
-                <p style="font-size:13px; color:#ccc;">{a["description"]}</p>
-                <a href="{a["url"]}" target="_blank" style="color:var(--neon-green); font-size:12px; font-weight:bold;">READ MORE →</a>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info(f"No news available.")
-
-elif menu_selection == "Economic Radar":
-    economic_calendar_widget()
-    st.markdown("""
-    <div class="radar-cyber-container">
-        <div class="radar-cyber-disc">
-            <div class="radar-cyber-sweep"></div>
-            <div class="radar-cyber-dot"></div>
-            <div class="radar-cyber-dot"></div>
-            <div class="radar-cyber-dot"></div>
-        </div>
-        <div>
-            <p class="alert-cyber-text" style="font-size:14px; margin:0;">GLOBAL ECONOMIC SCANNER</p>
-            <p style="font-family:'Rajdhani',sans-serif; font-size:10px; color:#888; margin:3px 0 0 0;">Real-Time High Impact Event Detection</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-elif menu_selection == "Smart Alert Center":
-    st.markdown("""
-    <div class="alert-cyber-border" style="border:2px solid rgba(0,212,255,0.5); border-radius:15px; padding:25px; background:rgba(0,212,255,0.03); box-shadow:0 0 20px rgba(0,212,255,0.3), inset 0 0 20px rgba(0,212,255,0.05); margin-bottom:20px;">
-        <div style="text-align:center; margin-bottom:20px;">
-            <h2 class="alert-cyber-text" style="font-size:26px; margin:0;">AEROVULPIS TERMINAL</h2>
-            <p class="alert-cyber-text" style="font-size:16px; margin:5px 0;">SMART ALERT CENTER V3.4</p>
-            <div style="display:flex; justify-content:center; gap:20px; margin-top:10px;">
-                <span style="font-family:'Rajdhani',sans-serif; font-size:11px; color:#00ff88; text-shadow:0 0 8px rgba(0,255,136,0.8);">● SYSTEM ONLINE</span>
-                <span style="font-family:'Rajdhani',sans-serif; font-size:11px; color:#00d4ff; text-shadow:0 0 8px rgba(0,212,255,0.8);">◈ SATELLITE SYNC</span>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    smart_alert_widget()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-elif menu_selection == "Chatbot AI":
-    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">🤖 AeroVulpis AI Assistant</h2>', unsafe_allow_html=True)
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]): st.markdown(message["content"])
-    if prompt := st.chat_input("Ask AeroVulpis..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"): st.markdown(prompt)
-        with st.chat_message("assistant"):
-            m_data = get_market_data(ticker_input)
-            context_str = f"Instrument: {ticker_display}, Price: {m_data['price'] if m_data else 'N/A'}"
-            response = get_groq_response(prompt, context_str)
-            st.markdown(response)
-            st.session_state.messages.append({"role": "assistant", "content": response})
-
-elif menu_selection == "Risk Management":
-    st.markdown('<h2 class="digital-font" style="text-align:center; font-size:26px; margin-bottom:10px;">Ultimate Risk Framework & Return Simulator</h2>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align:center; color:#888; font-family:Rajdhani; margin-top:-10px;">The Four Pillars of Survival</p>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="pillar-container">
-        <div class="pillar-item"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/lxtUFfqAGtqmckoG.png" class="pillar-icon"><p class="pillar-title">1. TRADING RULES</p><p class="pillar-desc">Stop Loss & Definition Rules.</p></div>
-        <div class="pillar-item"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/IrMPKUKVGNWfJYiT.png" class="pillar-icon"><p class="pillar-title">2. POSITION SIZING</p><p class="pillar-desc">Scale & Size.</p></div>
-        <div class="pillar-item"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/KvlBOIcTGsUXIlxi.png" class="pillar-icon"><p class="pillar-title">3. CONFIDENCE SCORES</p><p class="pillar-desc">Real-time Chart.</p></div>
-        <div class="pillar-item"><img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663558138123/XagmGYTISfZpBVMv.png" class="pillar-icon"><p class="pillar-title">4. RISK MGMT</p><p class="pillar-desc">Risk Strategy.</p></div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="glass-card" style="border-left: 4px solid #00d4ff; padding:15px; margin-top:15px;">
-        <p class="digital-font" style="font-size:14px; color:#00d4ff; margin-bottom:5px;">AeroVulpis Intelligence Rules</p>
-        <p style="font-size:11px; color:#ccc; margin:2px 0;"><b>TP:</b> Target Price | <b>SL:</b> Stop Loss | <b>Wait:</b> Perfect Confidence | <b>Rule 4:</b> Custom Strategy</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<p style="font-family:Orbitron; font-size:14px; margin-top:20px; color:#888;">FUNDING DETAILS</p>', unsafe_allow_html=True)
-    st.markdown('<div class="glass-card" style="border: 1px solid #00d4ff;"><p style="font-family:Orbitron; font-size:12px; color:#00d4ff; margin-bottom:5px;">ACCOUNT BALANCE ($)</p>', unsafe_allow_html=True)
-    balance = st.number_input("", value=1000.0, step=100.0, key="sim_balance", label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<p style="font-family:Orbitron; font-size:14px; margin-top:20px; color:#888;">REWARD-TO-RISK SIMULATOR</p>', unsafe_allow_html=True)
-    rr_ratios = {"1:2": 2.0, "1:3": 3.0, "1:4": 4.0, "2:3": 1.5, "2:4": 2.0, "2:5": 2.5, "3:4": 1.33, "3:5": 1.67, "3:6": 2.0}
-    selected_rr = st.radio("Select Ratio", list(rr_ratios.keys()), horizontal=True, key="rr_ratio_radio")
-    
-    st.markdown('<p style="font-family:Rajdhani; font-size:14px; margin-top:10px; color:#ccc;">Weekly Trade Win/Loss</p>', unsafe_allow_html=True)
-    w_col, l_col = st.columns(2)
-    with w_col: wins = st.number_input("Wins:", min_value=0, value=3, step=1, key="sim_wins")
-    with l_col: losses = st.number_input("Losses:", min_value=0, value=2, step=1, key="sim_losses")
-
-    risk_per_trade_pct = 1.0
-    
-    st.markdown('<p style="font-family:Orbitron; font-size:14px; margin-top:15px; color:#888;">DAILY RISK PARAMETERS</p>', unsafe_allow_html=True)
-    d_col1, d_col2 = st.columns(2)
-    with d_col1: max_daily_loss_pct = st.number_input("Max Daily Loss %", min_value=1.0, max_value=100.0, value=5.0, step=1.0, key="max_daily_loss")
-    with d_col2: max_daily_profit_pct = st.number_input("Max Daily Profit Target %", min_value=1.0, max_value=200.0, value=10.0, step=1.0, key="max_daily_profit")
-
-    if st.button("SIMULATE & CALCULATE RETURNS", use_container_width=True, type="primary"):
-        risk_amt = balance * (risk_per_trade_pct / 100)
-        reward_amt = risk_amt * rr_ratios[selected_rr]
-        weekly_net = (wins * reward_amt) - (losses * risk_amt)
-        weekly_return_pct = (weekly_net / balance) * 100
-        monthly_return_pct = weekly_return_pct * 4
-        yearly_return_pct = weekly_return_pct * 52
-        final_balance_weekly = balance + weekly_net
-        final_balance_monthly = balance + (weekly_net * 4)
-        final_balance_yearly = balance + (weekly_net * 52)
-        max_daily_loss_amt = balance * (max_daily_loss_pct / 100)
-        max_daily_profit_amt = balance * (max_daily_profit_pct / 100)
-        
-        st.markdown('<p style="font-family:Orbitron; font-size:16px; margin-top:25px; color:#00d4ff; text-align:center; letter-spacing:2px;">📊 PROJECTED PERFORMANCE</p>', unsafe_allow_html=True)
-        
-        for period_name, net, ret_pct, final_bal in [
-            ("WEEKLY", weekly_net, weekly_return_pct, final_balance_weekly),
-            ("MONTHLY", weekly_net*4, monthly_return_pct, final_balance_monthly),
-            ("YEARLY", weekly_net*52, yearly_return_pct, final_balance_yearly)
-        ]:
-            st.markdown(f"""
-            <div class="fintech-result-card">
-                <p style="font-family:Orbitron; font-size:12px; color:#00d4ff; margin:0 0 10px 0;">📅 {period_name} PROJECTION</p>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <div style="text-align:center;"><p style="font-size:10px; color:#888; margin:0;">NET P/L</p><p class="risk-metric" style="color:{'#00ff88' if net >= 0 else '#ff2a6d'}; font-size:16px;">{net:+,.2f} USD</p></div>
-                    <div style="text-align:center;"><p style="font-size:10px; color:#888; margin:0;">RETURN</p><p class="risk-metric" style="color:{'#00ff88' if ret_pct >= 0 else '#ff2a6d'}; font-size:16px;">{ret_pct:+.2f}%</p></div>
-                    <div style="text-align:center;"><p style="font-size:10px; color:#888; margin:0;">FINAL BALANCE</p><p class="risk-metric" style="color:#00d4ff; font-size:16px;">{final_bal:,.2f} USD</p></div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown('<p style="font-family:Orbitron; font-size:16px; margin-top:25px; color:#ff2a6d; text-align:center; letter-spacing:2px;">⚠️ RISK PARAMETERS</p>', unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class="fintech-result-card" style="border-color: rgba(255, 42, 109, 0.3);">
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
-                <div style="text-align:center;"><p style="font-size:10px; color:#888; margin:0;">RISK/TRADE</p><p class="risk-metric" style="color:#ff2a6d; font-size:14px;">{risk_amt:,.2f} USD</p></div>
-                <div style="text-align:center;"><p style="font-size:10px; color:#888; margin:0;">REWARD/TRADE</p><p class="risk-metric" style="color:#00ff88; font-size:14px;">{reward_amt:,.2f} USD</p></div>
-                <div style="text-align:center;"><p style="font-size:10px; color:#888; margin:0;">MAX DAILY LOSS</p><p class="risk-metric" style="color:#ff2a6d; font-size:14px;">-{max_daily_loss_amt:,.2f} USD</p></div>
-                <div style="text-align:center;"><p style="font-size:10px; color:#888; margin:0;">MAX DAILY PROFIT</p><p class="risk-metric" style="color:#00ff88; font-size:14px;">+{max_daily_profit_amt:,.2f} USD</p></div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div class="fintech-result-card" style="border: 2px solid #00d4ff; background: linear-gradient(145deg, rgba(0, 212, 255, 0.12), rgba(0, 85, 255, 0.08));">
-            <p style="font-family:Orbitron; font-size:12px; color:#00d4ff; margin:0 0 8px 0; text-align:center;">💰 TOTAL BALANCE SUMMARY</p>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
-                <div style="text-align:center;"><p style="font-size:9px; color:#888; margin:0;">INITIAL</p><p class="risk-metric" style="font-size:13px;">{balance:,.2f} USD</p></div>
-                <div style="text-align:center;"><p style="font-size:9px; color:#888; margin:0;">AFTER 1W</p><p class="risk-metric" style="font-size:13px; color:{'#00ff88' if final_balance_weekly >= balance else '#ff2a6d'};">{final_balance_weekly:,.2f} USD</p></div>
-                <div style="text-align:center;"><p style="font-size:9px; color:#888; margin:0;">AFTER 1M</p><p class="risk-metric" style="font-size:13px; color:{'#00ff88' if final_balance_monthly >= balance else '#ff2a6d'};">{final_balance_monthly:,.2f} USD</p></div>
-                <div style="text-align:center;"><p style="font-size:9px; color:#888; margin:0;">AFTER 1Y</p><p class="risk-metric" style="font-size:13px; color:{'#00ff88' if final_balance_yearly >= balance else '#ff2a6d'};">{final_balance_yearly:,.2f} USD</p></div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.info("Adjust parameters and click simulate.")
-
-elif menu_selection == "Settings":
-    st.markdown(f'<h2 class="digital-font" style="font-size:24px;">{t["settings"]}</h2>', unsafe_allow_html=True)
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    new_lang = st.selectbox(t['lang_select'], ["ID", "EN"], index=0 if st.session_state.lang == "ID" else 1)
-    if new_lang != st.session_state.lang:
-        st.session_state.lang = new_lang
-        st.rerun()
-    if st.button(t['clear_cache'], use_container_width=True):
-        st.cache_data.clear()
-        st.session_state.cached_analysis = {}
-        st.success("Cache Cleared!")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-elif menu_selection == "Help & Support":
-    st.markdown('<h2 class="digital-font" style="text-align:center; font-size:28px; margin-bottom:20px;">AeroVulpis v3.4 Help & Support</h2>', unsafe_allow_html=True)
-    
-    with st.expander("1. AEROVULPIS SENTINEL (PRO)", expanded=True):
-        st.markdown("Dashboard institusional dengan **Hermes 405B + Qwen 72B**. TradingView Chart real-time. Generate Deep Analysis Pro untuk laporan Key Levels, Fundamental Insight, Trade Scenarios.")
-    
-    with st.expander("2. LIVE DASHBOARD"):
-        st.markdown("Pusat pemantauan harga & sinyal teknikal. Live Price dari yFinance. Technical Strength gauge 15+ indikator. Deep Analysis pakai **Llama 3.3 70B**.")
-    
-    with st.expander("3. SIGNAL ANALYSIS"):
-        st.markdown("Grid 20+ indikator: RSI, MACD, SMA, EMA, Bollinger Bands, CCI, Williams %R, MFI, TRIX, ROC, AO, KAMA, Ichimoku, Parabolic SAR.")
-    
-    with st.expander("4. MARKET SESSIONS & NEWS"):
-        st.markdown("**Sessions**: Tokyo, London, New York + Golden Time. **News**: Real-time dari Marketaux & Tiingo.")
-    
-    with st.expander("5. SMART ALERT CENTER"):
-        st.markdown("Sensor harga otomatis via Telegram. Chat ID dari **@userinfobot**.")
-    
-    with st.expander("6. CHATBOT AI"):
-        st.markdown("Asisten AI dengan akses data harga live dan alert aktif.")
-    
-    with st.expander("7. ECONOMIC RADAR"):
-        st.markdown("Kalender ekonomi global real-time. Deteksi high impact events (NFP, CPI, suku bunga).")
-    
-    with st.expander("8. RISK MANAGEMENT"):
-        st.markdown("Four Pillars + RR Simulator. Proyeksi weekly/monthly/yearly. Max Daily Loss & Profit limits.")
-    
-    st.info("**Tips**: Login dengan Google untuk simpan data & unlock fitur. **Aktivasi kunci premium** di sidebar.")
-
-# ====================== FOOTER ======================
-st.markdown("---")
-st.markdown("""
-<div style="text-align: center; padding: 20px; opacity: 0.8;">
-    <p class="rajdhani-font" style="font-style: italic; font-size: 18px; color: #ccc;">
-        "Disiplin adalah kunci, emosi adalah musuh. Tetap tenang dan percaya pada sistem."
-    </p>
-    <p class="digital-font" style="font-size: 15px; color: #00ff88; white-space: nowrap;">
-        — Fahmi (Pencipta AeroVulpis)
-    </p>
-    <p style="font-size: 10px; color: #444; letter-spacing: 2px;">DYNAMIHATCH IDENTITY • v3.4 ULTIMATE • 2026</p>
-</div>
-""", unsafe_allow_html=True)

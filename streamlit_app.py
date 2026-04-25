@@ -759,30 +759,39 @@ def get_market_data(ticker_symbol):
                     break
         
         # Ambil data terakhir dari Supabase
-        supabase_url = st.secrets.get("SUPABASE_URL")
-        supabase_key = st.secrets.get("SUPABASE_KEY")
-        if supabase_url and supabase_key:
-            from supabase import create_client
-            supabase = create_client(supabase_url, supabase_key)
-            res = supabase.table("market_prices").select("*").eq("instrument", inst_name).execute()
+        supabase_for_cache = create_client(url, key)
+        res = supabase_for_cache.table("market_prices").select("*").eq("instrument", inst_name).execute()
+        
+        if res.data:
+            cached = res.data[0]
+            updated_at_str = cached['updated_at']
+            if isinstance(updated_at_str, str):
+                updated_at_str = updated_at_str.replace('Z', '+00:00')
+                updated_at = datetime.fromisoformat(updated_at_str)
+            else:
+                updated_at = updated_at_str
             
-            if res.data:
-                cached = res.data[0]
-                updated_at = datetime.fromisoformat(cached['updated_at'].replace('Z', '+00:00'))
-                now = datetime.now(pytz.UTC)
-                
-                # Jika data masih segar (< 3 detik), gunakan cache
-                if (now - updated_at).total_seconds() < 3:
-                    return {
-                        "price": cached['price'],
-                        "change": cached['price'] * (cached['change_pct']/100),
-                        "change_pct": cached['change_pct'],
-                        "source": "Cache"
-                    }
+            # Cek timezone
+            if updated_at.tzinfo is None:
+                updated_at = updated_at.replace(tzinfo=pytz.UTC)
+            else:
+                updated_at = updated_at.astimezone(pytz.UTC)
+            
+            now = datetime.now(pytz.UTC)
+            
+            # Jika data masih segar (< 3 detik), gunakan cache
+            if (now - updated_at).total_seconds() < 3:
+                return {
+                    "price": cached['price'],
+                    "change": cached['price'] * (cached.get('change_pct', 0)/100),
+                    "change_pct": cached.get('change_pct', 0),
+                    "source": "Cache"
+                }
 
         # Jika Cache Basi/Kosong, Ambil Live (yfinance)
         fetch_ticker = ticker_symbol
-        if ticker_symbol == "GC=F": fetch_ticker = "GC=F"
+        if ticker_symbol == "GC=F":
+            fetch_ticker = "GC=F"
         
         ticker = yf.Ticker(fetch_ticker)
         hist = ticker.history(period="2d")
@@ -1285,6 +1294,7 @@ with st.sidebar:
     tier_color = tier_colors.get(st.session_state.user_tier, "#888")
     tier_name = tier_names.get(st.session_state.user_tier, "FREE")
     
+    # PERBAIKAN: box-shadow pakai nilai fixed rgba
     st.markdown(f"""
     <div style="
         background: rgba(0, 0, 0, 0.4);
@@ -1293,7 +1303,7 @@ with st.sidebar:
         padding: 8px 12px;
         margin: 10px 0;
         text-align: center;
-        box-shadow: 0 0 10px rgba({','.join(str(int(tier_color[i:i+2], 16)) for i in (1,3,5))}, 0.2);
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
     ">
         <span style="font-family: 'Orbitron', sans-serif; font-size: 10px; color: {tier_color}; letter-spacing: 1px;">
             {tier_name}
@@ -1914,30 +1924,6 @@ elif menu_selection == "Risk Management":
         "3:4": 1.33, "3:5": 1.67, "3:6": 2.0
     }
     
-    # CSS for Neon Buttons
-    st.markdown("""
-    <style>
-    .rr-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 10px;
-        margin-bottom: 20px;
-    }
-    .rr-btn {
-        background: rgba(0, 212, 255, 0.05);
-        border: 1px solid rgba(0, 212, 255, 0.3);
-        border-radius: 8px;
-        padding: 10px;
-        text-align: center;
-        color: #00d4ff;
-        font-family: 'Orbitron', sans-serif;
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
     selected_rr = st.radio("Select Ratio", list(rr_ratios.keys()), horizontal=True, key="rr_ratio_radio")
     
     # Win/Loss Inputs
@@ -1948,7 +1934,6 @@ elif menu_selection == "Risk Management":
     with l_col:
         losses = st.number_input("Losses:", min_value=0, value=2, step=1, key="sim_losses")
 
-    # Risk per trade
     risk_per_trade_pct = 1.0
     
     # Max daily loss & profit inputs
@@ -2158,7 +2143,7 @@ elif menu_selection == "Help & Support":
                 padding: 15px 10px;
                 text-align: center;
                 height: 100%;
-                box-shadow: 0 0 10px rgba({','.join(str(int(pkg['color'][j:j+2], 16)) for j in (1,3,5))}, 0.2);
+                box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
             ">
                 <p style="font-family:Orbitron; font-size:10px; color:{pkg['color']}; margin:0 0 5px 0; letter-spacing:1px;">{pkg['name']}</p>
                 <p style="font-family:Orbitron; font-size:18px; color:white; margin:5px 0;">{pkg['price']}</p>

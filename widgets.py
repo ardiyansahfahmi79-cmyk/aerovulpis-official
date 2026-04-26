@@ -4,9 +4,74 @@ import os
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 import pytz
+import yfinance as yf
 
 url = st.secrets["supabase_url"]
 key = st.secrets["supabase_key"]
+
+def format_price_display(price, instrument_name):
+    """Format harga - XAUUSD: 4,756.00 | Forex: 1.0850"""
+    name_upper = str(instrument_name).upper() if instrument_name else ""
+    
+    if "XAU" in name_upper or "GOLD" in name_upper:
+        return f"{price:,.2f}"
+    elif "XAG" in name_upper or "SILVER" in name_upper:
+        return f"{price:,.2f}"
+    elif "BTC" in name_upper or "BITCOIN" in name_upper:
+        return f"{price:,.2f}"
+    elif "ETH" in name_upper or "ETHEREUM" in name_upper:
+        return f"{price:,.2f}"
+    elif any(c in name_upper for c in ["SOL", "BNB", "XRP"]):
+        return f"{price:,.2f}"
+    elif any(fx in name_upper for fx in ["EUR", "GBP", "CHF", "JPY", "AUD", "NZD", "CAD"]):
+        return f"{price:,.4f}".rstrip('0').rstrip('.')
+    elif any(idx in name_upper for idx in ["NASDAQ", "S&P", "DOW", "DAX", "IHSG"]):
+        return f"{price:,.2f}"
+    elif any(cmd in name_upper for cmd in ["OIL", "WTI", "CRUDE", "GAS", "COPPER", "PALLADIUM", "PLATINUM"]):
+        return f"{price:,.2f}"
+    else:
+        if price >= 1000:
+            return f"{price:,.2f}"
+        elif price >= 1:
+            return f"{price:,.2f}"
+        else:
+            return f"{price:,.4f}".rstrip('0').rstrip('.')
+
+def get_cached_price(instrument_name):
+    """Ambil harga dari Supabase cache, fallback ke yfinance"""
+    try:
+        supabase = create_client(url, key)
+        res = supabase.table("market_prices").select("*").eq("instrument", instrument_name).execute()
+        
+        if res.data and res.data[0].get("price") and res.data[0]["price"] > 0:
+            return {"price": res.data[0]["price"], "source": "SUPABASE"}
+        
+        # Fallback yfinance
+        ticker_map = {
+            "XAUUSD": "GC=F", "XAGUSD": "SI=F",
+            "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X",
+            "AUDUSD": "AUDUSD=X", "USDCHF": "USDCHF=X",
+            "BTCUSD": "BTC-USD", "ETHUSD": "ETH-USD", "SOLUSD": "SOL-USD",
+            "WTI": "CL=F", "US100": "^IXIC",
+            "Palladium": "PA=F", "Platinum": "PL=F",
+            "GOOGL": "GOOGL", "AAPL": "AAPL",
+            "BBCA.JK": "BBCA.JK", "TLKM.JK": "TLKM.JK"
+        }
+        
+        ticker = ticker_map.get(instrument_name)
+        if ticker:
+            yt = yf.Ticker(ticker)
+            hist = yt.history(period="1d")
+            if not hist.empty:
+                price = float(hist["Close"].iloc[-1])
+                if instrument_name in ["XAUUSD", "XAGUSD"]:
+                    price = round(price, 2)
+                return {"price": price, "source": "LIVE"}
+    except Exception:
+        pass
+    
+    return {"price": 0.0, "source": "UNAVAILABLE"}
+
 
 def economic_calendar_widget():
     """Economic Radar Widget"""
@@ -74,12 +139,7 @@ def economic_calendar_widget():
 
 
 def smart_alert_widget():
-    """
-    SMART ALERT CENTER - WIDGET ONLY
-    TIDAK ADA LOGO AEROVULPIS
-    TIDAK ADA HEADER
-    CURRENT PRICE AMBIL DARI SUPABASE (SAMA DENGAN LIVE DASHBOARD)
-    """
+    """SMART ALERT CENTER - Current price dari Supabase cache"""
     
     instruments_list = [
         "XAUUSD", "XAGUSD", "BTCUSD", "ETHUSD", "SOLUSD",
@@ -91,58 +151,15 @@ def smart_alert_widget():
     selected_instrument = st.selectbox(
         "INSTRUMENT SELECTOR",
         instruments_list,
-        key="alert_instrument_final"
+        key="alert_instrument_fix"
     )
 
-    # ========== CURRENT PRICE (DARI SUPABASE CACHE) ==========
-    current_price = 0.0
-    price_display = "0.00"
-    data_source = "NO DATA"
+    # ========== CURRENT PRICE ==========
+    price_data = get_cached_price(selected_instrument)
+    current_price = price_data["price"]
+    data_source = price_data["source"]
+    price_display = format_price_display(current_price, selected_instrument)
     
-    try:
-        # AMBIL DARI SUPABASE - SAMA PERSIS DENGAN LIVE DASHBOARD
-        supabase = create_client(url, key)
-        res = supabase.table("market_prices").select("*").eq("instrument", selected_instrument).execute()
-        
-        if res.data and res.data[0].get("price") and res.data[0]["price"] > 0:
-            current_price = res.data[0]["price"]
-            data_source = "SUPABASE"
-        else:
-            # FALLBACK: coba import dari streamlit_app
-            try:
-                from streamlit_app import get_market_data, instruments
-                ticker_to_fetch = None
-                for cat in instruments.values():
-                    if selected_instrument in cat:
-                        ticker_to_fetch = cat[selected_instrument]
-                        break
-                if ticker_to_fetch:
-                    m_data = get_market_data(ticker_to_fetch)
-                    if m_data and m_data.get("price"):
-                        current_price = m_data["price"]
-                        data_source = m_data.get("source", "LIVE")
-            except Exception:
-                pass
-        
-        # FORMAT HARGA SESUAI INSTRUMEN
-        if selected_instrument in ["XAUUSD", "XAGUSD"]:
-            price_display = f"{current_price:,.2f}"
-        elif selected_instrument in ["BTCUSD", "ETHUSD"]:
-            price_display = f"{current_price:,.2f}"
-        elif selected_instrument in ["SOLUSD"]:
-            price_display = f"{current_price:,.2f}"
-        elif selected_instrument in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF"]:
-            price_display = f"{current_price:,.4f}".rstrip('0').rstrip('.')
-        elif selected_instrument in ["WTI", "US100"]:
-            price_display = f"{current_price:,.2f}"
-        else:
-            price_display = f"{current_price:,.2f}"
-            
-    except Exception as e:
-        price_display = "ERROR"
-        data_source = "ERROR"
-    
-    # TAMPILKAN CURRENT PRICE
     st.markdown(f"""
     <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);padding:14px;border-radius:4px;margin-bottom:16px;text-align:center;">
         <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:#557799;letter-spacing:2px;">CURRENT PRICE</span><br>
@@ -151,21 +168,43 @@ def smart_alert_widget():
     </div>
     """, unsafe_allow_html=True)
 
-    # DIGITAL PRICE TARGET
+    # ========== DIGITAL PRICE TARGET ==========
+    # Format default value sesuai instrumen
+    if selected_instrument in ["XAUUSD", "XAGUSD"]:
+        default_target = 0.00
+        target_format = "%.2f"
+        target_step = 0.01
+    elif selected_instrument in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF"]:
+        default_target = 0.0000
+        target_format = "%.4f"
+        target_step = 0.0001
+    else:
+        default_target = 0.00
+        target_format = "%.2f"
+        target_step = 0.01
+    
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:0 0 4px 0;">DIGITAL PRICE TARGET</p>', unsafe_allow_html=True)
-    price_target = st.number_input("TARGET", min_value=0.0, format="%.4f", step=0.0001, key="alert_target_final", label_visibility="collapsed")
+    price_target = st.number_input(
+        "TARGET",
+        min_value=0.0,
+        format=target_format,
+        step=target_step,
+        value=default_target,
+        key="alert_target_fix",
+        label_visibility="collapsed"
+    )
 
-    # TELEGRAM CHAT ID
+    # Telegram Chat ID
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:16px 0 4px 0;">TELEGRAM CHAT ID</p>', unsafe_allow_html=True)
-    telegram_chat_id = st.text_input("CHAT ID", value="", placeholder="Enter Telegram Chat ID...", key="alert_chatid_final", label_visibility="collapsed")
+    telegram_chat_id = st.text_input("CHAT ID", value="", placeholder="Enter Telegram Chat ID...", key="alert_chatid_fix", label_visibility="collapsed")
 
-    # CONDITION TRIGGER
+    # Condition Trigger
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:16px 0 4px 0;">CONDITION TRIGGER</p>', unsafe_allow_html=True)
-    condition_label = st.radio("CONDITION", ["BREAKOUT ABOVE [BULLISH]", "BREAKDOWN BELOW [BEARISH]"], key="alert_cond_final", label_visibility="collapsed")
+    condition_label = st.radio("CONDITION", ["BREAKOUT ABOVE [BULLISH]", "BREAKDOWN BELOW [BEARISH]"], key="alert_cond_fix", label_visibility="collapsed")
     condition_value = "bullish" if "ABOVE" in condition_label else "bearish"
 
     # ACTIVATE BUTTON
-    if st.button("LOCK TARGET & ACTIVATE SENSOR", key="alert_activate_final", type="primary", use_container_width=True):
+    if st.button("LOCK TARGET & ACTIVATE SENSOR", key="alert_activate_fix", type="primary", use_container_width=True):
         if price_target > 0 and telegram_chat_id:
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
 
@@ -186,11 +225,12 @@ def smart_alert_widget():
                 supabase = create_client(url, key)
                 supabase.table("active_alerts").insert(alert_data).execute()
                 
+                formatted_target = format_price_display(price_target, selected_instrument)
                 st.markdown(f"""
                 <div style="background:rgba(0,212,255,0.06);border-left:3px solid #00d4ff;padding:16px;border-radius:3px;margin-top:18px;box-shadow:0 0 15px rgba(0,212,255,0.1);">
                     <p style="font-family:Orbitron;font-size:12px;color:#00d4ff;margin:0 0 8px;letter-spacing:2px;">SENSOR ACTIVATED</p>
                     <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">INSTRUMENT: {selected_instrument}</p>
-                    <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">TARGET: {price_display}</p>
+                    <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">TARGET: {formatted_target}</p>
                     <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">STATUS: MONITORING 24/7</p>
                 </div>
                 """, unsafe_allow_html=True)

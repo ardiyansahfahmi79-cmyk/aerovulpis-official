@@ -25,13 +25,16 @@ key = st.secrets["supabase_key"]
 service_role_key = st.secrets.get("supabase_service_role_key", key)
 
 def get_supabase_client():
+    """Mendapatkan Supabase client dengan anon key"""
     return create_client(url, key)
 
 def get_supabase_admin():
+    """Mendapatkan Supabase client dengan service_role key untuk operasi admin"""
     return create_client(url, service_role_key)
 
 # ====================== SYSTEM LOGGING & MAINTENANCE ======================
 def send_log(pesan):
+    """Mencatat log aktivitas sistem ke Supabase"""
     try:
         supabase = get_supabase_client()
         supabase.table("logs_aktivitas").insert({"keterangan": pesan}).execute()
@@ -39,6 +42,7 @@ def send_log(pesan):
         pass
 
 def cleanup_logs():
+    """Membersihkan log yang lebih lama dari 24 jam"""
     try:
         supabase = get_supabase_client()
         cutoff = (datetime.now() - timedelta(hours=24)).isoformat()
@@ -47,6 +51,7 @@ def cleanup_logs():
         pass
 
 def cache_market_price(symbol, price, change_pct=0.0):
+    """Menyimpan harga pasar terbaru ke cache Supabase"""
     try:
         supabase = get_supabase_client()
         data = {
@@ -60,6 +65,7 @@ def cache_market_price(symbol, price, change_pct=0.0):
         pass
 
 def get_cached_market_price(symbol):
+    """Mengambil harga dari cache Supabase"""
     try:
         supabase = get_supabase_client()
         res = supabase.table("market_prices").select("price").eq("instrument", symbol).execute()
@@ -70,6 +76,7 @@ def get_cached_market_price(symbol):
     return None
 
 def get_cached_market_price_full(symbol):
+    """Mengambil data harga lengkap dari cache untuk Smart Alert System"""
     try:
         supabase = get_supabase_client()
         res = supabase.table("market_prices").select("*").eq("instrument", symbol).execute()
@@ -84,6 +91,7 @@ def get_cached_market_price_full(symbol):
     return None
 
 def cleanup_old_data():
+    """Membersihkan data market_prices yang lebih lama dari 24 jam"""
     try:
         supabase = get_supabase_client()
         cutoff = (datetime.now(pytz.timezone('Asia/Jakarta')) - timedelta(hours=24)).isoformat()
@@ -93,6 +101,10 @@ def cleanup_old_data():
 
 # ====================== USER & LICENSE MANAGEMENT ======================
 def get_user_tier(user_id):
+    """
+    Memeriksa tier langganan user dari Supabase
+    Return: (tier, expired_at)
+    """
     if not user_id:
         return "free", None
     try:
@@ -105,6 +117,7 @@ def get_user_tier(user_id):
                 try:
                     expired_date = datetime.fromisoformat(expired_at.replace('Z', '+00:00'))
                     if datetime.now(pytz.UTC) > expired_date:
+                        # Tier sudah expired, update ke free
                         get_supabase_admin().table("user_tiers").update({"tier": "free"}).eq("user_id", user_id).execute()
                         return "free", None
                 except Exception:
@@ -115,60 +128,100 @@ def get_user_tier(user_id):
     return "free", None
 
 def activate_key(user_id, key_code):
+    """
+    Validasi dan aktivasi kunci lisensi premium
+    Flow:
+    1. Cek kunci di tabel activation_keys (is_used = false)
+    2. Jika valid, update user_tiers dengan tier baru
+    3. Tandai kunci sebagai sudah digunakan
+    """
     if not user_id or not key_code:
         return False, "IDENTITY VERIFICATION REQUIRED"
     try:
         supabase = get_supabase_client()
+        # Cari kunci yang valid dan belum digunakan
         res = supabase.table("activation_keys").select("*").eq("key_code", key_code.upper().strip()).eq("is_used", False).execute()
         if not res.data:
             return False, "INVALID OR EXPIRED LICENSE KEY"
+        
         key_data = res.data[0]
         tier = key_data.get("tier", "monthly")
         duration_days = key_data.get("duration_days", 30)
+        
+        # Hitung tanggal expired
         expired_at = (datetime.now(pytz.UTC) + timedelta(days=duration_days)).isoformat()
+        
+        # Gunakan service_role untuk bypass RLS
         supabase_admin = get_supabase_admin()
         supabase_admin.table("user_tiers").upsert({
-            "user_id": user_id, "tier": tier, "expired_at": expired_at,
+            "user_id": user_id,
+            "tier": tier,
+            "expired_at": expired_at,
             "activated_at": datetime.now(pytz.UTC).isoformat()
         }).execute()
+        
+        # Tandai kunci sebagai sudah digunakan
         supabase.table("activation_keys").update({
-            "is_used": True, "used_by": user_id,
+            "is_used": True,
+            "used_by": user_id,
             "used_at": datetime.now(pytz.UTC).isoformat()
         }).eq("key_code", key_code.upper().strip()).execute()
+        
         return True, f"ACCESS GRANTED | TIER: {tier.upper()} | VALID UNTIL: {expired_at[:10]}"
     except Exception as e:
         return False, f"SYSTEM ERROR: {str(e)}"
 
 def sync_user_to_supabase(user_id, email, name, avatar=""):
+    """
+    Sinkronisasi data user dari Google OAuth ke tabel users
+    Insert jika user baru, update last_login jika sudah ada
+    """
     try:
         supabase = get_supabase_client()
         existing = supabase.table("users").select("id").eq("id", user_id).execute()
         if existing.data:
+            # Update last_login untuk user yang sudah ada
             supabase.table("users").update({
-                "email": email, "name": name, "avatar": avatar,
+                "email": email,
+                "name": name,
+                "avatar": avatar,
                 "last_login": datetime.now(pytz.UTC).isoformat()
             }).eq("id", user_id).execute()
         else:
+            # Insert user baru
             supabase.table("users").insert({
-                "id": user_id, "email": email, "name": name, "avatar": avatar,
+                "id": user_id,
+                "email": email,
+                "name": name,
+                "avatar": avatar,
                 "created_at": datetime.now(pytz.UTC).isoformat(),
                 "last_login": datetime.now(pytz.UTC).isoformat()
             }).execute()
+            # Berikan tier free untuk user baru
             supabase.table("user_tiers").insert({
-                "user_id": user_id, "tier": "free",
+                "user_id": user_id,
+                "tier": "free",
                 "activated_at": datetime.now(pytz.UTC).isoformat()
             }).execute()
     except Exception:
         pass
 
-# ====================== AI ANALYSIS CACHE ======================
+# ====================== AI ANALYSIS CACHE SYSTEM ======================
 def get_cached_ai_analysis(asset_name, timeframe):
+    """
+    Mengambil cache analisis AI untuk menghemat API calls
+    Cache berlaku 5 menit
+    """
     try:
         supabase = get_supabase_client()
         cutoff = (datetime.now(pytz.UTC) - timedelta(minutes=5)).isoformat()
         res = supabase.table("ai_analysis_cache").select("*")\
-            .eq("asset_name", asset_name).eq("timeframe", timeframe)\
-            .gte("created_at", cutoff).order("created_at", desc=True).limit(1).execute()
+            .eq("asset_name", asset_name)\
+            .eq("timeframe", timeframe)\
+            .gte("created_at", cutoff)\
+            .order("created_at", desc=True)\
+            .limit(1)\
+            .execute()
         if res.data:
             return res.data[0]["analysis"]
     except Exception:
@@ -176,22 +229,40 @@ def get_cached_ai_analysis(asset_name, timeframe):
     return None
 
 def cache_ai_analysis(asset_name, timeframe, analysis):
+    """Menyimpan hasil analisis AI ke cache Supabase"""
     try:
         supabase = get_supabase_client()
         supabase.table("ai_analysis_cache").insert({
-            "asset_name": asset_name, "timeframe": timeframe,
-            "analysis": analysis, "created_at": datetime.now(pytz.UTC).isoformat()
+            "asset_name": asset_name,
+            "timeframe": timeframe,
+            "analysis": analysis,
+            "created_at": datetime.now(pytz.UTC).isoformat()
         }).execute()
     except Exception:
         pass
 
 # ====================== GOOGLE OAUTH AUTHENTICATION ======================
 def handle_google_oauth():
+    """
+    Menangani autentikasi Google OAuth via Supabase Auth
+    
+    GOOGLE 403 FIX - Pastikan konfigurasi berikut:
+    1. Google Cloud Console → Authorized JavaScript origins:
+       https://bqdugkmmnbxlftuxqtdg.supabase.co
+    2. Google Cloud Console → Authorized redirect URIs:
+       https://bqdugkmmnbxlftuxqtdg.supabase.co/auth/v1/callback
+    3. Supabase Dashboard → Authentication → Providers → Google:
+       - Enable = ON
+       - Client ID & Client Secret dari Google Console
+       - Skip nonce checks = OFF
+    """
+    # Handle OAuth callback (user kembali dari Google)
     query_params = st.query_params
     if "code" in query_params:
         code = query_params["code"]
         try:
             supabase = get_supabase_client()
+            # Exchange authorization code untuk session
             auth_response = supabase.auth.exchange_code_for_session({"auth_code": code})
             if auth_response and auth_response.user:
                 user = auth_response.user
@@ -199,19 +270,27 @@ def handle_google_oauth():
                 user_email = user.email or ""
                 user_name = user.user_metadata.get("full_name") or user.user_metadata.get("name") or (user_email.split("@")[0] if user_email else "USER")
                 user_avatar = user.user_metadata.get("avatar_url") or user.user_metadata.get("picture") or ""
+                
+                # Sinkronisasi ke database
                 sync_user_to_supabase(user_id, user_email, user_name, user_avatar)
+                
+                # Simpan ke session state
                 st.session_state.auth_session = auth_response.session.access_token if auth_response.session else "active"
                 st.session_state.user_id = user_id
                 st.session_state.user_name = user_name
                 st.session_state.user_email = user_email
                 st.session_state.user_avatar = user_avatar
                 st.session_state.user_tier, _ = get_user_tier(user_id)
+                
+                # Bersihkan URL dan refresh
                 st.query_params.clear()
                 send_log(f"AUTH: {user_name} ({user_email})")
                 st.rerun()
         except Exception as e:
             st.sidebar.error(f"AUTHENTICATION ERROR: {str(e)}")
             send_log(f"AUTH ERROR: {str(e)}")
+    
+    # Cek existing session (user sudah login sebelumnya)
     if not st.session_state.get("auth_session"):
         try:
             supabase = get_supabase_client()
@@ -227,24 +306,36 @@ def handle_google_oauth():
         except Exception:
             pass
 
-# ====================== ICMARKET / CTRADER PRICE FETCH ======================
+# ====================== ICMARKET PRICE FETCH ======================
 def get_icmarket_price(symbol):
+    """
+    Mengambil harga real-time dari IC Market via cTrader API
+    Untuk XAUUSD, XAGUSD, Forex, dan Crypto
+    Akurasi tinggi dengan spread 2 pip
+    """
     ctrader_map = {
         "XAUUSD": "1", "XAGUSD": "2",
         "EURUSD": "3", "GBPUSD": "4", "USDJPY": "5", "AUDUSD": "6", "USDCHF": "7",
         "BTCUSD": "100", "ETHUSD": "101", "SOLUSD": "102", "XRPUSD": "103", "BNBUSD": "104",
     }
+    
     symbol_id = ctrader_map.get(symbol)
     if not symbol_id:
         return None
+    
     ctrader_client_id = st.secrets.get("CTRADER_CLIENT_ID") or os.getenv("CTRADER_CLIENT_ID")
     ctrader_client_secret = st.secrets.get("CTRADER_CLIENT_SECRET") or os.getenv("CTRADER_CLIENT_SECRET")
+    
     if not ctrader_client_id or not ctrader_client_secret:
         return None
+    
     try:
         response = requests.get(
             f"https://api.ctrader.com/v1/symbols/{symbol_id}/price",
-            headers={"Authorization": f"Bearer {ctrader_client_id}:{ctrader_client_secret}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"Bearer {ctrader_client_id}:{ctrader_client_secret}",
+                "Content-Type": "application/json"
+            },
             timeout=5
         )
         if response.status_code == 200:
@@ -252,60 +343,128 @@ def get_icmarket_price(symbol):
             bid = float(data.get("bid", 0))
             ask = float(data.get("ask", 0))
             price = (bid + ask) / 2
-            if symbol in ["XAUUSD", "XAGUSD"]: formatted_price = round(price, 2)
-            elif symbol in ["BTCUSD", "ETHUSD"]: formatted_price = round(price, 2)
-            elif symbol in ["SOLUSD", "XRPUSD", "BNBUSD"]: formatted_price = round(price, 4)
-            else: formatted_price = round(price, 4)
-            return {"price": formatted_price, "bid": bid, "ask": ask, "spread": round(ask - bid, 2), "source": "ICMARKET"}
+            
+            # Format harga berdasarkan jenis instrumen
+            if symbol in ["XAUUSD", "XAGUSD"]:
+                formatted_price = round(price, 2)
+            elif symbol in ["BTCUSD", "ETHUSD"]:
+                formatted_price = round(price, 2)
+            elif symbol in ["SOLUSD", "XRPUSD", "BNBUSD"]:
+                formatted_price = round(price, 4)
+            else:
+                formatted_price = round(price, 4)
+            
+            spread = round(ask - bid, 2)
+            return {
+                "price": formatted_price,
+                "bid": bid,
+                "ask": ask,
+                "spread": spread,
+                "source": "ICMARKET"
+            }
     except Exception:
         pass
     return None
 
 def format_price_display(price, instrument_name):
+    """
+    Format tampilan harga sesuai jenis instrumen:
+    - XAUUSD: 4,756.00 (3 digit di tengah, 2 digit desimal)
+    - XAGUSD: 34.50
+    - Forex: 1.0850
+    - BTC/ETH: 67,250.00
+    - Indeks: 18,250.50
+    - Saham: 150.25
+    """
     name_upper = str(instrument_name).upper() if instrument_name else ""
-    if "XAU" in name_upper or "GOLD" in name_upper: return f"{price:,.2f}"
-    elif "XAG" in name_upper or "SILVER" in name_upper: return f"{price:,.2f}"
-    elif "BTC" in name_upper or "BITCOIN" in name_upper: return f"{price:,.2f}"
-    elif "ETH" in name_upper or "ETHEREUM" in name_upper: return f"{price:,.2f}"
-    elif any(c in name_upper for c in ["SOL", "BNB", "XRP"]): return f"{price:,.2f}"
-    elif any(fx in name_upper for fx in ["EUR", "GBP", "CHF", "JPY", "AUD", "NZD", "CAD"]): return f"{price:,.4f}".rstrip('0').rstrip('.')
-    elif any(idx in name_upper for idx in ["NASDAQ", "S&P", "DOW", "DAX", "IHSG"]): return f"{price:,.2f}"
-    elif any(cmd in name_upper for cmd in ["OIL", "WTI", "CRUDE", "GAS", "COPPER", "PALLADIUM", "PLATINUM"]): return f"{price:,.2f}"
+    
+    if "XAU" in name_upper or "GOLD" in name_upper:
+        return f"{price:,.2f}"
+    elif "XAG" in name_upper or "SILVER" in name_upper:
+        return f"{price:,.2f}"
+    elif "BTC" in name_upper or "BITCOIN" in name_upper:
+        return f"{price:,.2f}"
+    elif "ETH" in name_upper or "ETHEREUM" in name_upper:
+        return f"{price:,.2f}"
+    elif any(c in name_upper for c in ["SOL", "BNB", "XRP"]):
+        return f"{price:,.2f}"
+    elif any(fx in name_upper for fx in ["EUR", "GBP", "CHF", "JPY", "AUD", "NZD", "CAD"]):
+        return f"{price:,.4f}".rstrip('0').rstrip('.')
+    elif any(idx in name_upper for idx in ["NASDAQ", "S&P", "DOW", "DAX", "IHSG", "SP500"]):
+        return f"{price:,.2f}"
+    elif any(cmd in name_upper for cmd in ["OIL", "WTI", "CRUDE", "GAS", "COPPER", "PALLADIUM", "PLATINUM"]):
+        return f"{price:,.2f}"
     else:
-        if price >= 1000: return f"{price:,.2f}"
-        elif price >= 1: return f"{price:,.2f}"
-        else: return f"{price:,.4f}".rstrip('0').rstrip('.')
+        if price >= 1000:
+            return f"{price:,.2f}"
+        elif price >= 1:
+            return f"{price:,.2f}"
+        else:
+            return f"{price:,.4f}".rstrip('0').rstrip('.')
 
 # ====================== APPLICATION CONFIGURATION ======================
-st.set_page_config(layout="wide", page_title="AEROVULPIS V3.5", page_icon="◈", initial_sidebar_state="expanded")
+st.set_page_config(
+    layout="wide",
+    page_title="AEROVULPIS V3.5",
+    page_icon="◈",
+    initial_sidebar_state="expanded"
+)
+
+# Inisialisasi sistem
 cleanup_logs()
 cleanup_old_data()
 send_log("AEROVULPIS V3.5 SYSTEM ONLINE")
 
 # ====================== SESSION STATE INITIALIZATION ======================
-if "lang" not in st.session_state: st.session_state.lang = "ID"
-if "cached_analysis" not in st.session_state: st.session_state.cached_analysis = {}
-if "user_tier" not in st.session_state: st.session_state.user_tier = "free"
-if "user_id" not in st.session_state: st.session_state.user_id = None
-if "user_name" not in st.session_state: st.session_state.user_name = None
-if "user_email" not in st.session_state: st.session_state.user_email = None
-if "user_avatar" not in st.session_state: st.session_state.user_avatar = None
-if "auth_session" not in st.session_state: st.session_state.auth_session = None
-if "daily_analysis_count" not in st.session_state: st.session_state.daily_analysis_count = 0
-if "daily_chatbot_count" not in st.session_state: st.session_state.daily_chatbot_count = 0
-if "last_reset_date" not in st.session_state: st.session_state.last_reset_date = datetime.now().date()
-if "show_activation" not in st.session_state: st.session_state.show_activation = False
-if "activation_result" not in st.session_state: st.session_state.activation_result = None
-if "sentinel_analysis" not in st.session_state: st.session_state.sentinel_analysis = None
-if "messages" not in st.session_state: st.session_state.messages = []
-if "active_alerts" not in st.session_state: st.session_state.active_alerts = []
-if "last_news_fetch" not in st.session_state: st.session_state.last_news_fetch = {}
+if "lang" not in st.session_state:
+    st.session_state.lang = "ID"
 
+if "cached_analysis" not in st.session_state:
+    st.session_state.cached_analysis = {}
+
+# User & Authentication State
+if "user_tier" not in st.session_state:
+    st.session_state.user_tier = "free"
+if "user_id" not in st.session_state:
+    st.session_state.user_id = None
+if "user_name" not in st.session_state:
+    st.session_state.user_name = None
+if "user_email" not in st.session_state:
+    st.session_state.user_email = None
+if "user_avatar" not in st.session_state:
+    st.session_state.user_avatar = None
+if "auth_session" not in st.session_state:
+    st.session_state.auth_session = None
+
+# Usage Limits
+if "daily_analysis_count" not in st.session_state:
+    st.session_state.daily_analysis_count = 0
+if "daily_chatbot_count" not in st.session_state:
+    st.session_state.daily_chatbot_count = 0
+if "last_reset_date" not in st.session_state:
+    st.session_state.last_reset_date = datetime.now().date()
+
+# Feature States
+if "show_activation" not in st.session_state:
+    st.session_state.show_activation = False
+if "activation_result" not in st.session_state:
+    st.session_state.activation_result = None
+if "sentinel_analysis" not in st.session_state:
+    st.session_state.sentinel_analysis = None
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "active_alerts" not in st.session_state:
+    st.session_state.active_alerts = []
+if "last_news_fetch" not in st.session_state:
+    st.session_state.last_news_fetch = {}
+
+# Reset daily limits jika sudah ganti hari
 if st.session_state.last_reset_date < datetime.now().date():
     st.session_state.daily_analysis_count = 0
     st.session_state.daily_chatbot_count = 0
     st.session_state.last_reset_date = datetime.now().date()
 
+# Handle Google OAuth Redirect
 handle_google_oauth()
 
 # ====================== TIER LIMITS CONFIGURATION ======================
@@ -318,7 +477,7 @@ LIMITS = {
     "yearly": {"analysis_per_day": 999999, "chatbot_per_day": 999999}
 }
 
-# ====================== LANGUAGE DICTIONARY ======================
+# ====================== LANGUAGE DICTIONARY (ID & EN) ======================
 translations = {
     "ID": {
         "control_center": "CONTROL CENTER",
@@ -527,6 +686,7 @@ st.markdown("""
         color: var(--text-primary);
     }
 
+    /* ==================== GLASS CARDS ==================== */
     .glass-card {
         background: var(--card-bg);
         backdrop-filter: blur(24px);
@@ -544,6 +704,7 @@ st.markdown("""
         box-shadow: 0 6px 36px rgba(0, 0, 0, 0.7), 0 0 16px rgba(0, 212, 255, 0.04);
     }
 
+    /* ==================== SESSION CONTAINER ==================== */
     .session-container {
         border: 1px solid rgba(0, 212, 255, 0.2);
         border-radius: 6px;
@@ -553,6 +714,7 @@ st.markdown("""
         margin-bottom: 24px;
     }
 
+    /* ==================== NEWS CARDS ==================== */
     .news-card {
         background: rgba(0, 212, 255, 0.015);
         border: 1px solid rgba(0, 212, 255, 0.06);
@@ -580,6 +742,7 @@ st.markdown("""
         transform: translateX(2px);
     }
 
+    /* ==================== HEADER & LOGO ==================== */
     .main-title-container {
         text-align: center;
         margin-bottom: 0;
@@ -611,7 +774,11 @@ st.markdown("""
         z-index: 2;
     }
 
-    @keyframes floatLogo { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-7px); } }
+    @keyframes floatLogo {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-7px); }
+    }
+
     @keyframes rotateLogo3D {
         0% { transform: rotateY(0deg) rotateX(0deg); }
         25% { transform: rotateY(90deg) rotateX(4deg); }
@@ -634,7 +801,10 @@ st.markdown("""
         text-align: center;
     }
 
-    @keyframes titleShimmer { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+    @keyframes titleShimmer {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
 
     .subtitle-text {
         text-align: center;
@@ -646,50 +816,94 @@ st.markdown("""
         letter-spacing: 5px;
     }
 
-    /* 3D LOADING */
+    /* ==================== 3D LOADING ANIMATION ==================== */
     .loading-3d-pro-container {
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        padding: 60px; position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px;
+        position: relative;
         background: radial-gradient(circle at center, rgba(0, 212, 255, 0.06) 0%, transparent 70%);
-        border-radius: 8px; border: 1px solid rgba(0, 212, 255, 0.08);
+        border-radius: 8px;
+        border: 1px solid rgba(0, 212, 255, 0.08);
     }
-    .loading-3d-pro-scene { width: 140px; height: 140px; perspective: 600px; position: relative; }
+
+    .loading-3d-pro-scene {
+        width: 140px; height: 140px;
+        perspective: 600px;
+        position: relative;
+    }
+
     .loading-3d-pro-core {
-        width: 100%; height: 100%; position: relative; transform-style: preserve-3d;
+        width: 100%; height: 100%;
+        position: relative;
+        transform-style: preserve-3d;
         animation: rotateCore3D 3.5s infinite cubic-bezier(0.68, -0.55, 0.27, 1.55);
     }
+
     .loading-3d-pro-ring {
-        position: absolute; border-radius: 50%; border: 1.5px solid transparent;
-        top: 50%; left: 50%; transform-style: preserve-3d;
+        position: absolute;
+        border-radius: 50%;
+        border: 1.5px solid transparent;
+        top: 50%; left: 50%;
+        transform-style: preserve-3d;
     }
+
     .loading-3d-pro-ring:nth-child(1) {
         width: 100%; height: 100%; margin-top: -50%; margin-left: -50%;
-        border-top-color: #00d4ff; animation: ringPulse1 2s infinite ease-in-out; transform: rotateX(75deg);
+        border-top-color: #00d4ff;
+        animation: ringPulse1 2s infinite ease-in-out;
+        transform: rotateX(75deg);
     }
+
     .loading-3d-pro-ring:nth-child(2) {
         width: 78%; height: 78%; margin-top: -39%; margin-left: -39%;
-        border-right-color: #00ff88; animation: ringPulse2 2s infinite ease-in-out 0.4s; transform: rotateY(75deg);
+        border-right-color: #00ff88;
+        animation: ringPulse2 2s infinite ease-in-out 0.4s;
+        transform: rotateY(75deg);
     }
+
     .loading-3d-pro-ring:nth-child(3) {
         width: 56%; height: 56%; margin-top: -28%; margin-left: -28%;
-        border-bottom-color: #ff2a6d; animation: ringPulse3 2s infinite ease-in-out 0.8s; transform: rotateZ(60deg);
+        border-bottom-color: #ff2a6d;
+        animation: ringPulse3 2s infinite ease-in-out 0.8s;
+        transform: rotateZ(60deg);
     }
+
     .loading-3d-pro-ring:nth-child(4) {
         width: 34%; height: 34%; margin-top: -17%; margin-left: -17%;
-        border-left-color: #bc13fe; animation: ringPulse4 2s infinite ease-in-out 1.2s; transform: rotateX(45deg) rotateY(45deg);
+        border-left-color: #bc13fe;
+        animation: ringPulse4 2s infinite ease-in-out 1.2s;
+        transform: rotateX(45deg) rotateY(45deg);
     }
+
     .loading-3d-pro-center {
-        position: absolute; width: 16px; height: 16px;
-        background: radial-gradient(circle, #ffffff, #00d4ff); border-radius: 50%;
-        top: 50%; left: 50%; transform: translate(-50%, -50%);
+        position: absolute;
+        width: 16px; height: 16px;
+        background: radial-gradient(circle, #ffffff, #00d4ff);
+        border-radius: 50%;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
         box-shadow: 0 0 50px rgba(0, 212, 255, 0.8), 0 0 100px rgba(0, 85, 255, 0.4);
         animation: coreGlow 1.5s infinite alternate;
     }
-    .loading-3d-pro-particles { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
-    .loading-3d-pro-particle {
-        position: absolute; width: 2px; height: 2px; background: #00d4ff; border-radius: 50%;
-        box-shadow: 0 0 8px #00d4ff; animation: particleDrift 2.5s infinite ease-in-out;
+
+    .loading-3d-pro-particles {
+        position: absolute;
+        width: 100%; height: 100%;
+        top: 0; left: 0;
     }
+
+    .loading-3d-pro-particle {
+        position: absolute;
+        width: 2px; height: 2px;
+        background: #00d4ff;
+        border-radius: 50%;
+        box-shadow: 0 0 8px #00d4ff;
+        animation: particleDrift 2.5s infinite ease-in-out;
+    }
+
     .loading-3d-pro-particle:nth-child(1) { top: 8%; left: 25%; animation-delay: 0s; }
     .loading-3d-pro-particle:nth-child(2) { top: 22%; left: 78%; animation-delay: 0.5s; }
     .loading-3d-pro-particle:nth-child(3) { top: 68%; left: 18%; animation-delay: 1s; }
@@ -697,135 +911,406 @@ st.markdown("""
     .loading-3d-pro-particle:nth-child(5) { top: 40%; left: 88%; animation-delay: 2s; }
     .loading-3d-pro-particle:nth-child(6) { top: 55%; left: 8%; animation-delay: 0.3s; }
 
-    @keyframes rotateCore3D { 0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); } 100% { transform: rotateX(720deg) rotateY(360deg) rotateZ(180deg); } }
-    @keyframes ringPulse1 { 0%,100%{border-top-color:rgba(0,212,255,0.2)} 50%{border-top-color:#00d4ff;box-shadow:0 0 30px rgba(0,212,255,0.5)} }
-    @keyframes ringPulse2 { 0%,100%{border-right-color:rgba(0,255,136,0.2)} 50%{border-right-color:#00ff88;box-shadow:0 0 30px rgba(0,255,136,0.5)} }
-    @keyframes ringPulse3 { 0%,100%{border-bottom-color:rgba(255,42,109,0.2)} 50%{border-bottom-color:#ff2a6d;box-shadow:0 0 30px rgba(255,42,109,0.5)} }
-    @keyframes ringPulse4 { 0%,100%{border-left-color:rgba(188,19,254,0.2)} 50%{border-left-color:#bc13fe;box-shadow:0 0 30px rgba(188,19,254,0.5)} }
-    @keyframes coreGlow { 0%{transform:translate(-50%,-50%)scale(0.8);box-shadow:0 0 30px rgba(0,212,255,0.5)} 100%{transform:translate(-50%,-50%)scale(1.4);box-shadow:0 0 70px rgba(0,212,255,0.9),0 0 140px rgba(0,85,255,0.5)} }
-    @keyframes particleDrift { 0%,100%{transform:translateY(0)scale(0.8);opacity:0.2} 50%{transform:translateY(-18px)scale(2);opacity:1} }
+    @keyframes rotateCore3D {
+        0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+        100% { transform: rotateX(720deg) rotateY(360deg) rotateZ(180deg); }
+    }
+
+    @keyframes ringPulse1 {
+        0%, 100% { border-top-color: rgba(0,212,255,0.2); }
+        50% { border-top-color: #00d4ff; box-shadow: 0 0 30px rgba(0,212,255,0.5); }
+    }
+
+    @keyframes ringPulse2 {
+        0%, 100% { border-right-color: rgba(0,255,136,0.2); }
+        50% { border-right-color: #00ff88; box-shadow: 0 0 30px rgba(0,255,136,0.5); }
+    }
+
+    @keyframes ringPulse3 {
+        0%, 100% { border-bottom-color: rgba(255,42,109,0.2); }
+        50% { border-bottom-color: #ff2a6d; box-shadow: 0 0 30px rgba(255,42,109,0.5); }
+    }
+
+    @keyframes ringPulse4 {
+        0%, 100% { border-left-color: rgba(188,19,254,0.2); }
+        50% { border-left-color: #bc13fe; box-shadow: 0 0 30px rgba(188,19,254,0.5); }
+    }
+
+    @keyframes coreGlow {
+        0% { transform: translate(-50%, -50%) scale(0.8); box-shadow: 0 0 30px rgba(0,212,255,0.5); }
+        100% { transform: translate(-50%, -50%) scale(1.4); box-shadow: 0 0 70px rgba(0,212,255,0.9), 0 0 140px rgba(0,85,255,0.5); }
+    }
+
+    @keyframes particleDrift {
+        0%, 100% { transform: translateY(0) scale(0.8); opacity: 0.2; }
+        50% { transform: translateY(-18px) scale(2); opacity: 1; }
+    }
 
     .loading-3d-pro-text {
-        font-family: 'Orbitron', sans-serif; color: #00d4ff;
-        text-shadow: 0 0 20px rgba(0, 212, 255, 0.6); margin-top: 30px;
-        font-size: 15px; letter-spacing: 5px; font-weight: 700;
+        font-family: 'Orbitron', sans-serif;
+        color: #00d4ff;
+        text-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+        margin-top: 30px;
+        font-size: 15px;
+        letter-spacing: 5px;
+        font-weight: 700;
         animation: textFlicker 2s infinite alternate;
     }
-    .loading-3d-pro-sub { font-family: 'Share Tech Mono', monospace; color: #6688aa; font-size: 10px; margin-top: 6px; letter-spacing: 2px; }
-    @keyframes textFlicker { 0%,100%{opacity:0.7} 50%{opacity:1} }
 
-    /* FINTECH CARDS */
+    .loading-3d-pro-sub {
+        font-family: 'Share Tech Mono', monospace;
+        color: #6688aa;
+        font-size: 10px;
+        margin-top: 6px;
+        letter-spacing: 2px;
+        animation: textFlicker 2s infinite alternate 0.5s;
+    }
+
+    @keyframes textFlicker {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+    }
+
+    /* ==================== FIN-TECH RESULT CARDS ==================== */
     .fintech-result-card {
         background: linear-gradient(160deg, rgba(0, 18, 38, 0.9), rgba(0, 8, 24, 0.95));
-        border: 1px solid rgba(0, 212, 255, 0.18); border-radius: 4px; padding: 22px;
-        margin: 10px 0; position: relative; overflow: hidden;
+        border: 1px solid rgba(0, 212, 255, 0.18);
+        border-radius: 4px;
+        padding: 22px;
+        margin: 10px 0;
+        position: relative;
+        overflow: hidden;
     }
+
     .fintech-result-card::before {
-        content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 1px;
+        content: '';
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 1px;
         background: linear-gradient(90deg, transparent, #00d4ff, #00ff88, #00d4ff, transparent);
         animation: scanHorizontal 3s infinite;
     }
-    @keyframes scanHorizontal { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-    .risk-metric { font-family: 'Orbitron', sans-serif; font-size: 14px; color: #00d4ff; text-align: center; letter-spacing: 1px; }
 
-    /* BUTTONS */
+    @keyframes scanHorizontal {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+
+    .risk-metric {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 14px;
+        color: #00d4ff;
+        text-align: center;
+        letter-spacing: 1px;
+    }
+
+    /* ==================== BUTTONS ==================== */
     .stButton > button {
         background: linear-gradient(160deg, #001a33, #002850) !important;
         border: 1px solid rgba(0, 212, 255, 0.35) !important;
-        color: #00d4ff !important; font-family: 'Orbitron', sans-serif !important;
-        font-weight: 600 !important; font-size: 11px !important; padding: 10px 20px !important;
-        border-radius: 3px !important; letter-spacing: 2px !important;
-        transition: all 0.3s ease !important; text-transform: uppercase;
+        color: #00d4ff !important;
+        font-family: 'Orbitron', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 11px !important;
+        padding: 10px 20px !important;
+        border-radius: 3px !important;
+        letter-spacing: 2px !important;
+        transition: all 0.3s ease !important;
+        text-transform: uppercase;
     }
+
     .stButton > button:hover {
         background: linear-gradient(160deg, #002850, #003870) !important;
         border-color: #00d4ff !important;
         box-shadow: 0 0 28px rgba(0, 212, 255, 0.25), 0 0 56px rgba(0, 212, 255, 0.08) !important;
-        color: #ffffff !important; transform: translateY(-1px);
+        color: #ffffff !important;
+        transform: translateY(-1px);
     }
 
-    /* SIDEBAR */
+    .stButton > button:active {
+        transform: translateY(0) !important;
+    }
+
+    /* ==================== SIDEBAR ==================== */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, rgba(6, 10, 18, 0.99) 0%, rgba(2, 5, 10, 0.99) 100%) !important;
         border-right: 1px solid rgba(0, 212, 255, 0.1) !important;
     }
+
     [data-testid="stSidebar"] .stSelectbox > div > div {
-        background: rgba(0, 28, 56, 0.5) !important; border: 1px solid rgba(0, 212, 255, 0.2) !important;
-        border-radius: 3px !important; color: #c0d0e0 !important; font-family: 'Rajdhani', sans-serif !important;
+        background: rgba(0, 28, 56, 0.5) !important;
+        border: 1px solid rgba(0, 212, 255, 0.2) !important;
+        border-radius: 3px !important;
+        color: #c0d0e0 !important;
+        font-family: 'Rajdhani', sans-serif !important;
     }
+
     [data-testid="stSidebar"] .stSelectbox label {
-        color: #00d4ff !important; font-family: 'Orbitron', sans-serif !important;
-        font-size: 8px !important; letter-spacing: 2px !important;
+        color: #00d4ff !important;
+        font-family: 'Orbitron', sans-serif !important;
+        font-size: 8px !important;
+        letter-spacing: 2px !important;
     }
+
     [data-testid="stSidebar"] .nav-link {
-        background: rgba(0, 212, 255, 0.015) !important; border: 1px solid rgba(0, 212, 255, 0.06) !important;
-        border-radius: 3px !important; margin: 2px 0 !important; font-family: 'Rajdhani', sans-serif !important;
-        font-weight: 500 !important; letter-spacing: 1px !important; font-size: 11px !important;
+        background: rgba(0, 212, 255, 0.015) !important;
+        border: 1px solid rgba(0, 212, 255, 0.06) !important;
+        border-radius: 3px !important;
+        margin: 2px 0 !important;
         transition: all 0.25s ease !important;
+        font-family: 'Rajdhani', sans-serif !important;
+        font-weight: 500 !important;
+        letter-spacing: 1px !important;
+        font-size: 11px !important;
     }
+
     [data-testid="stSidebar"] .nav-link:hover {
-        background: rgba(0, 212, 255, 0.05) !important; border-color: rgba(0, 212, 255, 0.3) !important;
+        background: rgba(0, 212, 255, 0.05) !important;
+        border-color: rgba(0, 212, 255, 0.3) !important;
     }
+
     [data-testid="stSidebar"] .nav-link.selected {
         background: linear-gradient(160deg, rgba(0, 48, 96, 0.4), rgba(0, 28, 64, 0.6)) !important;
-        border-color: #00d4ff !important; box-shadow: 0 0 18px rgba(0, 212, 255, 0.12) !important;
+        border-color: #00d4ff !important;
+        box-shadow: 0 0 18px rgba(0, 212, 255, 0.12) !important;
         color: #00d4ff !important;
     }
 
-    /* GOOGLE LOGIN */
+    /* ==================== GOOGLE LOGIN BUTTON ==================== */
     .google-login-btn {
-        display: inline-flex; align-items: center; justify-content: center; gap: 10px;
-        background: #ffffff; border: 1px solid #ddd; color: #1a1a1a;
-        padding: 14px 24px; border-radius: 3px; font-family: 'Orbitron', sans-serif;
-        font-weight: 600; font-size: 10px; letter-spacing: 1.5px; width: 100%;
-        transition: all 0.3s ease; text-decoration: none !important; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        background: #ffffff;
+        border: 1px solid #ddd;
+        color: #1a1a1a;
+        padding: 14px 24px;
+        border-radius: 3px;
+        font-family: 'Orbitron', sans-serif;
+        font-weight: 600;
+        font-size: 10px;
+        letter-spacing: 1.5px;
+        width: 100%;
+        transition: all 0.3s ease;
+        text-decoration: none !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     }
-    .google-login-btn:hover { border-color: #4285F4; box-shadow: 0 4px 20px rgba(66, 133, 244, 0.3); transform: translateY(-1px); }
 
-    /* INDICATOR GRID */
-    .indicator-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 7px; margin-top: 14px; }
+    .google-login-btn:hover {
+        border-color: #4285F4;
+        box-shadow: 0 4px 20px rgba(66, 133, 244, 0.3);
+        transform: translateY(-1px);
+    }
+
+    /* ==================== INDICATOR GRID ==================== */
+    .indicator-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+        gap: 7px;
+        margin-top: 14px;
+    }
+
     .indicator-box {
-        background: rgba(0, 28, 56, 0.35); border: 1px solid rgba(0, 212, 255, 0.08);
-        border-radius: 3px; padding: 14px; text-align: center; transition: all 0.3s ease;
+        background: rgba(0, 28, 56, 0.35);
+        border: 1px solid rgba(0, 212, 255, 0.08);
+        border-radius: 3px;
+        padding: 14px;
+        text-align: center;
+        transition: all 0.3s ease;
     }
-    .indicator-box:hover { border-color: rgba(0, 212, 255, 0.35); background: rgba(0, 36, 72, 0.5); }
-    .indicator-name { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: #6688aa; margin-bottom: 6px; letter-spacing: 1px; }
-    .indicator-value { font-family: 'Orbitron', sans-serif; font-size: 15px; color: #e0e6f0; font-weight: 600; }
-    .indicator-signal { font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 700; margin-top: 4px; letter-spacing: 1.5px; }
 
-    /* PILLARS */
-    .pillar-container { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 3px !important; margin: 18px 0 !important; }
+    .indicator-box:hover {
+        border-color: rgba(0, 212, 255, 0.35);
+        background: rgba(0, 36, 72, 0.5);
+    }
+
+    .indicator-name {
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 9px;
+        color: #6688aa;
+        margin-bottom: 6px;
+        letter-spacing: 1px;
+    }
+
+    .indicator-value {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 15px;
+        color: #e0e6f0;
+        font-weight: 600;
+    }
+
+    .indicator-signal {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        margin-top: 4px;
+        letter-spacing: 1.5px;
+    }
+
+    /* ==================== PILLARS ==================== */
+    .pillar-container {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 3px !important;
+        margin: 18px 0 !important;
+        width: 100% !important;
+    }
+
     .pillar-item {
-        display: flex !important; flex-direction: column !important; align-items: center !important;
-        text-align: center !important; padding: 12px 4px !important;
-        background: rgba(0, 26, 52, 0.3) !important; border: 1px solid rgba(0, 212, 255, 0.08) !important; border-radius: 3px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+        padding: 12px 4px !important;
+        background: rgba(0, 26, 52, 0.3) !important;
+        border: 1px solid rgba(0, 212, 255, 0.08) !important;
+        border-radius: 3px !important;
     }
-    .pillar-icon { width: 30px !important; height: 30px !important; object-fit: contain !important; margin-bottom: 7px !important; filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.45)) !important; }
-    .pillar-title { font-family: 'Orbitron', sans-serif !important; font-size: 6px !important; font-weight: 700 !important; color: #00d4ff !important; margin: 0 0 3px 0 !important; letter-spacing: 1px !important; }
-    .pillar-desc { font-family: 'Share Tech Mono', monospace !important; font-size: 6px !important; color: #557799 !important; margin: 0 !important; }
 
-    /* SENTINEL */
+    .pillar-icon {
+        width: 30px !important; height: 30px !important;
+        object-fit: contain !important;
+        margin-bottom: 7px !important;
+        filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.45)) !important;
+    }
+
+    .pillar-title {
+        font-family: 'Orbitron', sans-serif !important;
+        font-size: 6px !important;
+        font-weight: 700 !important;
+        color: #00d4ff !important;
+        margin: 0 0 3px 0 !important;
+        letter-spacing: 1px !important;
+    }
+
+    .pillar-desc {
+        font-family: 'Share Tech Mono', monospace !important;
+        font-size: 6px !important;
+        color: #557799 !important;
+        margin: 0 !important;
+    }
+
+    /* ==================== SENTINEL ==================== */
     .sentinel-container {
-        border: 1px solid rgba(0, 212, 255, 0.25); border-radius: 6px; padding: 24px;
-        background: rgba(0, 12, 28, 0.6); box-shadow: 0 0 48px rgba(0, 212, 255, 0.06); margin-bottom: 20px;
+        border: 1px solid rgba(0, 212, 255, 0.25);
+        border-radius: 6px;
+        padding: 24px;
+        background: rgba(0, 12, 28, 0.6);
+        box-shadow: 0 0 48px rgba(0, 212, 255, 0.06);
+        margin-bottom: 20px;
     }
-    .sentinel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 1px solid rgba(0, 212, 255, 0.12); padding-bottom: 12px; }
-    .sentinel-title { font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 700; color: #00d4ff; text-shadow: 0 0 20px rgba(0, 212, 255, 0.35); letter-spacing: 4px; }
-    .intelligence-panel { background: rgba(0, 8, 22, 0.7); border: 1px solid rgba(0, 212, 255, 0.1); border-radius: 4px; padding: 18px; height: 100%; }
-    .intel-header { font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 600; color: #00d4ff; margin-bottom: 12px; border-left: 2px solid #00d4ff; padding-left: 12px; letter-spacing: 3px; }
-    .intel-content { font-family: 'Rajdhani', sans-serif; font-size: 13px; color: #c0d0e0; line-height: 1.6; }
-    .status-badge { padding: 4px 14px; border-radius: 2px; font-size: 9px; font-family: 'Orbitron', sans-serif; letter-spacing: 2px; }
-    .status-open { background: rgba(0, 255, 136, 0.07); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.25); }
-    .status-ai { background: rgba(0, 212, 255, 0.07); color: #00d4ff; border: 1px solid rgba(0, 212, 255, 0.25); }
 
-    /* SCROLLBAR */
-    ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-track { background: #010408; }
-    ::-webkit-scrollbar-thumb { background: #1a3350; border-radius: 2px; } ::-webkit-scrollbar-thumb:hover { background: #00d4ff; }
+    .sentinel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+        border-bottom: 1px solid rgba(0, 212, 255, 0.12);
+        padding-bottom: 12px;
+    }
 
-    /* TEXT GLOW */
-    .cyber-glow-text { font-family: 'Orbitron', sans-serif; color: #00d4ff; text-shadow: 0 0 10px rgba(0, 212, 255, 0.55), 0 0 30px rgba(0, 212, 255, 0.18); letter-spacing: 2px; }
-    .digital-display { font-family: 'Share Tech Mono', monospace; color: #00ff88; text-shadow: 0 0 8px rgba(0, 255, 136, 0.45); }
-    .section-title { font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 600; color: #7788aa; letter-spacing: 3px; text-transform: uppercase; margin: 22px 0 8px 0; }
+    .sentinel-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 26px;
+        font-weight: 700;
+        color: #00d4ff;
+        text-shadow: 0 0 20px rgba(0, 212, 255, 0.35);
+        letter-spacing: 4px;
+        margin: 0;
+    }
+
+    .intelligence-panel {
+        background: rgba(0, 8, 22, 0.7);
+        border: 1px solid rgba(0, 212, 255, 0.1);
+        border-radius: 4px;
+        padding: 18px;
+        height: 100%;
+    }
+
+    .intel-header {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        color: #00d4ff;
+        margin-bottom: 12px;
+        border-left: 2px solid #00d4ff;
+        padding-left: 12px;
+        letter-spacing: 3px;
+    }
+
+    .intel-content {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 13px;
+        color: #c0d0e0;
+        line-height: 1.6;
+    }
+
+    .status-badge {
+        padding: 4px 14px;
+        border-radius: 2px;
+        font-size: 9px;
+        font-family: 'Orbitron', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+
+    .status-open {
+        background: rgba(0, 255, 136, 0.07);
+        color: #00ff88;
+        border: 1px solid rgba(0, 255, 136, 0.25);
+    }
+
+    .status-ai {
+        background: rgba(0, 212, 255, 0.07);
+        color: #00d4ff;
+        border: 1px solid rgba(0, 212, 255, 0.25);
+    }
+
+    /* ==================== CYBER GAUGE ==================== */
+    .cyber-gauge-container {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .cyber-gauge-glow {
+        animation: gaugeGlowPulse 2s infinite alternate;
+    }
+
+    @keyframes gaugeGlowPulse {
+        0% { filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.3)); }
+        100% { filter: drop-shadow(0 0 12px rgba(0, 255, 136, 0.6)); }
+    }
+
+    /* ==================== SCROLLBAR ==================== */
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: #010408; }
+    ::-webkit-scrollbar-thumb { background: #1a3350; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00d4ff; }
+
+    /* ==================== TEXT GLOW ==================== */
+    .cyber-glow-text {
+        font-family: 'Orbitron', sans-serif;
+        color: #00d4ff;
+        text-shadow: 0 0 10px rgba(0, 212, 255, 0.55), 0 0 30px rgba(0, 212, 255, 0.18);
+        letter-spacing: 2px;
+    }
+
+    .digital-display {
+        font-family: 'Share Tech Mono', monospace;
+        color: #00ff88;
+        text-shadow: 0 0 8px rgba(0, 255, 136, 0.45);
+    }
+
+    .section-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        color: #7788aa;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin: 22px 0 8px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -844,39 +1329,74 @@ else:
 
 # ====================== MARKET DATA FUNCTIONS ======================
 def get_market_data(ticker_symbol):
+    """
+    Multi-source market data dengan prioritas:
+    1. IC Market cTrader API (XAUUSD, XAGUSD, Forex, Crypto)
+    2. Supabase Cache (3 detik freshness)
+    3. yfinance (global market data fallback)
+    """
     try:
+        # Identifikasi nama instrumen
         inst_name = ticker_symbol
         for cat in instruments.values():
             for name, tick in cat.items():
                 if tick == ticker_symbol:
                     inst_name = name
                     break
-        ctrader_instruments = ["XAUUSD", "XAGUSD", "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", "BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "BNBUSD"]
+        
+        # 1. IC Market cTrader
+        ctrader_instruments = [
+            "XAUUSD", "XAGUSD", "EURUSD", "GBPUSD", "USDJPY",
+            "AUDUSD", "USDCHF", "BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "BNBUSD"
+        ]
         if inst_name in ctrader_instruments:
             ctrader_data = get_icmarket_price(inst_name)
             if ctrader_data:
                 cache_market_price(inst_name, ctrader_data["price"], 0)
-                return {"price": ctrader_data["price"], "change": 0, "change_pct": 0, "source": "ICMARKET", "spread": ctrader_data.get("spread", 0)}
+                return {
+                    "price": ctrader_data["price"],
+                    "change": 0,
+                    "change_pct": 0,
+                    "source": "ICMARKET",
+                    "spread": ctrader_data.get("spread", 0)
+                }
+        
+        # 2. Supabase Cache
         supabase_for_cache = create_client(url, key)
         res = supabase_for_cache.table("market_prices").select("*").eq("instrument", inst_name).execute()
+        
         if res.data:
             cached = res.data[0]
             updated_at_str = cached.get('updated_at', '')
             if isinstance(updated_at_str, str) and updated_at_str:
                 updated_at_str = updated_at_str.replace('Z', '+00:00')
-                try: updated_at = datetime.fromisoformat(updated_at_str)
-                except: updated_at = datetime.now(pytz.UTC) - timedelta(seconds=10)
-            else: updated_at = datetime.now(pytz.UTC) - timedelta(seconds=10)
-            if updated_at.tzinfo is None: updated_at = updated_at.replace(tzinfo=pytz.UTC)
+                try:
+                    updated_at = datetime.fromisoformat(updated_at_str)
+                except:
+                    updated_at = datetime.now(pytz.UTC) - timedelta(seconds=10)
+            else:
+                updated_at = datetime.now(pytz.UTC) - timedelta(seconds=10)
+            
+            if updated_at.tzinfo is None:
+                updated_at = updated_at.replace(tzinfo=pytz.UTC)
+            
             now = datetime.now(pytz.UTC)
             if (now - updated_at).total_seconds() < 3:
-                return {"price": cached.get('price', 0), "change": cached.get('price', 0) * (cached.get('change_pct', 0)/100), "change_pct": cached.get('change_pct', 0), "source": "CACHE"}
+                return {
+                    "price": cached.get('price', 0),
+                    "change": cached.get('price', 0) * (cached.get('change_pct', 0)/100),
+                    "change_pct": cached.get('change_pct', 0),
+                    "source": "CACHE"
+                }
+        
+        # 3. yfinance fallback
         fetch_ticker = ticker_symbol
         ticker = yf.Ticker(fetch_ticker)
         hist = ticker.history(period="2d")
         if not hist.empty:
             price = float(hist["Close"].iloc[-1])
-            if ticker_symbol in ["GC=F", "SI=F"]: price = round(price, 2)
+            if ticker_symbol in ["GC=F", "SI=F"]:
+                price = round(price, 2)
             prev_close = float(hist["Close"].iloc[-2]) if len(hist) > 1 else float(hist["Open"].iloc[-1])
             change_pct = ((price - prev_close) / prev_close) * 100 if prev_close > 0 else 0
             cache_market_price(inst_name, price, change_pct)
@@ -886,89 +1406,196 @@ def get_market_data(ticker_symbol):
         return None
 
 def get_historical_data(ticker_symbol, period="1mo", interval="1h"):
+    """Mengambil data historis dari yfinance untuk analisis teknikal"""
     try:
         ticker = yf.Ticker(ticker_symbol)
         df = ticker.history(period=period, interval=interval)
-        if df.empty: return pd.DataFrame()
+        if df.empty:
+            return pd.DataFrame()
         return df.sort_index().dropna()
     except:
         return pd.DataFrame()
 
 def add_technical_indicators(df):
-    if len(df) < 50: return df
+    """
+    Menambahkan 20+ indikator teknikal ke dataframe
+    Termasuk: SMA, EMA, RSI, MACD, Bollinger Bands, Stochastic,
+    ATR, ADX, CCI, Williams %R, MFI, TRIX, ROC, AO, KAMA,
+    Ichimoku Cloud, Parabolic SAR, Volume SMA, Base Line
+    """
+    if len(df) < 50:
+        return df
+    
+    # Simple Moving Averages
     df["SMA20"] = df["Close"].rolling(window=20).mean()
     df["SMA50"] = df["Close"].rolling(window=50).mean()
     df["SMA200"] = df["Close"].rolling(window=min(len(df), 200)).mean()
+    
+    # Exponential Moving Averages
     df["EMA9"] = df["Close"].ewm(span=9, adjust=False).mean()
     df["EMA21"] = df["Close"].ewm(span=21, adjust=False).mean()
-    delta = df["Close"].diff(); gain = delta.where(delta > 0, 0).rolling(window=14).mean(); loss = -delta.where(delta < 0, 0).rolling(window=14).mean()
-    rs = gain / loss.replace(0, 0.001); df["RSI"] = 100 - (100 / (1 + rs))
-    exp1 = df["Close"].ewm(span=12, adjust=False).mean(); exp2 = df["Close"].ewm(span=26, adjust=False).mean()
-    df["MACD"] = exp1 - exp2; df["Signal_Line"] = df["MACD"].ewm(span=9, adjust=False).mean()
-    df["BB_Mid"] = df["Close"].rolling(window=20).mean(); df["BB_Std"] = df["Close"].rolling(window=20).std()
-    df["BB_Upper"] = df["BB_Mid"] + (df["BB_Std"] * 2); df["BB_Lower"] = df["BB_Mid"] - (df["BB_Std"] * 2)
-    low_14 = df["Low"].rolling(window=14).min(); high_14 = df["High"].rolling(window=14).max()
-    df["Stoch_K"] = 100 * ((df["Close"] - low_14) / (high_14 - low_14).replace(0, 0.001)); df["Stoch_D"] = df["Stoch_K"].rolling(window=3).mean()
-    high_low = df["High"] - df["Low"]; high_cp = np.abs(df["High"] - df["Close"].shift()); low_cp = np.abs(df["Low"] - df["Close"].shift())
-    df["TR"] = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1); df["ATR"] = df["TR"].rolling(window=14).mean()
-    df["UpMove"] = df["High"] - df["High"].shift(); df["DownMove"] = df["Low"].shift() - df["Low"]
+    
+    # RSI (Relative Strength Index) - 14 period
+    delta = df["Close"].diff()
+    gain = delta.where(delta > 0, 0).rolling(window=14).mean()
+    loss = -delta.where(delta < 0, 0).rolling(window=14).mean()
+    rs = gain / loss.replace(0, 0.001)
+    df["RSI"] = 100 - (100 / (1 + rs))
+    
+    # MACD (Moving Average Convergence Divergence)
+    exp1 = df["Close"].ewm(span=12, adjust=False).mean()
+    exp2 = df["Close"].ewm(span=26, adjust=False).mean()
+    df["MACD"] = exp1 - exp2
+    df["Signal_Line"] = df["MACD"].ewm(span=9, adjust=False).mean()
+    
+    # Bollinger Bands (20, 2)
+    df["BB_Mid"] = df["Close"].rolling(window=20).mean()
+    df["BB_Std"] = df["Close"].rolling(window=20).std()
+    df["BB_Upper"] = df["BB_Mid"] + (df["BB_Std"] * 2)
+    df["BB_Lower"] = df["BB_Mid"] - (df["BB_Std"] * 2)
+    
+    # Stochastic Oscillator (14, 3)
+    low_14 = df["Low"].rolling(window=14).min()
+    high_14 = df["High"].rolling(window=14).max()
+    df["Stoch_K"] = 100 * ((df["Close"] - low_14) / (high_14 - low_14).replace(0, 0.001))
+    df["Stoch_D"] = df["Stoch_K"].rolling(window=3).mean()
+    
+    # ATR (Average True Range) - 14 period
+    high_low = df["High"] - df["Low"]
+    high_cp = np.abs(df["High"] - df["Close"].shift())
+    low_cp = np.abs(df["Low"] - df["Close"].shift())
+    df["TR"] = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
+    df["ATR"] = df["TR"].rolling(window=14).mean()
+    
+    # ADX (Average Directional Index) - 14 period
+    df["UpMove"] = df["High"] - df["High"].shift()
+    df["DownMove"] = df["Low"].shift() - df["Low"]
     df["+DM"] = np.where((df["UpMove"] > df["DownMove"]) & (df["UpMove"] > 0), df["UpMove"], 0)
     df["-DM"] = np.where((df["DownMove"] > df["UpMove"]) & (df["DownMove"] > 0), df["DownMove"], 0)
     df["+DI"] = 100 * (df["+DM"].rolling(14).mean() / df["ATR"].replace(0, 0.001))
     df["-DI"] = 100 * (df["-DM"].rolling(14).mean() / df["ATR"].replace(0, 0.001))
-    df["DX"] = 100 * np.abs(df["+DI"] - df["-DI"]) / (df["+DI"] + df["-DI"]).replace(0, 0.001); df["ADX"] = df["DX"].rolling(14).mean()
+    df["DX"] = 100 * np.abs(df["+DI"] - df["-DI"]) / (df["+DI"] + df["-DI"]).replace(0, 0.001)
+    df["ADX"] = df["DX"].rolling(14).mean()
+    
+    # Additional Indicators using ta library
     df["CCI"] = ta.trend.cci(df["High"], df["Low"], df["Close"], window=20)
     df["WPR"] = ta.momentum.williams_r(df["High"], df["Low"], df["Close"], lbp=14)
     df["MFI"] = ta.volume.money_flow_index(df["High"], df["Low"], df["Close"], df["Volume"], window=14)
-    df["TRIX"] = ta.trend.trix(df["Close"], window=15); df["ROC"] = ta.momentum.roc(df["Close"], window=12)
+    df["TRIX"] = ta.trend.trix(df["Close"], window=15)
+    df["ROC"] = ta.momentum.roc(df["Close"], window=12)
     df["AO"] = ta.momentum.awesome_oscillator(df["High"], df["Low"], window1=5, window2=34)
     df["KAMA"] = ta.momentum.kama(df["Close"], window=10, pow1=2, pow2=30)
     df["Ichimoku_A"] = ta.trend.ichimoku_a(df["High"], df["Low"], window1=9, window2=26)
     df["Ichimoku_B"] = ta.trend.ichimoku_b(df["High"], df["Low"], window2=26, window3=52)
+    
+    # Parabolic SAR
     psar_up = ta.trend.psar_up(df["High"], df["Low"], df["Close"])
-    df["Parabolic_SAR"] = psar_up.fillna(ta.trend.psar_down(df["High"], df["Low"], df["Close"]))
+    psar_down = ta.trend.psar_down(df["High"], df["Low"], df["Close"])
+    df["Parabolic_SAR"] = psar_up.fillna(psar_down)
+    
+    # Volume Analysis
     df["Vol_SMA"] = df["Volume"].rolling(window=20).mean()
     df["Base_Line"] = (df["High"].rolling(window=26).max() + df["Low"].rolling(window=26).min()) / 2
+    
     return df
 
 def get_weighted_signal(df):
+    """
+    Menghitung sinyal teknikal berbasis weighted scoring
+    Menggunakan RSI, MACD, SMA50, SMA200
+    Return: (score, signal, reasons, bullish_count, bearish_count, neutral_count)
+    """
     required_cols = ["RSI", "MACD", "Signal_Line", "SMA50", "SMA200"]
     for col in required_cols:
-        if col not in df.columns: return 0, "WAITING", ["INITIALIZING INDICATORS..."], 0, 0, 100
-    latest = df.iloc[-1]; bull, bear, neut = 0, 0, 0; reasons = []
+        if col not in df.columns:
+            return 0, "WAITING", ["INITIALIZING INDICATORS..."], 0, 0, 100
+    
+    latest = df.iloc[-1]
+    bullish_count = 0
+    bearish_count = 0
+    neutral_count = 0
+    reasons = []
+    
+    # RSI Analysis
     rsi_val = latest["RSI"]
-    if rsi_val < 30: bull += 1; reasons.append(f"RSI OVERSOLD [{rsi_val:.1f}]")
-    elif rsi_val > 70: bear += 1; reasons.append(f"RSI OVERBOUGHT [{rsi_val:.1f}]")
-    else: neut += 1; reasons.append(f"RSI NEUTRAL [{rsi_val:.1f}]")
-    if latest["MACD"] > latest["Signal_Line"]: bull += 1; reasons.append("MACD BULLISH CROSS")
-    else: bear += 1; reasons.append("MACD BEARISH CROSS")
-    if latest["Close"] > latest["SMA50"]: bull += 1; reasons.append("PRICE ABOVE SMA50")
-    else: bear += 1; reasons.append("PRICE BELOW SMA50")
-    if latest["Close"] > latest["SMA200"]: bull += 1; reasons.append("PRICE ABOVE SMA200")
-    else: bear += 1; reasons.append("PRICE BELOW SMA200")
-    total = bull + bear + neut; score = (bull / total) * 100 if total > 0 else 50
-    if score > 70: signal = "STRONG BUY"
-    elif score > 55: signal = "BUY"
-    elif score < 30: signal = "STRONG SELL"
-    elif score < 45: signal = "SELL"
-    else: signal = "NEUTRAL"
-    return score, signal, reasons, bull, bear, neut
+    if rsi_val < 30:
+        bullish_count += 1
+        reasons.append(f"RSI OVERSOLD [{rsi_val:.1f}]")
+    elif rsi_val > 70:
+        bearish_count += 1
+        reasons.append(f"RSI OVERBOUGHT [{rsi_val:.1f}]")
+    else:
+        neutral_count += 1
+        reasons.append(f"RSI NEUTRAL [{rsi_val:.1f}]")
+    
+    # MACD Analysis
+    if latest["MACD"] > latest["Signal_Line"]:
+        bullish_count += 1
+        reasons.append("MACD BULLISH CROSS")
+    else:
+        bearish_count += 1
+        reasons.append("MACD BEARISH CROSS")
+    
+    # SMA 50 Analysis
+    if latest["Close"] > latest["SMA50"]:
+        bullish_count += 1
+        reasons.append("PRICE ABOVE SMA50")
+    else:
+        bearish_count += 1
+        reasons.append("PRICE BELOW SMA50")
+    
+    # SMA 200 Analysis
+    if latest["Close"] > latest["SMA200"]:
+        bullish_count += 1
+        reasons.append("PRICE ABOVE SMA200")
+    else:
+        bearish_count += 1
+        reasons.append("PRICE BELOW SMA200")
+    
+    # Calculate Weighted Score
+    total = bullish_count + bearish_count + neutral_count
+    score = (bullish_count / total) * 100 if total > 0 else 50
+    
+    # Signal Classification
+    if score > 70:
+        signal = "STRONG BUY"
+    elif score > 55:
+        signal = "BUY"
+    elif score < 30:
+        signal = "STRONG SELL"
+    elif score < 45:
+        signal = "SELL"
+    else:
+        signal = "NEUTRAL"
+    
+    return score, signal, reasons, bullish_count, bearish_count, neutral_count
 
 # ====================== AI FUNCTIONS ======================
 def get_groq_response(question, context=""):
-    if not client: return "ERROR: SYSTEM CONFIGURATION REQUIRED"
+    """Chatbot AI menggunakan AeroVulpis Engine"""
+    if not client:
+        return "ERROR: SYSTEM CONFIGURATION REQUIRED"
+    
     user_limits = LIMITS.get(st.session_state.user_tier, LIMITS["free"])
     if st.session_state.daily_chatbot_count >= user_limits["chatbot_per_day"]:
         return f"LIMIT REACHED [{st.session_state.daily_chatbot_count}/{user_limits['chatbot_per_day']}] | UPGRADE TIER"
+    
     MODEL_NAME = 'llama-3.3-70b-versatile'
     system_prompt = f"""AEROVULPIS NEURAL SYSTEM V3.5
 TIMESTAMP: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} WIB
+LANGUAGE: {st.session_state.lang}
 CONTEXT: {context}
-PROTOCOL: Technical trading analysis with specific entry, stop loss, and take profit levels."""
+PROTOCOL: Provide professional technical trading analysis with specific entry, stop loss, and take profit levels."""
+    
     try:
         chat_completion = client.chat.completions.create(
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": question}],
-            model=MODEL_NAME, temperature=0.7, max_tokens=1024,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": question}
+            ],
+            model=MODEL_NAME,
+            temperature=0.7,
+            max_tokens=1024,
         )
         st.session_state.daily_chatbot_count += 1
         return chat_completion.choices[0].message.content
@@ -976,77 +1603,221 @@ PROTOCOL: Technical trading analysis with specific entry, stop loss, and take pr
         return f"SYSTEM ERROR: {str(e)}"
 
 def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
+    """
+    AEROVULPIS SENTINEL PRO - Deep Institutional Analysis
+    Primary Model: Hermes 405B + Qwen3 Next 80B Instruct
+    Backup Models: Ling-2.6-Flash, LFM2.5-Thinking, Minimax M2.5
+    """
     openrouter_api_key = st.secrets.get("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
-    if not openrouter_api_key: return "ERROR: SYSTEM CONFIGURATION REQUIRED"
+    if not openrouter_api_key:
+        return "ERROR: SYSTEM CONFIGURATION REQUIRED"
+    
+    # Check cache
     cached = get_cached_ai_analysis(asset_name, "sentinel")
-    if cached: return cached + "\n\n---\n*[CACHED INTELLIGENCE | < 5 MINUTES]*"
+    if cached:
+        return cached + "\n\n---\n*[CACHED INTELLIGENCE | < 5 MINUTES]*"
+    
+    # Check limits
     user_limits = LIMITS.get(st.session_state.user_tier, LIMITS["free"])
     if st.session_state.daily_analysis_count >= user_limits["analysis_per_day"]:
         return f"DAILY LIMIT REACHED [{st.session_state.daily_analysis_count}/{user_limits['analysis_per_day']}] | UPGRADE TIER"
+    
+    # Model Configuration
     PRIMARY_MODEL = 'nousresearch/hermes-3-llama-3.1-405b'
     COMPANION_MODEL = 'qwen/qwen3-next-80b-instruct'
-    BACKUP_MODELS = ['deepseek/deepseek-chat', 'liquid/lfm-2.5-1.2b-thinking', 'minimax/minimax-01']
-    latest = df.iloc[-1]; price = market_data['price']
+    BACKUP_MODELS = [
+        'deepseek/deepseek-chat',          # Ling-2.6-Flash
+        'liquid/lfm-2.5-1.2b-thinking',    # LFM2.5-1.2B-Thinking
+        'minimax/minimax-01'               # Minimax M2.5
+    ]
+    
+    latest = df.iloc[-1]
+    price = market_data['price']
+    
+    # Get news context
     news_list, _ = get_news_data(asset_name, max_articles=5)
-    news_context = "\n".join([f"> {n['title']}" for n in news_list]) if news_list else "NO NEWS DATA"
+    news_context = "\n".join([f"> {n['title']}" for n in news_list]) if news_list else "NO NEWS DATA AVAILABLE"
+    
+    # Analysis Prompt
     prompt = f"""AEROVULPIS SENTINEL INTELLIGENCE REPORT
-INSTRUMENT: {asset_name} | DATE: {datetime.now().strftime('%Y-%m-%d')}
-CURRENT PRICE: {price:,.4f} | SIGNAL: {signal}
-RSI: {latest.get('RSI', 0):.2f} | MACD: {latest.get('MACD', 0):.4f} | ATR: {latest.get('ATR', 0):.4f}
-ADX: {latest.get('ADX', 0):.2f} | STOCH K: {latest.get('Stoch_K', 0):.2f}
-REASONS: {', '.join(reasons)}
-NEWS: {news_context}
-OUTPUT: KEY LEVELS | FUNDAMENTAL INSIGHT | BULLISH SCENARIO | BEARISH SCENARIO | FINAL VERDICT
-Language: Indonesian | Max: 320 words | Balanced."""
+
+INSTRUMENT: {asset_name}
+DATE: {datetime.now().strftime('%Y-%m-%d')}
+CURRENT PRICE: {price:,.4f}
+SIGNAL: {signal}
+
+TECHNICAL DATA:
+- RSI (14): {latest.get('RSI', 0):.2f}
+- MACD: {latest.get('MACD', 0):.4f}
+- Signal Line: {latest.get('Signal_Line', 0):.4f}
+- ATR (14): {latest.get('ATR', 0):.4f}
+- ADX (14): {latest.get('ADX', 0):.2f}
+- Stochastic K: {latest.get('Stoch_K', 0):.2f}
+- Bollinger Upper: {latest.get('BB_Upper', 0):.4f}
+- Bollinger Lower: {latest.get('BB_Lower', 0):.4f}
+
+TECHNICAL REASONS:
+{', '.join(reasons)}
+
+MARKET NEWS:
+{news_context}
+
+REQUIRED OUTPUT STRUCTURE:
+
+[KEY LEVELS]
+Support: (2-3 levels with brief reasoning)
+Resistance: (2-3 levels with brief reasoning)
+
+[FUNDAMENTAL INSIGHT]
+(Brief analysis of key factors affecting this instrument)
+
+[BULLISH SCENARIO]
+Entry:
+Target:
+Stop Loss:
+Risk-Reward:
+
+[BEARISH SCENARIO]
+Entry:
+Target:
+Stop Loss:
+Risk-Reward:
+
+[FINAL VERDICT]
+(Neutral conclusion with key risks to monitor)
+
+RULES:
+- Respond in Indonesian language
+- Maximum 320 words total
+- Balanced analysis between bullish and bearish
+- Based on current April 2026 market conditions
+"""
+    
     def call_openrouter(model_name, system_msg):
+        """Make API call to OpenRouter"""
         try:
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {openrouter_api_key}", "Content-Type": "application/json"},
-                data=json.dumps({"model": model_name, "messages": [{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}]}),
+                headers={
+                    "Authorization": f"Bearer {openrouter_api_key}",
+                    "Content-Type": "application/json",
+                },
+                data=json.dumps({
+                    "model": model_name,
+                    "messages": [
+                        {"role": "system", "content": system_msg},
+                        {"role": "user", "content": prompt}
+                    ]
+                }),
                 timeout=45
             )
-            if response.status_code == 200: return response.json()['choices'][0]['message']['content']
+            if response.status_code == 200:
+                return response.json()['choices'][0]['message']['content']
             return None
-        except: return None
-    analysis = call_openrouter(PRIMARY_MODEL, "AEROVULPIS SENTINEL PRO INTELLIGENCE")
+        except:
+            return None
+    
+    # 1. Try Primary Model (Hermes 405B)
+    analysis = call_openrouter(PRIMARY_MODEL, "You are AeroVulpis Sentinel Pro Intelligence. Provide institutional-grade trading analysis.")
+    
+    # 2. Add Companion Insights (Qwen3 Next 80B)
     if analysis:
-        companion = call_openrouter(COMPANION_MODEL, "TECHNICAL DETAIL SUPPLEMENT FOR TRADING ANALYSIS")
-        if companion: analysis += "\n\n---\nSENTINEL COMPANION ANALYSIS [QWEN3 NEXT 80B]:\n" + companion
+        companion_detail = call_openrouter(COMPANION_MODEL, "Provide additional technical details to supplement the trading analysis.")
+        if companion_detail:
+            analysis += "\n\n---\nSENTINEL COMPANION ANALYSIS [QWEN3 NEXT 80B]:\n" + companion_detail
+    
+    # 3. Fallback to Backup Models
     if not analysis:
         backup_names = ["LING-2.6-FLASH", "LFM2.5-THINKING", "MINIMAX M2.5"]
         for i, model in enumerate(BACKUP_MODELS):
-            analysis = call_openrouter(model, "AEROVULPIS BACKUP INTELLIGENCE SYSTEM")
-            if analysis: analysis = f"[BACKUP SYSTEM: {backup_names[i]}]\n\n" + analysis; break
-    if not analysis: return "ALL NEURAL SYSTEMS AT CAPACITY | PLEASE RETRY"
+            analysis = call_openrouter(model, "You are AeroVulpis Backup Intelligence System. Provide trading analysis.")
+            if analysis:
+                analysis = f"[BACKUP SYSTEM ACTIVE: {backup_names[i]}]\n\n" + analysis
+                break
+    
+    if not analysis:
+        return "ALL NEURAL SYSTEMS AT CAPACITY | PLEASE RETRY IN A FEW MINUTES"
+    
+    # Update counters and cache
     st.session_state.daily_analysis_count += 1
     cache_ai_analysis(asset_name, "sentinel", analysis)
+    
     return analysis
 
 def get_deep_analysis(asset_name, market_data, df, signal, reasons):
-    if not client: return "ERROR: SYSTEM CONFIGURATION REQUIRED"
+    """AEROVULPIS ENGINE - Deep Technical Analysis"""
+    if not client:
+        return "ERROR: SYSTEM CONFIGURATION REQUIRED"
+    
+    # Check cache
     cached = get_cached_ai_analysis(asset_name, "deep")
-    if cached: return cached + "\n\n---\n*[CACHED | < 5 MINUTES]*"
+    if cached:
+        return cached + "\n\n---\n*[CACHED ANALYSIS | < 5 MINUTES]*"
+    
+    # Check limits
     user_limits = LIMITS.get(st.session_state.user_tier, LIMITS["free"])
     if st.session_state.daily_analysis_count >= user_limits["analysis_per_day"]:
         return f"DAILY LIMIT REACHED [{st.session_state.daily_analysis_count}/{user_limits['analysis_per_day']}] | UPGRADE TIER"
+    
     MODEL_NAME = 'llama-3.3-70b-versatile'
-    latest = df.iloc[-1]; price = market_data['price']
+    
+    latest = df.iloc[-1]
+    price = market_data['price']
+    
     technical_data = f"""
-INSTRUMENT: {asset_name} | PRICE: {price:,.4f} | SIGNAL: {signal}
-RSI: {latest.get('RSI',0):.2f} | MACD: {latest.get('MACD',0):.4f} | SMA50: {latest.get('SMA50',0):.4f} | SMA200: {latest.get('SMA200',0):.4f}
-ATR: {latest.get('ATR',0):.4f} | ADX: {latest.get('ADX',0):.2f} | BB: [{latest.get('BB_Lower',0):.4f} - {latest.get('BB_Upper',0):.4f}]
-REASONS: {', '.join(reasons)}"""
-    system_prompt = "AEROVULPIS DEEP ANALYSIS ENGINE V3.5. Technical analysis with Entry/SL/TP levels. Indonesian, max 2000 chars."
-    user_prompt = f"DEEP ANALYSIS REQUEST:\n{technical_data}\n\nINCLUDE: RSI Analysis, SMA200 Position, Entry (2-3), SL (ATR-based), TP (1:2+), Risk Management, Scenarios."
+INSTRUMENT: {asset_name}
+CURRENT PRICE: {price:,.4f}
+SIGNAL: {signal}
+
+TECHNICAL INDICATORS:
+- RSI (14): {latest.get('RSI',0):.2f}
+- MACD: {latest.get('MACD',0):.4f}
+- Signal Line: {latest.get('Signal_Line',0):.4f}
+- SMA 50: {latest.get('SMA50',0):.4f}
+- SMA 200: {latest.get('SMA200',0):.4f}
+- ATR (14): {latest.get('ATR',0):.4f}
+- ADX (14): {latest.get('ADX',0):.2f}
+- Bollinger Bands: [{latest.get('BB_Lower',0):.4f} - {latest.get('BB_Upper',0):.4f}]
+- Stochastic K: {latest.get('Stoch_K',0):.2f}
+- Volume: {df['Volume'].iloc[-1]:,.0f}
+
+TECHNICAL REASONS:
+{', '.join(reasons)}
+"""
+    
+    system_prompt = """AEROVULPIS DEEP ANALYSIS ENGINE V3.5
+You are an expert technical analyst. Provide comprehensive analysis with specific entry, stop loss, and take profit levels.
+Use markdown formatting with emojis. Maximum 2000 characters. Focus on actionable insights."""
+
+    user_prompt = f"""DEEP ANALYSIS REQUEST:
+
+{technical_data}
+
+PLEASE INCLUDE:
+1. RSI (14) Interpretation: {latest.get('RSI',0):.2f}
+2. Price vs SMA 200 Position: {latest.get('SMA200',0):.4f}
+3. Entry Levels (2-3 specific price levels with reasoning)
+4. Stop Loss based on ATR: {latest.get('ATR',0):.4f}
+5. Take Profit levels with minimum 1:2 risk-reward ratio
+6. Position sizing and risk management recommendations
+7. Bullish and Bearish scenarios with probability assessment"""
+    
     try:
         chat_completion = client.chat.completions.create(
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
-            model=MODEL_NAME, temperature=0.6, max_tokens=2000,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            model=MODEL_NAME,
+            temperature=0.6,
+            max_tokens=2000,
         )
         analysis = chat_completion.choices[0].message.content
+        
+        # Update counters and cache
         st.session_state.daily_analysis_count += 1
         cache_ai_analysis(asset_name, "deep", analysis)
+        
         return analysis
     except Exception as e:
         return f"SYSTEM ERROR: {str(e)}"

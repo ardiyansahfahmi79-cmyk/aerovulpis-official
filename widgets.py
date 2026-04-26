@@ -4,107 +4,9 @@ import os
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 import pytz
-import yfinance as yf
 
 url = st.secrets["supabase_url"]
 key = st.secrets["supabase_key"]
-
-def format_price_display(price, instrument_name):
-    """Format harga sesuai instrumen (sama dengan streamlit_app)"""
-    name_upper = str(instrument_name).upper() if instrument_name else ""
-    
-    if "XAU" in name_upper or "GOLD" in name_upper:
-        return f"{price:,.2f}"
-    elif "XAG" in name_upper or "SILVER" in name_upper:
-        return f"{price:,.2f}"
-    elif "BTC" in name_upper or "BITCOIN" in name_upper:
-        return f"{price:,.2f}"
-    elif "ETH" in name_upper or "ETHEREUM" in name_upper:
-        return f"{price:,.2f}"
-    elif any(c in name_upper for c in ["SOL", "BNB", "XRP"]):
-        return f"{price:,.2f}"
-    elif any(fx in name_upper for fx in ["EUR", "GBP", "CHF", "JPY", "AUD", "NZD", "CAD"]):
-        return f"{price:,.4f}".rstrip('0').rstrip('.')
-    elif any(idx in name_upper for idx in ["NASDAQ", "S&P", "DOW", "DAX", "IHSG"]):
-        return f"{price:,.2f}"
-    elif any(cmd in name_upper for cmd in ["OIL", "WTI", "CRUDE", "GAS", "COPPER", "PALLADIUM", "PLATINUM"]):
-        return f"{price:,.2f}"
-    else:
-        if price >= 1000:
-            return f"{price:,.2f}"
-        elif price >= 1:
-            return f"{price:,.2f}"
-        else:
-            return f"{price:,.4f}".rstrip('0').rstrip('.')
-
-
-def get_cached_price(instrument_name):
-    """
-    Ambil harga dari Supabase cache.
-    Kalau tidak ada / expired, ambil dari yfinance.
-    Return: {"price": float, "source": str}
-    """
-    # 1. Cek Supabase cache
-    try:
-        supabase = create_client(url, key)
-        res = supabase.table("market_prices").select("*").eq("instrument", instrument_name).execute()
-        
-        if res.data:
-            cached = res.data[0]
-            updated_at_str = cached.get('updated_at', '')
-            
-            if updated_at_str:
-                try:
-                    updated_at_str = updated_at_str.replace('Z', '+00:00')
-                    updated_at = datetime.fromisoformat(updated_at_str)
-                    if updated_at.tzinfo is None:
-                        updated_at = updated_at.replace(tzinfo=pytz.UTC)
-                    
-                    now = datetime.now(pytz.UTC)
-                    if (now - updated_at).total_seconds() < 60:  # Cache valid 60 detik
-                        return {
-                            "price": cached.get('price', 0),
-                            "source": "SUPABASE"
-                        }
-                except Exception:
-                    pass
-            
-            # Cache expired tapi masih ada datanya
-            if cached.get('price') and cached['price'] > 0:
-                return {
-                    "price": cached['price'],
-                    "source": "CACHE (EXPIRED)"
-                }
-    except Exception:
-        pass
-    
-    # 2. Fallback: yfinance
-    ticker_map = {
-        "XAUUSD": "GC=F", "XAGUSD": "SI=F",
-        "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X",
-        "AUDUSD": "AUDUSD=X", "USDCHF": "USDCHF=X",
-        "BTCUSD": "BTC-USD", "ETHUSD": "ETH-USD", "SOLUSD": "SOL-USD",
-        "WTI": "CL=F", "US100": "^IXIC",
-        "Palladium": "PA=F", "Platinum": "PL=F",
-        "GOOGL": "GOOGL", "AAPL": "AAPL",
-        "BBCA.JK": "BBCA.JK", "TLKM.JK": "TLKM.JK"
-    }
-    
-    ticker = ticker_map.get(instrument_name)
-    if ticker:
-        try:
-            yt = yf.Ticker(ticker)
-            hist = yt.history(period="1d")
-            if not hist.empty:
-                price = float(hist["Close"].iloc[-1])
-                if instrument_name in ["XAUUSD", "XAGUSD"]:
-                    price = round(price, 2)
-                return {"price": price, "source": "LIVE"}
-        except Exception:
-            pass
-    
-    return {"price": 0.0, "source": "UNAVAILABLE"}
-
 
 def economic_calendar_widget():
     """Economic Radar Widget"""
@@ -174,7 +76,9 @@ def economic_calendar_widget():
 def smart_alert_widget():
     """
     SMART ALERT CENTER - WIDGET ONLY
-    TIDAK ADA LOGO, TIDAK ADA HEADER, TIDAK ADA JUDUL
+    TIDAK ADA LOGO AEROVULPIS
+    TIDAK ADA HEADER
+    CURRENT PRICE AMBIL DARI SUPABASE (SAMA DENGAN LIVE DASHBOARD)
     """
     
     instruments_list = [
@@ -187,15 +91,58 @@ def smart_alert_widget():
     selected_instrument = st.selectbox(
         "INSTRUMENT SELECTOR",
         instruments_list,
-        key="alert_instrument_v3"
+        key="alert_instrument_final"
     )
 
-    # ========== CURRENT PRICE (AMBIL DARI SUPABASE, FALLBACK YFINANCE) ==========
-    price_data = get_cached_price(selected_instrument)
-    current_price = price_data["price"]
-    data_source = price_data["source"]
-    price_display = format_price_display(current_price, selected_instrument)
+    # ========== CURRENT PRICE (DARI SUPABASE CACHE) ==========
+    current_price = 0.0
+    price_display = "0.00"
+    data_source = "NO DATA"
     
+    try:
+        # AMBIL DARI SUPABASE - SAMA PERSIS DENGAN LIVE DASHBOARD
+        supabase = create_client(url, key)
+        res = supabase.table("market_prices").select("*").eq("instrument", selected_instrument).execute()
+        
+        if res.data and res.data[0].get("price") and res.data[0]["price"] > 0:
+            current_price = res.data[0]["price"]
+            data_source = "SUPABASE"
+        else:
+            # FALLBACK: coba import dari streamlit_app
+            try:
+                from streamlit_app import get_market_data, instruments
+                ticker_to_fetch = None
+                for cat in instruments.values():
+                    if selected_instrument in cat:
+                        ticker_to_fetch = cat[selected_instrument]
+                        break
+                if ticker_to_fetch:
+                    m_data = get_market_data(ticker_to_fetch)
+                    if m_data and m_data.get("price"):
+                        current_price = m_data["price"]
+                        data_source = m_data.get("source", "LIVE")
+            except Exception:
+                pass
+        
+        # FORMAT HARGA SESUAI INSTRUMEN
+        if selected_instrument in ["XAUUSD", "XAGUSD"]:
+            price_display = f"{current_price:,.2f}"
+        elif selected_instrument in ["BTCUSD", "ETHUSD"]:
+            price_display = f"{current_price:,.2f}"
+        elif selected_instrument in ["SOLUSD"]:
+            price_display = f"{current_price:,.2f}"
+        elif selected_instrument in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF"]:
+            price_display = f"{current_price:,.4f}".rstrip('0').rstrip('.')
+        elif selected_instrument in ["WTI", "US100"]:
+            price_display = f"{current_price:,.2f}"
+        else:
+            price_display = f"{current_price:,.2f}"
+            
+    except Exception as e:
+        price_display = "ERROR"
+        data_source = "ERROR"
+    
+    # TAMPILKAN CURRENT PRICE
     st.markdown(f"""
     <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);padding:14px;border-radius:4px;margin-bottom:16px;text-align:center;">
         <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:#557799;letter-spacing:2px;">CURRENT PRICE</span><br>
@@ -204,21 +151,21 @@ def smart_alert_widget():
     </div>
     """, unsafe_allow_html=True)
 
-    # Digital Price Target
+    # DIGITAL PRICE TARGET
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:0 0 4px 0;">DIGITAL PRICE TARGET</p>', unsafe_allow_html=True)
-    price_target = st.number_input("TARGET", min_value=0.0, format="%.4f", step=0.0001, key="alert_target_v3", label_visibility="collapsed")
+    price_target = st.number_input("TARGET", min_value=0.0, format="%.4f", step=0.0001, key="alert_target_final", label_visibility="collapsed")
 
-    # Telegram Chat ID
+    # TELEGRAM CHAT ID
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:16px 0 4px 0;">TELEGRAM CHAT ID</p>', unsafe_allow_html=True)
-    telegram_chat_id = st.text_input("CHAT ID", value="", placeholder="Enter Telegram Chat ID...", key="alert_chatid_v3", label_visibility="collapsed")
+    telegram_chat_id = st.text_input("CHAT ID", value="", placeholder="Enter Telegram Chat ID...", key="alert_chatid_final", label_visibility="collapsed")
 
-    # Condition Trigger
+    # CONDITION TRIGGER
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:16px 0 4px 0;">CONDITION TRIGGER</p>', unsafe_allow_html=True)
-    condition_label = st.radio("CONDITION", ["BREAKOUT ABOVE [BULLISH]", "BREAKDOWN BELOW [BEARISH]"], key="alert_cond_v3", label_visibility="collapsed")
+    condition_label = st.radio("CONDITION", ["BREAKOUT ABOVE [BULLISH]", "BREAKDOWN BELOW [BEARISH]"], key="alert_cond_final", label_visibility="collapsed")
     condition_value = "bullish" if "ABOVE" in condition_label else "bearish"
 
     # ACTIVATE BUTTON
-    if st.button("LOCK TARGET & ACTIVATE SENSOR", key="alert_activate_v3", type="primary", use_container_width=True):
+    if st.button("LOCK TARGET & ACTIVATE SENSOR", key="alert_activate_final", type="primary", use_container_width=True):
         if price_target > 0 and telegram_chat_id:
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
 

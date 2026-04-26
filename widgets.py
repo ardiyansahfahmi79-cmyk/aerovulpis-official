@@ -2,12 +2,112 @@ import streamlit as st
 import requests
 import os
 from supabase import create_client, Client
+from datetime import datetime, timedelta
+import pytz
+import yfinance as yf
 
 url = st.secrets["supabase_url"]
 key = st.secrets["supabase_key"]
 
+def format_price_display(price, instrument_name):
+    """Format harga sesuai instrumen (sama dengan streamlit_app)"""
+    name_upper = str(instrument_name).upper() if instrument_name else ""
+    
+    if "XAU" in name_upper or "GOLD" in name_upper:
+        return f"{price:,.2f}"
+    elif "XAG" in name_upper or "SILVER" in name_upper:
+        return f"{price:,.2f}"
+    elif "BTC" in name_upper or "BITCOIN" in name_upper:
+        return f"{price:,.2f}"
+    elif "ETH" in name_upper or "ETHEREUM" in name_upper:
+        return f"{price:,.2f}"
+    elif any(c in name_upper for c in ["SOL", "BNB", "XRP"]):
+        return f"{price:,.2f}"
+    elif any(fx in name_upper for fx in ["EUR", "GBP", "CHF", "JPY", "AUD", "NZD", "CAD"]):
+        return f"{price:,.4f}".rstrip('0').rstrip('.')
+    elif any(idx in name_upper for idx in ["NASDAQ", "S&P", "DOW", "DAX", "IHSG"]):
+        return f"{price:,.2f}"
+    elif any(cmd in name_upper for cmd in ["OIL", "WTI", "CRUDE", "GAS", "COPPER", "PALLADIUM", "PLATINUM"]):
+        return f"{price:,.2f}"
+    else:
+        if price >= 1000:
+            return f"{price:,.2f}"
+        elif price >= 1:
+            return f"{price:,.2f}"
+        else:
+            return f"{price:,.4f}".rstrip('0').rstrip('.')
+
+
+def get_cached_price(instrument_name):
+    """
+    Ambil harga dari Supabase cache.
+    Kalau tidak ada / expired, ambil dari yfinance.
+    Return: {"price": float, "source": str}
+    """
+    # 1. Cek Supabase cache
+    try:
+        supabase = create_client(url, key)
+        res = supabase.table("market_prices").select("*").eq("instrument", instrument_name).execute()
+        
+        if res.data:
+            cached = res.data[0]
+            updated_at_str = cached.get('updated_at', '')
+            
+            if updated_at_str:
+                try:
+                    updated_at_str = updated_at_str.replace('Z', '+00:00')
+                    updated_at = datetime.fromisoformat(updated_at_str)
+                    if updated_at.tzinfo is None:
+                        updated_at = updated_at.replace(tzinfo=pytz.UTC)
+                    
+                    now = datetime.now(pytz.UTC)
+                    if (now - updated_at).total_seconds() < 60:  # Cache valid 60 detik
+                        return {
+                            "price": cached.get('price', 0),
+                            "source": "SUPABASE"
+                        }
+                except Exception:
+                    pass
+            
+            # Cache expired tapi masih ada datanya
+            if cached.get('price') and cached['price'] > 0:
+                return {
+                    "price": cached['price'],
+                    "source": "CACHE (EXPIRED)"
+                }
+    except Exception:
+        pass
+    
+    # 2. Fallback: yfinance
+    ticker_map = {
+        "XAUUSD": "GC=F", "XAGUSD": "SI=F",
+        "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X",
+        "AUDUSD": "AUDUSD=X", "USDCHF": "USDCHF=X",
+        "BTCUSD": "BTC-USD", "ETHUSD": "ETH-USD", "SOLUSD": "SOL-USD",
+        "WTI": "CL=F", "US100": "^IXIC",
+        "Palladium": "PA=F", "Platinum": "PL=F",
+        "GOOGL": "GOOGL", "AAPL": "AAPL",
+        "BBCA.JK": "BBCA.JK", "TLKM.JK": "TLKM.JK"
+    }
+    
+    ticker = ticker_map.get(instrument_name)
+    if ticker:
+        try:
+            yt = yf.Ticker(ticker)
+            hist = yt.history(period="1d")
+            if not hist.empty:
+                price = float(hist["Close"].iloc[-1])
+                if instrument_name in ["XAUUSD", "XAGUSD"]:
+                    price = round(price, 2)
+                return {"price": price, "source": "LIVE"}
+        except Exception:
+            pass
+    
+    return {"price": 0.0, "source": "UNAVAILABLE"}
+
+
 def economic_calendar_widget():
-    """Economic Radar Widget - Cyber Tech Style"""
+    """Economic Radar Widget"""
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap');
@@ -20,20 +120,20 @@ def economic_calendar_widget():
         .radar-title { font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 700; color: #00d4ff; text-shadow: 0 0 12px rgba(0, 212, 255, 0.6); margin: 0; padding: 0 10px; text-transform: uppercase; letter-spacing: 3px; text-align: center; line-height: 1; }
         .radar-subtitle-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .radar-logo { width: 14px; height: 14px; position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .radar-circle { position: absolute; width: 100%; height: 100%; border: 1px solid #00d4ff; border-radius: 50%; opacity: 0.5; animation: radarDiscPulse 2s infinite; }
-        .radar-sweep { position: absolute; width: 50%; height: 1px; background: linear-gradient(to right, transparent, #00d4ff); top: 50%; left: 50%; transform-origin: left center; animation: radarSweepWidget 2s linear infinite; }
-        @keyframes radarDiscPulse { 0%, 100% { transform: scale(1); opacity: 0.4; } 50% { transform: scale(1.2); opacity: 0.8; } }
-        @keyframes radarSweepWidget { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .status-indicator { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: #00ff88; letter-spacing: 1px; background: rgba(0, 255, 136, 0.05); padding: 2px 8px; border-radius: 3px; border: 1px solid rgba(0, 255, 136, 0.2); display: flex; align-items: center; }
-        .status-dot { height: 5px; width: 5px; background-color: #00ff88; border-radius: 50%; display: inline-block; margin-right: 6px; box-shadow: 0 0 5px #00ff88; animation: pulse-green 2s infinite; }
-        @keyframes pulse-green { 0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.6); } 70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(0, 255, 136, 0); } 100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); } }
-        .tradingview-widget-container iframe { border-radius: 6px !important; filter: brightness(0.9) contrast(1.05); }
-        .impact-legend { display: flex; justify-content: center; gap: 18px; margin-top: 14px; font-family: 'Share Tech Mono', monospace; font-size: 10px; flex-wrap: wrap; }
-        .legend-item { display: flex; align-items: center; gap: 6px; color: #8899bb; }
-        .star-icon { font-size: 11px; }
-        .high-impact { color: #ff2a6d; text-shadow: 0 0 4px rgba(255, 42, 109, 0.4); }
-        .med-impact { color: #ffcc00; }
-        .low-impact { color: #00ff88; }
+        .radar-circle { position: absolute; width: 100%; height: 100%; border: 1px solid #00d4ff; border-radius: 50%; opacity: 0.5; animation: rdp 2s infinite; }
+        .radar-sweep { position: absolute; width: 50%; height: 1px; background: linear-gradient(to right, transparent, #00d4ff); top: 50%; left: 50%; transform-origin: left center; animation: rsw 2s linear infinite; }
+        @keyframes rdp { 0%,100%{transform:scale(1);opacity:0.4} 50%{transform:scale(1.2);opacity:0.8} }
+        @keyframes rsw { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        .status-indicator { font-family:'Share Tech Mono',monospace; font-size:10px; color:#00ff88; letter-spacing:1px; background:rgba(0,255,136,0.05); padding:2px 8px; border-radius:3px; border:1px solid rgba(0,255,136,0.2); display:flex; align-items:center; }
+        .status-dot { height:5px; width:5px; background:#00ff88; border-radius:50%; display:inline-block; margin-right:6px; box-shadow:0 0 5px #00ff88; animation:pg 2s infinite; }
+        @keyframes pg { 0%{transform:scale(0.9);box-shadow:0 0 0 0 rgba(0,255,136,0.6)} 70%{transform:scale(1);box-shadow:0 0 0 4px rgba(0,255,136,0)} 100%{transform:scale(0.9);box-shadow:0 0 0 0 rgba(0,255,136,0)} }
+        .tradingview-widget-container iframe { border-radius:6px!important; filter:brightness(0.9) contrast(1.05); }
+        .impact-legend { display:flex; justify-content:center; gap:18px; margin-top:14px; font-family:'Share Tech Mono',monospace; font-size:10px; flex-wrap:wrap; }
+        .legend-item { display:flex; align-items:center; gap:6px; color:#8899bb; }
+        .star-icon { font-size:11px; }
+        .high-impact { color:#ff2a6d; text-shadow:0 0 4px rgba(255,42,109,0.4); }
+        .med-impact { color:#ffcc00; }
+        .low-impact { color:#00ff88; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -59,7 +159,7 @@ def economic_calendar_widget():
     try:
         st.components.v1.html(tradingview_html, height=450)
     except Exception as e:
-        st.error(f"ECONOMIC RADAR LOAD ERROR: {str(e)}")
+        st.error(f"ECONOMIC RADAR ERROR: {str(e)}")
 
     st.markdown("""
         <div class="impact-legend">
@@ -73,9 +173,8 @@ def economic_calendar_widget():
 
 def smart_alert_widget():
     """
-    SMART ALERT CENTER - MURNI WIDGET INPUT
-    TIDAK ADA LOGO, TIDAK ADA HEADER, TIDAK ADA JUDUL AEROVULPIS
-    Logo dan judul dihandle oleh streamlit_app.py
+    SMART ALERT CENTER - WIDGET ONLY
+    TIDAK ADA LOGO, TIDAK ADA HEADER, TIDAK ADA JUDUL
     """
     
     instruments_list = [
@@ -85,52 +184,17 @@ def smart_alert_widget():
         "GOOGL", "AAPL", "BBCA.JK", "TLKM.JK"
     ]
     
-    selected_instrument = st.selectbox("INSTRUMENT SELECTOR", instruments_list, key="alert_instrument_v2")
+    selected_instrument = st.selectbox(
+        "INSTRUMENT SELECTOR",
+        instruments_list,
+        key="alert_instrument_v3"
+    )
 
-    # ====================== CURRENT PRICE (100% SAMA DENGAN LIVE DASHBOARD) ======================
-    current_price = 0.0
-    price_display = "0.00"
-    data_source = "NO DATA"
-    
-    try:
-        from streamlit_app import get_cached_market_price_full, get_market_data, instruments
-        
-        # 1. AMBIL DARI SUPABASE CACHE (FUNGSI SAMA DENGAN LIVE DASHBOARD)
-        cached = get_cached_market_price_full(selected_instrument)
-        
-        if cached and cached.get("price") and cached["price"] > 0:
-            current_price = cached["price"]
-            data_source = "SUPABASE"
-        else:
-            # 2. FALLBACK: AMBIL LIVE SEPERTI LIVE DASHBOARD
-            ticker_to_fetch = None
-            for cat in instruments.values():
-                if selected_instrument in cat:
-                    ticker_to_fetch = cat[selected_instrument]
-                    break
-            if ticker_to_fetch:
-                m_data = get_market_data(ticker_to_fetch)
-                if m_data and m_data.get("price"):
-                    current_price = m_data["price"]
-                    data_source = m_data.get("source", "LIVE")
-        
-        # 3. FORMAT HARGA (100% SAMA DENGAN format_price_display DI STREAMLIT_APP)
-        if selected_instrument in ["XAUUSD", "XAGUSD"]:
-            price_display = f"{current_price:,.2f}"
-        elif selected_instrument in ["BTCUSD", "ETHUSD"]:
-            price_display = f"{current_price:,.2f}"
-        elif selected_instrument in ["SOLUSD"]:
-            price_display = f"{current_price:,.2f}"
-        elif selected_instrument in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF"]:
-            price_display = f"{current_price:,.4f}".rstrip('0').rstrip('.')
-        elif selected_instrument in ["WTI", "US100"]:
-            price_display = f"{current_price:,.2f}"
-        else:
-            price_display = f"{current_price:,.2f}"
-            
-    except Exception as e:
-        price_display = "ERROR"
-        data_source = "ERROR"
+    # ========== CURRENT PRICE (AMBIL DARI SUPABASE, FALLBACK YFINANCE) ==========
+    price_data = get_cached_price(selected_instrument)
+    current_price = price_data["price"]
+    data_source = price_data["source"]
+    price_display = format_price_display(current_price, selected_instrument)
     
     st.markdown(f"""
     <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);padding:14px;border-radius:4px;margin-bottom:16px;text-align:center;">
@@ -142,22 +206,20 @@ def smart_alert_widget():
 
     # Digital Price Target
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:0 0 4px 0;">DIGITAL PRICE TARGET</p>', unsafe_allow_html=True)
-    price_target = st.number_input("TARGET", min_value=0.0, format="%.4f", step=0.0001, key="alert_target_v2", label_visibility="collapsed")
+    price_target = st.number_input("TARGET", min_value=0.0, format="%.4f", step=0.0001, key="alert_target_v3", label_visibility="collapsed")
 
     # Telegram Chat ID
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:16px 0 4px 0;">TELEGRAM CHAT ID</p>', unsafe_allow_html=True)
-    telegram_chat_id = st.text_input("CHAT ID", value="", placeholder="Enter Telegram Chat ID...", key="alert_chatid_v2", label_visibility="collapsed")
+    telegram_chat_id = st.text_input("CHAT ID", value="", placeholder="Enter Telegram Chat ID...", key="alert_chatid_v3", label_visibility="collapsed")
 
     # Condition Trigger
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:16px 0 4px 0;">CONDITION TRIGGER</p>', unsafe_allow_html=True)
-    condition_label = st.radio("CONDITION", ["BREAKOUT ABOVE [BULLISH]", "BREAKDOWN BELOW [BEARISH]"], key="alert_cond_v2", label_visibility="collapsed")
+    condition_label = st.radio("CONDITION", ["BREAKOUT ABOVE [BULLISH]", "BREAKDOWN BELOW [BEARISH]"], key="alert_cond_v3", label_visibility="collapsed")
     condition_value = "bullish" if "ABOVE" in condition_label else "bearish"
 
     # ACTIVATE BUTTON
-    if st.button("LOCK TARGET & ACTIVATE SENSOR", key="alert_activate_v2", type="primary", use_container_width=True):
+    if st.button("LOCK TARGET & ACTIVATE SENSOR", key="alert_activate_v3", type="primary", use_container_width=True):
         if price_target > 0 and telegram_chat_id:
-            from datetime import datetime
-            import pytz
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
 
             if "active_alerts" not in st.session_state:
@@ -174,7 +236,7 @@ def smart_alert_widget():
             st.session_state.active_alerts.append(alert_data)
             
             try:
-                supabase: Client = create_client(url, key)
+                supabase = create_client(url, key)
                 supabase.table("active_alerts").insert(alert_data).execute()
                 
                 st.markdown(f"""
@@ -186,6 +248,6 @@ def smart_alert_widget():
                 </div>
                 """, unsafe_allow_html=True)
             except Exception as e:
-                st.error(f"DATABASE SYNC ERROR: {str(e)}")
+                st.error(f"DATABASE ERROR: {str(e)}")
         else:
             st.warning("ENTER VALID TARGET PRICE AND TELEGRAM CHAT ID")

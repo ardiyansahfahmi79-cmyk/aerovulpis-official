@@ -152,17 +152,13 @@ def economic_calendar_widget():
             color: #8899bb;
         }
         
-        .star-icon {
-            font-size: 11px;
-        }
-        
+        .star-icon { font-size: 11px; }
         .high-impact { color: #ff2a6d; text-shadow: 0 0 4px rgba(255, 42, 109, 0.4); }
         .med-impact { color: #ffcc00; }
         .low-impact { color: #00ff88; }
     </style>
     """, unsafe_allow_html=True)
 
-    # Container Utama
     st.markdown("""
     <div class="economic-radar-container">
         <div class="radar-header-stack">
@@ -180,7 +176,6 @@ def economic_calendar_widget():
         </div>
     """, unsafe_allow_html=True)
 
-    # TradingView Economic Calendar Widget
     tradingview_html = """
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
@@ -201,9 +196,8 @@ def economic_calendar_widget():
     try:
         st.components.v1.html(tradingview_html, height=450)
     except Exception as e:
-        st.error(f"Gagal memuat radar ekonomi: {str(e)}")
+        st.error(f"ECONOMIC RADAR LOAD ERROR: {str(e)}")
 
-    # Legenda Dampak & Penutup Container
     st.markdown("""
         <div class="impact-legend">
             <div class="legend-item"><span class="star-icon high-impact">★★★</span> High Impact</div>
@@ -216,22 +210,19 @@ def economic_calendar_widget():
 
 def smart_alert_widget():
     """
-    Menampilkan Smart Alert Center V3.5 dengan gaya UI cyber-tech/terminal.
-    TANPA logo AeroVulpis (logo ada di streamlit_app.py header).
-    Current price mengikuti format dari Live Dashboard.
+    Smart Alert Center V3.5
+    TIDAK ADA LOGO AEROVULPIS (logo hanya di header utama)
+    TIDAK ADA JUDUL DUPLIKAT (judul dari streamlit_app.py)
+    HANYA: Instrument Selector + Current Price + Target + Chat ID + Condition + Button
     """
-
-    # Custom CSS for Smart Alert Center
+    
+    # Minimal CSS - tidak ada logo, tidak ada header
     st.markdown("""
     <style>
-        .alert-widget-container {
-            position: relative;
-        }
-
         .alert-widget-selector label {
-            color: #00d4ff !important;
+            color: #8899bb !important;
             font-family: 'Orbitron', sans-serif !important;
-            font-size: 10px !important;
+            font-size: 9px !important;
             letter-spacing: 2px !important;
         }
         
@@ -240,7 +231,6 @@ def smart_alert_widget():
             border: 1px solid rgba(0, 212, 255, 0.3) !important;
             border-radius: 3px !important;
             color: #c0d0e0 !important;
-            font-family: 'Rajdhani', sans-serif !important;
         }
 
         .alert-price-display {
@@ -303,7 +293,6 @@ def smart_alert_widget():
             border-color: #00d4ff !important;
             box-shadow: 0 0 28px rgba(0, 212, 255, 0.3) !important;
             color: #ffffff !important;
-            transform: translateY(-1px);
         }
 
         .alert-success-box {
@@ -321,11 +310,7 @@ def smart_alert_widget():
 
     def send_telegram_alert(chat_id, message, bot_token):
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        payload = {
-            'chat_id': chat_id,
-            'text': message,
-            'parse_mode': 'HTML'
-        }
+        payload = {'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'}
         try:
             response = requests.post(url, json=payload)
             response.raise_for_status()
@@ -333,13 +318,23 @@ def smart_alert_widget():
         except requests.exceptions.RequestException as e:
             return False, str(e)
 
-    st.markdown("<div class='alert-widget-container'>", unsafe_allow_html=True)
+    # ====================== TIDAK ADA HEADER / LOGO ======================
+    # HANYA WIDGET INPUT SAJA
 
     # Instrument Selector
-    instruments_list = ["XAUUSD", "XAGUSD", "BTCUSD", "ETHUSD", "SOLUSD", "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", "WTI", "US100", "Palladium", "Platinum", "GOOGL", "AAPL", "BBCA.JK", "TLKM.JK"]
-    selected_instrument = st.selectbox("INSTRUMENT SELECTOR", instruments_list, key="alert_instrument")
+    instruments_list = [
+        "XAUUSD", "XAGUSD", "BTCUSD", "ETHUSD", "SOLUSD",
+        "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF",
+        "WTI", "US100", "Palladium", "Platinum",
+        "GOOGL", "AAPL", "BBCA.JK", "TLKM.JK"
+    ]
+    selected_instrument = st.selectbox(
+        "INSTRUMENT SELECTOR",
+        instruments_list,
+        key="alert_instrument"
+    )
 
-    # ====================== CURRENT PRICE DARI SUPABASE CACHE ======================
+    # ====================== CURRENT PRICE DARI SUPABASE ======================
     try:
         supabase: Client = create_client(url, key)
         res = supabase.table("market_prices").select("*").eq("instrument", selected_instrument).execute()
@@ -351,12 +346,12 @@ def smart_alert_widget():
             current_price = 0.0
             data_source = "NO DATA"
         
-        # Format harga sesuai instrumen (SAMA DENGAN LIVE DASHBOARD)
+        # Format harga (sama persis dengan Live Dashboard)
         if selected_instrument in ["XAUUSD", "XAGUSD"]:
             price_display = f"{current_price:,.2f}"
         elif selected_instrument in ["BTCUSD", "ETHUSD"]:
             price_display = f"{current_price:,.2f}"
-        elif selected_instrument in ["SOLUSD", "XRPUSD", "BNBUSD"]:
+        elif selected_instrument in ["SOLUSD"]:
             price_display = f"{current_price:,.2f}"
         elif selected_instrument in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF"]:
             price_display = f"{current_price:,.4f}".rstrip('0').rstrip('.')
@@ -365,7 +360,7 @@ def smart_alert_widget():
         else:
             price_display = f"{current_price:,.2f}"
         
-        # Jika harga 0, coba ambil dari streamlit_app cache
+        # Fallback jika harga 0
         if current_price == 0:
             try:
                 from streamlit_app import get_market_data, instruments
@@ -379,7 +374,6 @@ def smart_alert_widget():
                     if m_data:
                         current_price = m_data["price"]
                         data_source = m_data.get("source", "LIVE")
-                        # Re-format
                         if selected_instrument in ["XAUUSD", "XAGUSD"]:
                             price_display = f"{current_price:,.2f}"
                         elif selected_instrument in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF"]:
@@ -412,7 +406,7 @@ def smart_alert_widget():
         min_value=0.0,
         format="%.4f",
         step=0.0001,
-        key="alert_price_target",
+        key="alert_price_target_input",
         label_visibility="collapsed"
     )
 
@@ -422,7 +416,7 @@ def smart_alert_widget():
         "TELEGRAM CHAT ID",
         value="",
         placeholder="Enter your Telegram Chat ID...",
-        key="alert_chat_id",
+        key="alert_chat_id_input",
         label_visibility="collapsed"
     )
 
@@ -435,18 +429,17 @@ def smart_alert_widget():
     selected_condition_label = st.radio(
         "CONDITION TRIGGER",
         list(condition_options.keys()),
-        key="alert_condition",
+        key="alert_condition_radio",
         label_visibility="collapsed"
     )
 
-    # Main Button
-    if st.button("LOCK TARGET & ACTIVATE SENSOR", key="activate_sensor_button", type="primary"):
+    # ACTIVATE BUTTON
+    if st.button("LOCK TARGET & ACTIVATE SENSOR", key="activate_sensor_btn", type="primary"):
         if price_target > 0 and telegram_chat_id:
             from datetime import datetime
             import pytz
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
 
-            # Simpan ke Session State
             if "active_alerts" not in st.session_state:
                 st.session_state.active_alerts = []
             
@@ -460,12 +453,10 @@ def smart_alert_widget():
             }
             st.session_state.active_alerts.append(alert_data)
             
-            # Simpan ke Supabase
             try:
                 supabase: Client = create_client(url, key)
                 supabase.table("active_alerts").insert(alert_data).execute()
                 
-                # Tampilan Sukses
                 st.markdown(f"""
                 <div class="alert-success-box">
                     <p style="font-family:Orbitron;font-size:12px;margin:0 0 8px;letter-spacing:2px;">SENSOR ACTIVATED</p>
@@ -475,9 +466,6 @@ def smart_alert_widget():
                 </div>
                 """, unsafe_allow_html=True)
             except Exception as e:
-                st.error(f"SYSTEM ERROR: DATABASE SYNC FAILED")
-                st.caption(f"Details: {str(e)}")
+                st.error(f"DATABASE SYNC ERROR: {str(e)}")
         else:
-            st.warning("Please enter both Target Price and Telegram Chat ID.")
-
-    st.markdown("</div>", unsafe_allow_html=True)
+            st.warning("ENTER VALID TARGET PRICE AND TELEGRAM CHAT ID")

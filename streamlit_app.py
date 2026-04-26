@@ -69,6 +69,21 @@ def get_cached_market_price(symbol):
         pass
     return None
 
+def get_cached_market_price_full(symbol):
+    """Mengambil data harga lengkap dari cache untuk Smart Alert"""
+    try:
+        supabase = get_supabase_client()
+        res = supabase.table("market_prices").select("*").eq("instrument", symbol).execute()
+        if res.data:
+            return {
+                "price": res.data[0].get("price", 0),
+                "change_pct": res.data[0].get("change_pct", 0),
+                "updated_at": res.data[0].get("updated_at", "")
+            }
+    except Exception:
+        pass
+    return None
+
 def cleanup_old_data():
     try:
         supabase = get_supabase_client()
@@ -173,6 +188,16 @@ def cache_ai_analysis(asset_name, timeframe, analysis):
 
 # ====================== GOOGLE OAUTH AUTHENTICATION ======================
 def handle_google_oauth():
+    """
+    GOOGLE 403 FIX:
+    Pastikan di Google Cloud Console:
+    - Authorized JavaScript origins: https://bqdugkmmnbxlftuxqtdg.supabase.co
+    - Authorized redirect URIs: https://bqdugkmmnbxlftuxqtdg.supabase.co/auth/v1/callback
+    
+    Dan di Supabase Dashboard → Authentication → Providers → Google:
+    - Client ID & Client Secret sudah diisi
+    - Skip nonce checks = OFF
+    """
     query_params = st.query_params
     if "code" in query_params:
         code = query_params["code"]
@@ -213,11 +238,12 @@ def handle_google_oauth():
         except Exception:
             pass
 
-# ====================== CTRADER INTEGRATION ======================
-def get_ctrader_price(symbol):
+# ====================== ICMARKET / CTRADER PRICE FETCH ======================
+def get_icmarket_price(symbol):
     """
-    Mengambil harga real-time dari cTrader API
+    Mengambil harga real-time dari IC Market via cTrader API
     Untuk XAUUSD, XAGUSD, Forex, dan Crypto
+    Harga lebih akurat dengan spread 2 pip
     """
     ctrader_map = {
         "XAUUSD": "1", "XAGUSD": "2",
@@ -233,9 +259,11 @@ def get_ctrader_price(symbol):
     ctrader_client_secret = st.secrets.get("CTRADER_CLIENT_SECRET") or os.getenv("CTRADER_CLIENT_SECRET")
     
     if not ctrader_client_id or not ctrader_client_secret:
+        # Fallback ke yfinance untuk development
         return None
     
     try:
+        # IC Market cTrader API endpoint
         response = requests.get(
             f"https://api.ctrader.com/v1/symbols/{symbol_id}/price",
             headers={
@@ -250,7 +278,7 @@ def get_ctrader_price(symbol):
             ask = float(data.get("ask", 0))
             price = (bid + ask) / 2
             
-            # Format harga berdasarkan jenis instrumen
+            # Format harga
             if symbol in ["XAUUSD", "XAGUSD"]:
                 formatted_price = round(price, 2)
             elif symbol in ["BTCUSD", "ETHUSD"]:
@@ -260,19 +288,18 @@ def get_ctrader_price(symbol):
             else:
                 formatted_price = round(price, 4)
             
-            spread = ask - bid
+            spread = round(ask - bid, 2)
             return {
                 "price": formatted_price,
                 "bid": bid,
                 "ask": ask,
                 "spread": spread,
-                "source": "CTRADER"
+                "source": "ICMARKET"
             }
     except Exception:
         pass
     return None
 
-# ====================== FORMAT HARGA BERDASARKAN INSTRUMEN ======================
 def format_price_display(price, instrument_name):
     """
     Format tampilan harga sesuai jenis instrumen:
@@ -280,10 +307,7 @@ def format_price_display(price, instrument_name):
     - XAGUSD: 34.50
     - Forex: 1.0850
     - BTC/ETH: 67,250.00
-    - SOL/BNB/XRP: 145.80
     - Indeks: 18,250.50
-    - Saham: 150.25
-    - Minyak/Gas: 85.50
     """
     name_upper = str(instrument_name).upper() if instrument_name else ""
     
@@ -299,7 +323,7 @@ def format_price_display(price, instrument_name):
         return f"{price:,.2f}"
     elif any(fx in name_upper for fx in ["EUR", "GBP", "CHF", "JPY", "AUD", "NZD", "CAD"]):
         return f"{price:,.4f}".rstrip('0').rstrip('.')
-    elif any(idx in name_upper for idx in ["NASDAQ", "S&P", "DOW", "DAX", "IHSG", "SP500"]):
+    elif any(idx in name_upper for idx in ["NASDAQ", "S&P", "DOW", "DAX", "IHSG"]):
         return f"{price:,.2f}"
     elif any(cmd in name_upper for cmd in ["OIL", "WTI", "CRUDE", "GAS", "COPPER", "PALLADIUM", "PLATINUM"]):
         return f"{price:,.2f}"
@@ -336,6 +360,7 @@ if "sentinel_analysis" not in st.session_state: st.session_state.sentinel_analys
 if "messages" not in st.session_state: st.session_state.messages = []
 if "active_alerts" not in st.session_state: st.session_state.active_alerts = []
 if "last_news_fetch" not in st.session_state: st.session_state.last_news_fetch = {}
+if "gauge_animation_frame" not in st.session_state: st.session_state.gauge_animation_frame = 0
 
 if st.session_state.last_reset_date < datetime.now().date():
     st.session_state.daily_analysis_count = 0
@@ -443,7 +468,10 @@ translations = {
         "enter_license_key": "ENTER LICENSE KEY",
         "license_placeholder": "XXXX-XXXX-XXXX-XXXX",
         "key_activate_button": "VALIDATE & ACTIVATE LICENSE",
-        "force_refresh": "FORCE REFRESH"
+        "force_refresh": "FORCE REFRESH",
+        "current_price_label": "CURRENT PRICE",
+        "digital_price_target": "DIGITAL PRICE TARGET",
+        "telegram_chat_id": "TELEGRAM CHAT ID"
     },
     "EN": {
         "control_center": "CONTROL CENTER",
@@ -532,7 +560,10 @@ translations = {
         "enter_license_key": "ENTER LICENSE KEY",
         "license_placeholder": "XXXX-XXXX-XXXX-XXXX",
         "key_activate_button": "VALIDATE & ACTIVATE LICENSE",
-        "force_refresh": "FORCE REFRESH"
+        "force_refresh": "FORCE REFRESH",
+        "current_price_label": "CURRENT PRICE",
+        "digital_price_target": "DIGITAL PRICE TARGET",
+        "telegram_chat_id": "TELEGRAM CHAT ID"
     }
 }
 
@@ -616,7 +647,6 @@ st.markdown("""
         transform: translateX(2px);
     }
 
-    /* ==================== HEADER & LOGO ==================== */
     .main-title-container {
         text-align: center;
         margin-bottom: 0;
@@ -1118,6 +1148,21 @@ st.markdown("""
         border: 1px solid rgba(0, 212, 255, 0.25);
     }
 
+    /* ==================== CYBER GAUGE ANIMATION ==================== */
+    .cyber-gauge-container {
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .cyber-gauge-glow {
+        animation: gaugeGlowPulse 2s infinite alternate;
+    }
+    
+    @keyframes gaugeGlowPulse {
+        0% { filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.3)); }
+        100% { filter: drop-shadow(0 0 12px rgba(0, 255, 136, 0.6)); }
+    }
+
     ::-webkit-scrollbar { width: 3px; }
     ::-webkit-scrollbar-track { background: #010408; }
     ::-webkit-scrollbar-thumb { background: #1a3350; border-radius: 2px; }
@@ -1163,6 +1208,7 @@ else:
 
 # ====================== MARKET DATA FUNCTIONS ======================
 def get_market_data(ticker_symbol):
+    """Multi-source data: IC Market cTrader → Supabase Cache → yfinance"""
     try:
         inst_name = ticker_symbol
         for cat in instruments.values():
@@ -1171,18 +1217,20 @@ def get_market_data(ticker_symbol):
                     inst_name = name
                     break
         
+        # 1. IC Market cTrader (prioritas utama)
         ctrader_instruments = ["XAUUSD", "XAGUSD", "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", "BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "BNBUSD"]
         if inst_name in ctrader_instruments:
-            ctrader_data = get_ctrader_price(inst_name)
+            ctrader_data = get_icmarket_price(inst_name)
             if ctrader_data:
                 cache_market_price(inst_name, ctrader_data["price"], 0)
                 return {
                     "price": ctrader_data["price"],
                     "change": 0, "change_pct": 0,
-                    "source": "CTRADER",
+                    "source": "ICMARKET",
                     "spread": ctrader_data.get("spread", 0)
                 }
         
+        # 2. Supabase Cache
         supabase_for_cache = create_client(url, key)
         res = supabase_for_cache.table("market_prices").select("*").eq("instrument", inst_name).execute()
         
@@ -1204,6 +1252,7 @@ def get_market_data(ticker_symbol):
                     "source": "CACHE"
                 }
         
+        # 3. yfinance fallback
         fetch_ticker = ticker_symbol
         ticker = yf.Ticker(fetch_ticker)
         hist = ticker.history(period="2d")
@@ -1315,7 +1364,6 @@ def get_groq_response(question, context=""):
     MODEL_NAME = 'llama-3.3-70b-versatile'
     system_prompt = f"""AEROVULPIS NEURAL SYSTEM V3.5
 TIMESTAMP: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} WIB
-LANGUAGE: {st.session_state.lang}
 CONTEXT: {context}
 PROTOCOL: Technical trading analysis with specific entry, stop loss, and take profit levels."""
     try:
@@ -1417,7 +1465,7 @@ RSI: {latest.get('RSI',0):.2f} | MACD: {latest.get('MACD',0):.4f} | SMA50: {late
 ATR: {latest.get('ATR',0):.4f} | ADX: {latest.get('ADX',0):.2f} | BB: [{latest.get('BB_Lower',0):.4f} - {latest.get('BB_Upper',0):.4f}]
 REASONS: {', '.join(reasons)}"""
     system_prompt = "AEROVULPIS DEEP ANALYSIS ENGINE V3.5. Technical analysis with Entry/SL/TP levels. Indonesian, max 2000 chars."
-    user_prompt = f"DEEP ANALYSIS REQUEST:\n{technical_data}\n\nINCLUDE: RSI Analysis, SMA200 Position, Entry Levels (2-3), SL (ATR-based), TP (1:2+), Risk Management, Scenarios."
+    user_prompt = f"DEEP ANALYSIS REQUEST:\n{technical_data}\n\nINCLUDE: RSI Analysis, SMA200 Position, Entry (2-3), SL (ATR-based), TP (1:2+), Risk Management, Scenarios."
     try:
         chat_completion = client.chat.completions.create(
             messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
@@ -1429,7 +1477,7 @@ REASONS: {', '.join(reasons)}"""
         return analysis
     except Exception as e:
         return f"SYSTEM ERROR: {str(e)}"
-# ====================== MARKET SESSIONS MONITOR ======================
+        # ====================== MARKET SESSIONS MONITOR ======================
 def market_session_status():
     """Real-time global market session tracker with SMC strategy protocol"""
     tz = pytz.timezone('Asia/Jakarta')
@@ -1715,15 +1763,16 @@ def check_smart_alerts():
 
     current_prices = {}
     for inst in unique_instruments:
-        price = get_cached_market_price(inst)
-        if price is None:
+        # Cek cache dari Supabase (sama dengan Live Dashboard)
+        cached_data = get_cached_market_price_full(inst)
+        if cached_data and cached_data.get("price"):
+            current_prices[inst] = cached_data["price"]
+        else:
             ticker = instrument_to_ticker.get(inst)
             if ticker:
                 m_data = get_market_data(ticker)
                 if m_data:
-                    price = m_data.get("price")
-        if price is not None:
-            current_prices[inst] = price
+                    current_prices[inst] = m_data.get("price")
 
     for alert in st.session_state.active_alerts:
         if not alert.get("triggered", False):
@@ -1795,7 +1844,7 @@ with st.sidebar:
             {f'<img src="{avatar_url}" style="width:40px;height:40px;border-radius:2px;margin-bottom:10px;border:1px solid {tier_color};">' if avatar_url else '<div style="width:40px;height:40px;border-radius:2px;margin:0 auto 10px;background:linear-gradient(160deg,#001a33,#003060);display:flex;align-items:center;justify-content:center;font-size:18px;">V</div>'}
             <p style="font-family:Rajdhani;font-size:10px;color:#6688aa;margin:0;letter-spacing:1px;">{t['welcome']}</p>
             <p style="font-family:Orbitron;font-size:12px;color:#e0e6f0;margin:3px 0;letter-spacing:1px;">{st.session_state.user_name.upper()}</p>
-            <p style="font-family:Share Tech Mono;font-size:8px;color:#557799;margin:2px 0;">{t['user_id_label']}: {st.session_state.user_id[:12]}...</p>
+            <p style="font-family:Share Tech Mono;font-size:8px;color:#557799;margin:2px 0;">{t['user_id_label']}: {st.session_state.user_id[:16]}...</p>
             <p style="font-family:Share Tech Mono;font-size:8px;color:#557799;margin:2px 0;">{t['tier_label']}: <span style="color:{tier_color};">{tier_name}</span></p>
         </div>
         """, unsafe_allow_html=True)
@@ -2064,9 +2113,63 @@ elif menu_selection == "Live Dashboard":
         col_g, col_a = st.columns([1, 1])
         with col_g:
             st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-            fig_gauge = go.Figure(go.Indicator(mode="gauge+number",value=score,title={"text":"TECHNICAL STRENGTH","font":{"family":"Orbitron","color":"#00d4ff","size":14}},gauge={"axis":{"range":[0,100]},"bar":{"color":color},"bgcolor":"rgba(0,0,0,0)","steps":[{"range":[0,40],"color":"rgba(255,42,109,0.1)"},{"range":[40,60],"color":"rgba(255,204,0,0.1)"},{"range":[60,100],"color":"rgba(0,255,136,0.1)"}]}))
-            fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)",font={"color":"#8899bb"},height=260,margin=dict(l=20,r=20,t=50,b=20))
+            
+            # CYBER GAUGE DENGAN ANIMASI JARUM
+            gauge_color = color
+            # Animasi jarum dengan rotasi berdasarkan score
+            needle_angle = -90 + (score / 100) * 180  # -90 ke +90 derajat
+            
+            fig_gauge = go.Figure()
+            
+            # Background arc
+            fig_gauge.add_trace(go.Scatterpolar(
+                r=[1, 1, 1, 1, 1],
+                theta=[0, 45, 90, 135, 180],
+                mode='markers',
+                marker=dict(size=0, color='rgba(0,0,0,0)'),
+                showlegend=False
+            ))
+            
+            # Main gauge
+            fig_gauge = go.Figure(go.Indicator(
+                mode="gauge+number+delta",
+                value=score,
+                number={"font":{"family":"Orbitron","color":"#00d4ff","size":42},"suffix":"%"},
+                title={"text":"TECHNICAL STRENGTH","font":{"family":"Orbitron","color":"#00d4ff","size":15}},
+                gauge={
+                    "axis": {"range":[0,100],"tickwidth":1,"tickcolor":"#00d4ff","tickfont":{"color":"#8899bb","size":10}},
+                    "bar": {"color":gauge_color,"thickness":0.25},
+                    "bgcolor":"rgba(0,0,0,0)",
+                    "borderwidth":1,
+                    "bordercolor":"rgba(0,212,255,0.3)",
+                    "steps":[
+                        {"range":[0,30],"color":"rgba(255,42,109,0.15)"},
+                        {"range":[30,45],"color":"rgba(255,42,109,0.08)"},
+                        {"range":[45,55],"color":"rgba(255,204,0,0.08)"},
+                        {"range":[55,70],"color":"rgba(0,255,136,0.08)"},
+                        {"range":[70,100],"color":"rgba(0,255,136,0.15)"}
+                    ],
+                    "threshold":{
+                        "line":{"color":gauge_color,"width":3},
+                        "thickness":0.8,
+                        "value":score
+                    }
+                },
+                delta={"reference":50,"increasing":{"color":"#00ff88"},"decreasing":{"color":"#ff2a6d"},"font":{"size":12}}
+            ))
+            
+            fig_gauge.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font={"color":"#8899bb"},
+                height=300,
+                margin=dict(l=20,r=20,t=60,b=20)
+            )
+            
+            st.markdown('<div class="cyber-gauge-container">', unsafe_allow_html=True)
             st.plotly_chart(fig_gauge, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
             if st.button(t['refresh'], use_container_width=True): st.cache_data.clear(); st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
         with col_a:
@@ -2185,6 +2288,48 @@ elif menu_selection == "Smart Alert Center":
             </div>
         </div>
     """, unsafe_allow_html=True)
+    
+    # SMART ALERT WIDGET DENGAN CURRENT PRICE DARI SUPABASE CACHE
+    try:
+        # Ambil harga dari cache Supabase (sama dengan Live Dashboard)
+        cached_price_data = get_cached_market_price_full(asset_name)
+        
+        if cached_price_data and cached_price_data.get("price"):
+            current_price = cached_price_data["price"]
+        else:
+            # Fallback ke live data
+            market_data = get_market_data(ticker_input)
+            current_price = market_data["price"] if market_data else 0.0
+        
+        # Format harga sesuai instrumen
+        if "GOLD" in asset_name.upper() or "XAU" in asset_name.upper() or "XAG" in asset_name.upper():
+            price_display = f"{current_price:,.2f}"
+            price_format = "%.2f"
+        elif any(fx in asset_name.upper() for fx in ["EUR","GBP","USD","AUD","CHF","JPY","NZD","CAD"]):
+            price_display = f"{current_price:,.4f}".rstrip('0').rstrip('.')
+            price_format = "%.4f"
+        else:
+            price_display = f"{current_price:,.2f}"
+            price_format = "%.2f"
+        
+        st.markdown(f"""
+        <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);padding:12px;border-radius:4px;margin-bottom:15px;text-align:center;">
+            <span style="font-family:Share Tech Mono;font-size:10px;color:#557799;">{t['current_price_label']}</span><br>
+            <span style="font-family:Orbitron;font-size:22px;color:#00ff88;text-shadow:0 0 12px rgba(0,255,136,0.5);letter-spacing:2px;">
+                {price_display}
+            </span>
+            <br><span style="font-family:Share Tech Mono;font-size:8px;color:#445566;">{t['data_source']}: {cached_price_data.get('source', 'SUPABASE') if cached_price_data else 'LIVE'}</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    except Exception:
+        st.markdown(f"""
+        <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);padding:12px;border-radius:4px;margin-bottom:15px;text-align:center;">
+            <span style="font-family:Share Tech Mono;font-size:10px;color:#557799;">{t['current_price_label']}</span><br>
+            <span style="font-family:Orbitron;font-size:18px;color:#ff2a6d;">PRICE UNAVAILABLE</span>
+        </div>
+        """, unsafe_allow_html=True)
+    
     smart_alert_widget()
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -2319,26 +2464,25 @@ elif menu_selection == "Help & Support":
         - Advanced real-time charting with multi-timeframe support
         - Deep Analysis Pro generates comprehensive intelligence reports including Key Support/Resistance Levels, Fundamental Market Insight, and detailed Bullish/Bearish Trade Scenarios
         - Market microstructure analysis for precise entry and exit timing
-        - Automated pattern recognition and trend detection
         - 5-minute intelligent caching to optimize API usage
 
-        **Data Sources:** cTrader API (primary for XAUUSD, XAGUSD, Forex, Crypto) with 2-pip precision, with automatic fallback to global market data via system cache and live feeds.
+        **Data Sources:** IC Market cTrader API (primary for XAUUSD, XAGUSD, Forex, Crypto) with 2-pip precision, with automatic fallback to system cache and global market data.
 
-        **Usage:** Select an instrument and timeframe, navigate to Sentinel, and click "INITIATE DEEP ANALYSIS PRO" to generate a full intelligence report.
+        **Usage:** Select instrument and timeframe, navigate to Sentinel, click "INITIATE DEEP ANALYSIS PRO".
         """)
     
     with st.expander("LIVE DASHBOARD"):
         st.markdown("""
-        The **Live Dashboard** provides real-time market monitoring with integrated technical analysis powered by the AeroVulpis Engine.
+        **Live Dashboard** provides real-time market monitoring with the AeroVulpis Engine.
 
         **Features:**
-        - Live price display with data source indicator (CTRADER, CACHE, LIVE)
-        - Technical Strength Gauge from 4 primary indicators (RSI, MACD, SMA50, SMA200)
-        - Interactive price chart with SMA50 and SMA200 overlays
-        - One-click Deep Analysis using the AeroVulpis Engine
+        - Live price with data source indicator (ICMARKET, CACHE, LIVE)
+        - Technical Strength Cyber Gauge with animated needle and glow effects
+        - Interactive price chart with SMA50/SMA200 overlays
+        - One-click Deep Analysis
 
-        **Price Feed Priority:** cTrader API > System Cache > Global Market Data
-        **Price Display Format:** Auto-formatted per instrument type (XAUUSD: 4,756.00 | Forex: 1.0850 | Crypto: 67,250.00)
+        **Price Feed Priority:** IC Market cTrader > System Cache (3-sec) > Global Market Data
+        **Price Format:** XAUUSD: 4,756.00 | Forex: 1.0850 | Crypto: 67,250.00
         """)
     
     with st.expander("SIGNAL ANALYSIS"):
@@ -2346,34 +2490,34 @@ elif menu_selection == "Help & Support":
         **Signal Analysis Matrix** displays 20 technical indicators in a comprehensive grid.
 
         **Categories:** Trend (SMA, EMA, KAMA, Ichimoku, SAR), Momentum (RSI, MACD, Stoch, CCI, Williams %R, MFI, ROC, TRIX, AO), Volatility (ATR, Bollinger Bands), Volume (Vol SMA, Base Line)
-
-        **Color Coding:** Green = Bullish | Red = Bearish | Yellow = Neutral
+        **Colors:** Green=Bullish | Red=Bearish | Yellow=Neutral
         """)
     
     with st.expander("MARKET SESSIONS & NEWS"):
         st.markdown("""
-        **Market Sessions:** Real-time tracking of Asian, European, American sessions with progress bars, Golden Hour detection, and SMC strategy recommendations.
+        **Market Sessions:** Real-time Asian/European/American tracking with progress bars, Golden Hour detection, SMC strategy recommendations.
 
-        **Market News:** Multi-source aggregation (Marketaux, Tiingo, NewsAPI) with 6-hour freshness, category filtering, and force refresh capability.
+        **Market News:** Multi-source aggregation (Marketaux, Tiingo, NewsAPI) with 6-hour freshness, category filtering, force refresh.
         """)
     
     with st.expander("SMART ALERT CENTER"):
         st.markdown("""
         **Automated Price Monitoring** with Telegram notifications.
 
-        **Setup:** Select instrument > Set target price > Enter Telegram Chat ID (from @userinfobot) > Choose condition > Activate.
-        **Features:** 24/7 monitoring, instant alerts, multiple concurrent alerts, auto-formatted prices per instrument.
+        **Setup:** Select instrument > Set target > Enter Telegram Chat ID (@userinfobot) > Choose condition > Activate.
+        **Current Price** displayed from the same Supabase cache as Live Dashboard for consistency.
+        **Features:** 24/7 monitoring, instant alerts, multiple concurrent alerts, auto-formatted prices.
         """)
     
     with st.expander("CHATBOT AI"):
         st.markdown("""
-        **Neural Assistant** powered by AeroVulpis Engine. Contextual awareness of selected instrument and live price. Ask about indicators, trading strategies, or alert status.
+        **Neural Assistant** with contextual awareness of selected instrument and live price.
         **Limits:** FREE: 20/day, TRIAL: 50/day, WEEKLY: 100/day, MONTHLY: 200/day, 6M PRO: 500/day, ULTIMATE: Unlimited.
         """)
     
     with st.expander("ECONOMIC RADAR"):
         st.markdown("""
-        **Global Economic Scanner** monitors high-impact events (NFP, CPI, FOMC, GDP, PMI). Real-time calendar with impact filtering and currency-specific events.
+        **Global Economic Scanner** monitors high-impact events (NFP, CPI, FOMC, GDP, PMI). Real-time calendar with impact filtering.
         """)
     
     with st.expander("RISK MANAGEMENT"):
@@ -2384,9 +2528,13 @@ elif menu_selection == "Help & Support":
     
     with st.expander("LICENSE & TIER SYSTEM"):
         st.markdown("""
-        **Sign In:** Google OAuth 2.0 authentication.
-        **License Activation:** Enter key after login to upgrade tier.
+        **Sign In:** Google OAuth 2.0 via Supabase Auth.
+        **License Activation:** Enter key after login.
         **Tiers:** FREE (5 AI/20 chat), TRIAL (10/50), WEEKLY (20/100), MONTHLY (50/200), 6M PRO (100/500), ULTIMATE (Unlimited).
+        
+        **Google 403 Fix:**
+        1. Google Cloud Console → Authorized redirect URIs: `https://bqdugkmmnbxlftuxqtdg.supabase.co/auth/v1/callback`
+        2. Supabase Dashboard → Authentication → Providers → Google → Enable + Isi Client ID & Secret
         """)
     
     st.info("SETTINGS: Language switching (ID/EN). System cache clear available.")

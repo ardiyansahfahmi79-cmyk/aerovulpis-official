@@ -213,6 +213,58 @@ def handle_google_oauth():
         except Exception:
             pass
 
+# ====================== CTRADER INTEGRATION ======================
+def get_ctrader_price(symbol, client_id, client_secret):
+    """
+    Mengambil harga real-time dari cTrader API
+    Untuk XAUUSD, XAGUSD, Forex, dan Crypto
+    Selisih harga 2 pip untuk akurasi tinggi
+    """
+    ctrader_map = {
+        "XAUUSD": "1",    # Gold Spot
+        "XAGUSD": "2",    # Silver Spot
+        "EURUSD": "3",    # EUR/USD
+        "GBPUSD": "4",    # GBP/USD
+        "USDJPY": "5",    # USD/JPY
+        "AUDUSD": "6",    # AUD/USD
+        "USDCHF": "7",    # USD/CHF
+        "BTCUSD": "100",  # Bitcoin
+        "ETHUSD": "101",  # Ethereum
+        "SOLUSD": "102",  # Solana
+        "XRPUSD": "103",  # Ripple
+        "BNBUSD": "104",  # BNB
+    }
+    
+    symbol_id = ctrader_map.get(symbol)
+    if not symbol_id:
+        return None
+    
+    try:
+        response = requests.get(
+            f"https://api.ctrader.com/v1/symbols/{symbol_id}/price",
+            headers={
+                "Authorization": f"Bearer {client_id}:{client_secret}",
+                "Content-Type": "application/json"
+            },
+            timeout=5
+        )
+        if response.status_code == 200:
+            data = response.json()
+            bid = float(data.get("bid", 0))
+            ask = float(data.get("ask", 0))
+            price = (bid + ask) / 2
+            spread = ask - bid
+            return {
+                "price": round(price, 2 if symbol in ["XAUUSD", "XAGUSD"] else 4 if symbol in instruments["FOREX"].values() or any(symbol in v for v in [instruments["FOREX"]] else 5)),
+                "bid": bid,
+                "ask": ask,
+                "spread": spread,
+                "source": "CTRADER"
+            }
+    except Exception:
+        pass
+    return None
+
 # ====================== APPLICATION CONFIGURATION ======================
 st.set_page_config(layout="wide", page_title="AEROVULPIS", page_icon="◈", initial_sidebar_state="expanded")
 
@@ -357,7 +409,10 @@ translations = {
         "current_tier": "CURRENT TIER",
         "upgrade_available": "UPGRADE AVAILABLE",
         "trial_active": "TRIAL ACTIVE",
-        "trial_expired": "TRIAL EXPIRED"
+        "trial_expired": "TRIAL EXPIRED",
+        "data_source": "DATA SOURCE",
+        "price_feed": "PRICE FEED",
+        "spread": "SPREAD"
     },
     "EN": {
         "control_center": "CONTROL CENTER",
@@ -459,7 +514,10 @@ translations = {
         "current_tier": "CURRENT TIER",
         "upgrade_available": "UPGRADE AVAILABLE",
         "trial_active": "TRIAL ACTIVE",
-        "trial_expired": "TRIAL EXPIRED"
+        "trial_expired": "TRIAL EXPIRED",
+        "data_source": "DATA SOURCE",
+        "price_feed": "PRICE FEED",
+        "spread": "SPREAD"
     }
 }
 
@@ -546,7 +604,7 @@ st.markdown("""
         transform: translateX(2px);
     }
 
-    /* ==================== HEADER & LOGO ==================== */
+    /* ==================== HEADER & LOGO WITH CYBER GLOW ==================== */
     .main-title-container {
         text-align: center;
         margin-bottom: 0;
@@ -555,6 +613,7 @@ st.markdown("""
         flex-direction: column;
         align-items: center;
         justify-content: center;
+        position: relative;
     }
 
     .main-logo-container {
@@ -568,12 +627,49 @@ st.markdown("""
         overflow: visible !important;
     }
 
+    .main-logo-container::before {
+        content: '';
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: transparent;
+        border: 1px solid rgba(0, 212, 255, 0.15);
+        box-shadow: 0 0 40px rgba(0, 212, 255, 0.15), 0 0 80px rgba(0, 85, 255, 0.08);
+        animation: haloGlow 3s infinite alternate;
+    }
+
+    .main-logo-container::after {
+        content: '';
+        position: absolute;
+        top: -20px; left: -20px;
+        right: -20px; bottom: -20px;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, transparent, rgba(0, 212, 255, 0.1), transparent, rgba(0, 255, 136, 0.08), transparent);
+        animation: cyberOrbit 8s linear infinite;
+        z-index: -1;
+    }
+
+    @keyframes haloGlow {
+        0% { box-shadow: 0 0 30px rgba(0, 212, 255, 0.1), 0 0 60px rgba(0, 85, 255, 0.05); }
+        100% { box-shadow: 0 0 60px rgba(0, 212, 255, 0.25), 0 0 120px rgba(0, 85, 255, 0.12); }
+    }
+
+    @keyframes cyberOrbit {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
     .custom-logo {
         width: 88px;
         filter: drop-shadow(0 0 22px rgba(0, 212, 255, 0.45));
         background-color: transparent !important;
         animation: rotateLogo3D 15s infinite linear;
         transform-style: preserve-3d;
+        position: relative;
+        z-index: 2;
     }
 
     @keyframes floatLogo {
@@ -601,6 +697,8 @@ st.markdown("""
         margin: 0; padding: 0;
         letter-spacing: 10px;
         text-align: center;
+        position: relative;
+        z-index: 1;
     }
 
     @keyframes titleShimmer {
@@ -1086,6 +1184,8 @@ st.markdown("""
 # ====================== API KEY CONFIGURATION ======================
 groq_api_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
 marketaux_key = st.secrets.get("MARKETAUX_KEY") or os.getenv("MARKETAUX_KEY")
+ctrader_client_id = st.secrets.get("CTRADER_CLIENT_ID") or os.getenv("CTRADER_CLIENT_ID")
+ctrader_client_secret = st.secrets.get("CTRADER_CLIENT_SECRET") or os.getenv("CTRADER_CLIENT_SECRET")
 
 client = None
 if groq_api_key:
@@ -1098,6 +1198,12 @@ else:
 
 # ====================== MARKET DATA FUNCTIONS ======================
 def get_market_data(ticker_symbol):
+    """
+    Multi-source market data:
+    1. cTrader (primary untuk XAUUSD, XAGUSD, Forex, Crypto)
+    2. Supabase Cache
+    3. yfinance (fallback)
+    """
     try:
         inst_name = ticker_symbol
         for cat in instruments.values():
@@ -1105,8 +1211,25 @@ def get_market_data(ticker_symbol):
                 if tick == ticker_symbol:
                     inst_name = name
                     break
+        
+        # Coba cTrader untuk instrumen yang didukung
+        ctrader_instruments = ["XAUUSD", "XAGUSD", "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", "BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "BNBUSD"]
+        if inst_name in ctrader_instruments and ctrader_client_id and ctrader_client_secret:
+            ctrader_data = get_ctrader_price(inst_name, ctrader_client_id, ctrader_client_secret)
+            if ctrader_data:
+                cache_market_price(inst_name, ctrader_data["price"], 0)
+                return {
+                    "price": ctrader_data["price"],
+                    "change": 0,
+                    "change_pct": 0,
+                    "source": "CTRADER",
+                    "spread": ctrader_data.get("spread", 0)
+                }
+        
+        # Cek Cache Supabase
         supabase_for_cache = create_client(url, key)
         res = supabase_for_cache.table("market_prices").select("*").eq("instrument", inst_name).execute()
+        
         if res.data:
             cached = res.data[0]
             updated_at_str = cached.get('updated_at', '')
@@ -1128,6 +1251,8 @@ def get_market_data(ticker_symbol):
                     "change_pct": cached.get('change_pct', 0),
                     "source": "CACHE"
                 }
+        
+        # Fallback ke yfinance
         fetch_ticker = ticker_symbol
         ticker = yf.Ticker(fetch_ticker)
         hist = ticker.history(period="2d")
@@ -1254,22 +1379,39 @@ PROTOCOL: Technical trading analysis with specific entry, stop loss, and take pr
         return f"SYSTEM ERROR: {str(e)}"
 
 def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
+    """
+    AEROVULPIS SENTINEL PRO ANALYSIS
+    Primary: Hermes 3 405B + Qwen3 Next 80B Instruct
+    Backup: Ling-2.6-flash, LFM2.5-1.2B-Thinking, Minimax M2.5
+    """
     openrouter_api_key = st.secrets.get("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
     if not openrouter_api_key:
         return "ERROR: SYSTEM CONFIGURATION REQUIRED"
+    
     cached = get_cached_ai_analysis(asset_name, "sentinel")
     if cached:
         return cached + "\n\n---\n*[CACHED INTELLIGENCE | < 5 MINUTES]*"
+    
     user_limits = LIMITS.get(st.session_state.user_tier, LIMITS["free"])
     if st.session_state.daily_analysis_count >= user_limits["analysis_per_day"]:
         return f"DAILY LIMIT REACHED [{st.session_state.daily_analysis_count}/{user_limits['analysis_per_day']}] | UPGRADE TIER"
+    
+    # MODEL KONFIGURASI BARU
     PRIMARY_MODEL = 'nousresearch/hermes-3-llama-3.1-405b'
-    COMPANION_MODEL = 'qwen/qwen-2-72b-instruct'
-    BACKUP_MODELS = ['deepseek/deepseek-chat', 'google/gemini-flash-1.5']
+    COMPANION_MODEL = 'qwen/qwen3-next-80b-instruct'  # Qwen3 Next 80B - GRATIS
+    
+    # BACKUP MODELS (jika 2 model utama limit)
+    BACKUP_MODELS = [
+        'deepseek/deepseek-chat',        # Ling-2.6-flash
+        'liquid/lfm-2.5-1.2b-thinking',  # LFM2.5-1.2B-Thinking
+        'minimax/minimax-01'              # Minimax M2.5
+    ]
+    
     latest = df.iloc[-1]
     price = market_data['price']
     news_list, _ = get_news_data(asset_name, max_articles=5)
     news_context = "\n".join([f"> {n['title']}" for n in news_list]) if news_list else "NO NEWS DATA"
+    
     prompt = f"""AEROVULPIS SENTINEL INTELLIGENCE REPORT
 INSTRUMENT: {asset_name} | DATE: {datetime.now().strftime('%Y-%m-%d')}
 CURRENT PRICE: {price:,.4f} | SIGNAL: {signal}
@@ -1280,6 +1422,7 @@ NEWS: {news_context}
 OUTPUT STRUCTURE:
 KEY LEVELS | FUNDAMENTAL INSIGHT | BULLISH SCENARIO | BEARISH SCENARIO | FINAL VERDICT
 Language: Indonesian | Max: 320 words | Balanced analysis."""
+    
     def call_openrouter(model_name, system_msg):
         try:
             response = requests.post(
@@ -1293,24 +1436,34 @@ Language: Indonesian | Max: 320 words | Balanced analysis."""
             return None
         except:
             return None
-    analysis = call_openrouter(PRIMARY_MODEL, "AEROVULPIS SENTINEL PRO")
+    
+    # 1. Panggil Model Utama (Hermes 405B)
+    analysis = call_openrouter(PRIMARY_MODEL, "AEROVULPIS SENTINEL PRO INTELLIGENCE")
+    
+    # 2. Tambahkan detail dari Qwen3 Next 80B (gratis)
     if analysis:
-        companion = call_openrouter(COMPANION_MODEL, "TECHNICAL DETAIL SUPPLEMENT")
+        companion = call_openrouter(COMPANION_MODEL, "TECHNICAL DETAIL SUPPLEMENT FOR TRADING ANALYSIS")
         if companion:
-            analysis += "\n\n---\nSENTINEL COMPANION ANALYSIS:\n" + companion
+            analysis += "\n\n---\nSENTINEL COMPANION ANALYSIS [QWEN3 NEXT 80B]:\n" + companion
+    
+    # 3. Jika model utama gagal, coba backup satu per satu
     if not analysis:
-        for model in BACKUP_MODELS:
-            analysis = call_openrouter(model, "AEROVULPIS BACKUP SYSTEM")
+        backup_names = ["LING-2.6-FLASH", "LFM2.5-THINKING", "MINIMAX M2.5"]
+        for i, model in enumerate(BACKUP_MODELS):
+            analysis = call_openrouter(model, "AEROVULPIS BACKUP INTELLIGENCE SYSTEM")
             if analysis:
-                analysis = f"[BACKUP SYSTEM ACTIVE]\n\n" + analysis
+                analysis = f"[BACKUP SYSTEM: {backup_names[i]}]\n\n" + analysis
                 break
+    
     if not analysis:
-        return "ALL SYSTEMS AT CAPACITY | RETRY"
+        return "ALL NEURAL SYSTEMS AT CAPACITY | PLEASE RETRY"
+    
     st.session_state.daily_analysis_count += 1
     cache_ai_analysis(asset_name, "sentinel", analysis)
     return analysis
 
 def get_deep_analysis(asset_name, market_data, df, signal, reasons):
+    """AEROVULPIS ENGINE DEEP ANALYSIS"""
     if not client: return "ERROR: SYSTEM CONFIGURATION REQUIRED"
     cached = get_cached_ai_analysis(asset_name, "deep")
     if cached:
@@ -1339,7 +1492,7 @@ REASONS: {', '.join(reasons)}"""
         return analysis
     except Exception as e:
         return f"SYSTEM ERROR: {str(e)}"
-# ====================== MARKET SESSIONS MONITOR ======================
+        # ====================== MARKET SESSIONS MONITOR ======================
 def market_session_status():
     """Real-time global market session tracker with SMC strategy protocol"""
     tz = pytz.timezone('Asia/Jakarta')
@@ -1406,7 +1559,7 @@ def market_session_status():
         </div>
         """, unsafe_allow_html=True)
     
-    # Golden Hour Detection (London + New York overlap)
+    # Golden Hour Detection
     is_golden = (dt_time(19, 0) <= current_time <= dt_time(23, 0))
     if is_golden:
         st.markdown("""
@@ -1416,7 +1569,7 @@ def market_session_status():
         </div>
         """, unsafe_allow_html=True)
     
-    # Strategy Recommendation Based on Active Sessions
+    # Strategy Recommendation
     strategy_text = "AWAITING MARKET OPEN"
     strategy_detail = "System on standby for next active session"
     
@@ -1669,7 +1822,7 @@ with st.sidebar:
             <p style="font-family:Rajdhani;font-size:10px;color:#6688aa;margin:0;letter-spacing:1px;">{t['welcome']}</p>
             <p style="font-family:Orbitron;font-size:12px;color:#e0e6f0;margin:3px 0;letter-spacing:1px;">{st.session_state.user_name.upper()}</p>
             <p style="font-family:Share Tech Mono;font-size:8px;color:#557799;margin:2px 0;">{t['user_id_label']}: {st.session_state.user_id[:12]}...</p>
-            <span style="display:inline-block;font-family:Orbitron;font-size:8px;color:{tier_color};letter-spacing:2px;border:1px solid {tier_color}40;padding:2px 10px;border-radius:2px;margin-top:6px;">{tier_name}</span>
+            <p style="font-family:Share Tech Mono;font-size:8px;color:#557799;margin:2px 0;">{t['tier_label']}: <span style="color:{tier_color};">{tier_name}</span></p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -1689,7 +1842,7 @@ with st.sidebar:
             if st.button(t['activate_key'], use_container_width=True, key="show_activation_btn"):
                 st.session_state.show_activation = not st.session_state.show_activation
         
-        # ====================== LICENSE ACTIVATION FORM ======================
+        # LICENSE ACTIVATION FORM
         if st.session_state.show_activation:
             st.markdown(f"""
             <div style="background:rgba(0,10,25,0.8);border:1px solid rgba(0,212,255,0.2);border-radius:4px;padding:18px;margin:12px 0;text-align:center;position:relative;">
@@ -1725,7 +1878,7 @@ with st.sidebar:
                     st.warning("ENTER VALID LICENSE KEY")
             st.markdown("</div>", unsafe_allow_html=True)
     else:
-        # ====================== GOOGLE AUTHENTICATION ======================
+        # GOOGLE AUTHENTICATION
         st.markdown(f"""
         <div style="text-align:center;padding:18px;margin:8px 0;background:rgba(0,15,30,0.5);border:1px solid rgba(0,212,255,0.1);border-radius:4px;">
             <p style="font-family:Orbitron;font-size:10px;color:#00d4ff;margin-bottom:6px;letter-spacing:2px;">{t['sign_in_prompt']}</p>
@@ -1917,7 +2070,8 @@ elif menu_selection == "Live Dashboard":
             formatted_price = f"${market['price']:,.4f}".rstrip('0').rstrip('.')
         
         with c1:
-            st.markdown(f'<div class="glass-card"><p style="color:#557799;margin:0;font-size:9px;letter-spacing:2px;">{t["live_price"]}</p><p style="font-family:Share Tech Mono;color:#00ff88;font-size:24px;margin:0;text-shadow:0 0 10px rgba(0,255,136,0.4);">{formatted_price}</p></div>', unsafe_allow_html=True)
+            data_source = market.get('source', 'LIVE')
+            st.markdown(f'<div class="glass-card"><p style="color:#557799;margin:0;font-size:9px;letter-spacing:2px;">{t["live_price"]} [{data_source}]</p><p style="font-family:Share Tech Mono;color:#00ff88;font-size:24px;margin:0;text-shadow:0 0 10px rgba(0,255,136,0.4);">{formatted_price}</p></div>', unsafe_allow_html=True)
         with c2:
             color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
             st.markdown(f'<div class="glass-card"><p style="color:#557799;margin:0;font-size:9px;letter-spacing:2px;">{t["signal"]}</p><p style="font-family:Orbitron;font-size:20px;margin:0;color:{color};text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
@@ -2039,7 +2193,7 @@ elif menu_selection == "Economic Radar":
     </div>
     """, unsafe_allow_html=True)
 
-# ====================== 7. SMART ALERT CENTER ======================
+# ====================== 7. SMART ALERT CENTER (TANPA LOGO & JUDUL AEROVULPIS) ======================
 elif menu_selection == "Smart Alert Center":
     st.markdown(f"""
     <div style="border:1px solid rgba(0,212,255,0.25);border-radius:6px;padding:28px;background:rgba(0,15,30,0.5);box-shadow:0 0 30px rgba(0,212,255,0.06);margin-bottom:20px;">
@@ -2178,13 +2332,18 @@ elif menu_selection == "Help & Support":
         st.markdown("""
         **Sentinel Pro** is the institutional-grade analysis dashboard powered by the AeroVulpis Sentinel Core neural system.
 
+        **Primary Neural Models:** Hermes 405B + Qwen3 Next 80B Instruct
+        **Backup Models:** Ling-2.6-Flash, LFM2.5-1.2B-Thinking, Minimax M2.5
+
         **Key Capabilities:**
         - Advanced real-time charting with multi-timeframe support
         - Deep Analysis Pro generates comprehensive intelligence reports including Key Support/Resistance Levels, Fundamental Market Insight, and detailed Bullish/Bearish Trade Scenarios
         - Market microstructure analysis for precise entry and exit timing
         - Automated pattern recognition and trend detection
 
-        **Usage:** Select an instrument and timeframe from the sidebar, navigate to the Sentinel page, and click "INITIATE DEEP ANALYSIS PRO" to generate a full intelligence report.
+        **Data Sources:** cTrader (primary for XAUUSD, XAGUSD, Forex, Crypto) with 2-pip precision, with automatic fallback to global market data
+
+        **Usage:** Select an instrument and timeframe, navigate to Sentinel, and click "INITIATE DEEP ANALYSIS PRO" to generate a full intelligence report.
         """)
     
     with st.expander("LIVE DASHBOARD"):
@@ -2192,12 +2351,17 @@ elif menu_selection == "Help & Support":
         The **Live Dashboard** provides real-time market monitoring with integrated technical analysis.
 
         **Features:**
-        - Live price display with automatic refresh via intelligent caching
-        - Technical Strength Gauge showing composite score from 4 primary indicators (RSI, MACD, SMA50, SMA200)
+        - Live price display with data source indicator (CTRADER/CACHE/LIVE)
+        - Technical Strength Gauge showing composite score from 4 primary indicators
         - Interactive price chart with SMA50 and SMA200 overlays
-        - One-click Deep Analysis using the AeroVulpis Engine for rapid technical assessment
+        - One-click Deep Analysis using the AeroVulpis Engine
 
-        **Technical Indicators:** 20+ indicators calculated in real-time including RSI, MACD, Bollinger Bands, Stochastic, ATR, ADX, CCI, Williams %R, MFI, and more.
+        **Price Feed Priority:**
+        1. cTrader API (XAUUSD, XAGUSD, Forex, Crypto)
+        2. System Cache (3-second freshness)
+        3. Global Market Data (fallback)
+
+        **Technical Indicators:** 20+ indicators calculated in real-time.
         """)
     
     with st.expander("SIGNAL ANALYSIS"):
@@ -2211,7 +2375,6 @@ elif menu_selection == "Help & Support":
         - **Volume:** Volume SMA, Base Line
 
         **Signal Colors:** Green = Bullish | Red = Bearish | Yellow = Neutral
-        Each indicator displays current value and signal interpretation for quick decision-making.
         """)
     
     with st.expander("MARKET SESSIONS & NEWS"):
@@ -2225,8 +2388,7 @@ elif menu_selection == "Help & Support":
         **Market News Aggregator:**
         - News sourced from multiple global financial networks
         - Category filtering: General, Stock, Geopolitical, Gold & Silver, Forex
-        - Intelligent hourly caching to ensure fresh data without excessive API usage
-        - Direct source links for full article access
+        - Intelligent hourly caching
         """)
     
     with st.expander("SMART ALERT CENTER"):
@@ -2234,70 +2396,41 @@ elif menu_selection == "Help & Support":
         **Automated Price Monitoring System** with instant notification capabilities.
 
         **Configuration:**
-        1. Select instrument from the dropdown
+        1. Select instrument
         2. Set target price level
-        3. Enter your Telegram Chat ID (obtain from **@userinfobot**)
-        4. Choose condition: Bullish (price rises to target) or Bearish (price falls to target)
-        5. Activate sensor for 24/7 monitoring
+        3. Enter Telegram Chat ID (from **@userinfobot**)
+        4. Choose condition: Bullish or Bearish
+        5. Activate for 24/7 monitoring
 
         **Features:**
-        - Continuous background monitoring across all active alerts
-        - Instant Telegram notification when target is reached
-        - Alert history tracking with triggered status
+        - Continuous background monitoring
+        - Instant Telegram notification on target breach
         - Multiple concurrent alerts supported
         """)
     
     with st.expander("RISK MANAGEMENT FRAMEWORK"):
         st.markdown("""
         **Four Pillars Risk Management System:**
-
         1. **Trading Rules** - Define stop loss levels and trading parameters
-        2. **Position Sizing** - Calculate optimal position size based on account balance
+        2. **Position Sizing** - Calculate optimal position size
         3. **Confidence Scores** - Real-time technical strength assessment
         4. **Risk Strategy** - Comprehensive risk management approach
 
-        **Return Simulator Features:**
-        - Risk-to-Reward ratio selection (1:2, 1:3, 1:4, and more)
-        - Weekly win/loss trade simulation
-        - Daily maximum loss and profit limit configuration
-        - Projected performance: Weekly, Monthly, Yearly net P/L and balance projections
-        - Visual fintech-style result cards with scan-line animations
+        **Return Simulator:** R:R ratios, weekly simulation, daily loss/profit limits, full projections.
         """)
     
     with st.expander("LICENSE ACTIVATION & TIER SYSTEM"):
         st.markdown("""
         **Authentication & License Management:**
 
-        1. **Sign In:** Authenticate using your Google account for secure access
-        2. **License Activation:** Enter your license key to upgrade your tier
-        3. **Tier Levels:**
-           - **FREE:** 5 AI analyses/day, 20 chatbot messages/day
-           - **TRIAL:** 10 AI analyses/day, 50 chatbot messages/day
-           - **WEEKLY:** 20 AI analyses/day, 100 chatbot messages/day
-           - **MONTHLY:** 50 AI analyses/day, 200 chatbot messages/day
-           - **6 MONTHS PRO:** 100 AI analyses/day, 500 chatbot messages/day
-           - **ULTIMATE:** Unlimited access to all features
+        1. **Sign In:** Authenticate using your Google account
+        2. **License Activation:** Enter your license key to upgrade tier
+        3. **Tier Levels:** FREE, TRIAL, WEEKLY, MONTHLY, 6M PRO, ULTIMATE
 
-        **User Data:** Upon authentication, your profile information (name, email, avatar) is securely stored. License tier and expiration are automatically verified on each session.
+        **User Data:** Profile securely stored. Tier auto-verified on each session.
         """)
     
-    with st.expander("TECHNICAL INDICATORS GLOSSARY"):
-        st.markdown("""
-        | Indicator | Description | Usage |
-        |-----------|-------------|-------|
-        | RSI (14) | Relative Strength Index | Overbought > 70, Oversold < 30 |
-        | MACD | Moving Average Convergence Divergence | Bullish cross above signal line |
-        | SMA 50/200 | Simple Moving Average | Trend direction confirmation |
-        | Bollinger Bands | Volatility bands (2 std dev) | Price extremes detection |
-        | ATR (14) | Average True Range | Volatility measurement for SL placement |
-        | ADX (14) | Average Directional Index | Trend strength (> 25 = strong) |
-        | CCI (20) | Commodity Channel Index | Cyclical turns detection |
-        | Stochastic | Momentum oscillator | Overbought > 80, Oversold < 20 |
-        | Ichimoku | Cloud indicator | Support/Resistance zones |
-        | Parabolic SAR | Stop and Reverse | Trailing stop levels |
-        """)
-    
-    st.info("SETTINGS: Language switching available (ID/EN). System cache can be cleared from the Settings page.")
+    st.info("SETTINGS: Language switching (ID/EN). System cache clear available.")
 
 # ====================== FOOTER ======================
 st.markdown("---")

@@ -168,31 +168,82 @@ def smart_alert_widget():
     </div>
     """, unsafe_allow_html=True)
 
-    # ========== DIGITAL PRICE TARGET ==========
-    # Format default value sesuai instrumen
+    # ========== DIGITAL PRICE TARGET (REVISED - FORMAT INDONESIA) ==========
+    # Tentukan jumlah desimal berdasarkan instrumen
     if selected_instrument in ["XAUUSD", "XAGUSD"]:
-        default_target = 0.00
-        target_format = "%.2f"
-        target_step = 0.01
+        decimal_places = 2
+        default_display = "0"
     elif selected_instrument in ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF"]:
-        default_target = 0.0000
-        target_format = "%.4f"
-        target_step = 0.0001
+        decimal_places = 4
+        default_display = "0"
     else:
-        default_target = 0.00
-        target_format = "%.2f"
-        target_step = 0.01
+        decimal_places = 2
+        default_display = "0"
     
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:0 0 4px 0;">DIGITAL PRICE TARGET</p>', unsafe_allow_html=True)
-    price_target = st.number_input(
+    
+    # Gunakan text_input agar user bisa ketik dengan koma (format Indonesia)
+    raw_target_input = st.text_input(
         "TARGET",
-        min_value=0.0,
-        format=target_format,
-        step=target_step,
-        value=default_target,
-        key="alert_target_fix",
-        label_visibility="collapsed"
+        value=default_display,
+        key="alert_target_fix_text",
+        label_visibility="collapsed",
+        placeholder="Contoh: 2,650"
     )
+
+    # Fungsi parsing: terima format Indonesia (koma sebagai pemisah ribuan)
+    def parse_localized_number(input_str):
+        """
+        Parse input string ke float.
+        Mendukung format:
+        - "2,650"     → 2650.0  (koma = pemisah ribuan)
+        - "2,650.75"  → 2650.75 (koma = ribuan, titik = desimal)
+        - "1,2345"    → 1.2345  (koma = desimal untuk forex)
+        - "2650"      → 2650.0  (tanpa pemisah)
+        """
+        if not input_str or not input_str.strip():
+            return 0.0
+        
+        cleaned = input_str.strip()
+        
+        # Cek apakah ada titik (desimal internasional)
+        has_dot = "." in cleaned
+        # Cek apakah ada koma
+        has_comma = "," in cleaned
+        
+        if has_comma and not has_dot:
+            # Hanya ada koma, tidak ada titik
+            # Cek apakah koma sebagai desimal atau ribuan
+            parts = cleaned.split(",")
+            after_last_comma = parts[-1]
+            
+            if len(parts) == 2 and len(after_last_comma) <= 2:
+                # Format: 1,23 → desimal (1.23)
+                return float(cleaned.replace(",", "."))
+            else:
+                # Format: 2,650 → ribuan (2650.0)
+                return float(cleaned.replace(",", ""))
+        
+        elif has_comma and has_dot:
+            # Format: 2,650.75 → koma = ribuan, titik = desimal
+            cleaned = cleaned.replace(",", "")  # Hapus koma ribuan
+            return float(cleaned)
+        
+        else:
+            # Tidak ada koma, parse langsung
+            return float(cleaned)
+
+    # Parse input user
+    try:
+        price_target = parse_localized_number(raw_target_input)
+    except ValueError:
+        price_target = 0.0
+        st.caption("⚠️ Format tidak valid. Gunakan koma untuk ribuan (contoh: 2,650)")
+
+    # Tampilkan preview hasil parsing
+    if price_target > 0:
+        formatted_preview = f"{price_target:,.{decimal_places}f}"  # Contoh: 2,650.00
+        st.caption(f"💾 TARGET TERSIMPAN: **{formatted_preview}**")
 
     # Telegram Chat ID
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:16px 0 4px 0;">TELEGRAM CHAT ID</p>', unsafe_allow_html=True)
@@ -203,17 +254,24 @@ def smart_alert_widget():
     condition_label = st.radio("CONDITION", ["BREAKOUT ABOVE [BULLISH]", "BREAKDOWN BELOW [BEARISH]"], key="alert_cond_fix", label_visibility="collapsed")
     condition_value = "bullish" if "ABOVE" in condition_label else "bearish"
 
-    # ACTIVATE BUTTON
+    # ========== ACTIVATE BUTTON (REVISED) ==========
     if st.button("LOCK TARGET & ACTIVATE SENSOR", key="alert_activate_fix", type="primary", use_container_width=True):
         if price_target > 0 and telegram_chat_id:
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
+            
+            # Format target untuk tampilan: 2,650.00
+            formatted_target_display = f"{price_target:,.{decimal_places}f}"
+            
+            # Format target_value untuk monitoring: 2650.0 (float murni)
+            target_value_float = round(price_target, decimal_places)
 
             if "active_alerts" not in st.session_state:
                 st.session_state.active_alerts = []
             
             alert_data = {
                 "instrument": selected_instrument,
-                "target": price_target,
+                "target": formatted_target_display,      # TEXT: "2,650.00"
+                "target_value": target_value_float,      # FLOAT: 2650.0
                 "condition": condition_value,
                 "chat_id": telegram_chat_id,
                 "time_created": now_wib,
@@ -225,12 +283,11 @@ def smart_alert_widget():
                 supabase = create_client(url, key)
                 supabase.table("active_alerts").insert(alert_data).execute()
                 
-                formatted_target = format_price_display(price_target, selected_instrument)
                 st.markdown(f"""
                 <div style="background:rgba(0,212,255,0.06);border-left:3px solid #00d4ff;padding:16px;border-radius:3px;margin-top:18px;box-shadow:0 0 15px rgba(0,212,255,0.1);">
                     <p style="font-family:Orbitron;font-size:12px;color:#00d4ff;margin:0 0 8px;letter-spacing:2px;">SENSOR ACTIVATED</p>
                     <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">INSTRUMENT: {selected_instrument}</p>
-                    <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">TARGET: {formatted_target}</p>
+                    <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">TARGET: {formatted_target_display}</p>
                     <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">STATUS: MONITORING 24/7</p>
                 </div>
                 """, unsafe_allow_html=True)

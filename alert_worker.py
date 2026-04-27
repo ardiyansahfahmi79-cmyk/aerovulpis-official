@@ -77,13 +77,14 @@ def run_worker():
 
     for alert in alerts:
         inst = alert.get('instrument')
-        target = alert.get('target')
+        target = alert.get('target')              # TEXT: "2,650.00"
+        target_value = alert.get('target_value')  # FLOAT: 2650.0
         condition = alert.get('condition')
         chat_id = alert.get('chat_id')
         alert_id = alert.get('id')
 
         print(f"\n--- Processing Alert ID: {alert_id} ---")
-        print(f"Instrument: {inst}, Target: {target}, Condition: {condition}")
+        print(f"Instrument: {inst}, Target: {target}, Target Value: {target_value}, Condition: {condition}")
 
         ticker = ticker_map.get(inst)
         if not ticker:
@@ -94,10 +95,11 @@ def run_worker():
         if current_price is None:
             continue
 
+        # ✅ GUNAKAN target_value (FLOAT) untuk perbandingan
         triggered = False
-        if condition == "bullish" and current_price >= target:
+        if condition == "bullish" and current_price >= target_value:
             triggered = True
-        elif condition == "bearish" and current_price <= target:
+        elif condition == "bearish" and current_price <= target_value:
             triggered = True
 
         if triggered:
@@ -111,14 +113,18 @@ def run_worker():
 
             # Kirim Telegram
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
-            # Format harga khusus XAUUSD (2 desimal) vs lainnya (4 desimal)
-            p_fmt = "{:,.2f}" if inst == "XAUUSD" else "{:,.4f}"
+            
+            # ✅ Format current_price untuk tampilan
+            if inst in ["XAUUSD", "XAGUSD", "BTCUSD"]:
+                p_fmt = "{:,.2f}"
+            else:
+                p_fmt = "{:,.4f}"
             
             msg = (
                 f"<b>🦅 AEROVULPIS SENTINEL ALERT</b>\n"
                 f"━━━━━━━━━━━━━━━━━━\n"
                 f"<b>INSTRUMENT:</b> {inst}\n"
-                f"<b>TARGET:</b> {p_fmt.format(target)}\n"
+                f"<b>TARGET:</b> {target}\n"
                 f"<b>CURRENT:</b> {p_fmt.format(current_price)}\n"
                 f"<b>TIME:</b> {now_wib}\n"
                 f"━━━━━━━━━━━━━━━━━━\n"

@@ -54,6 +54,27 @@ def send_telegram(chat_id, message):
         print(f"DEBUG: Telegram error: {e}")
         return False
 
+def parse_target_value(target_raw):
+    """
+    Parse target dari berbagai format:
+    - "2,650.00" (TEXT baru) → 2650.0
+    - "2650.0" (FLOAT lama) → 2650.0
+    - 2650.0 (sudah FLOAT) → 2650.0
+    """
+    if target_raw is None:
+        return 0.0
+    
+    # Kalau sudah float, return langsung
+    if isinstance(target_raw, (int, float)):
+        return float(target_raw)
+    
+    # Kalau string, bersihkan
+    try:
+        cleaned = str(target_raw).replace(",", "").strip()
+        return float(cleaned)
+    except (ValueError, AttributeError):
+        return 0.0
+
 def run_worker():
     try:
         print("DEBUG: Fetching alerts from 'active_alerts' table...")
@@ -77,14 +98,25 @@ def run_worker():
 
     for alert in alerts:
         inst = alert.get('instrument')
-        target = alert.get('target')              # TEXT: "2,650.00"
-        target_value = alert.get('target_value')  # FLOAT: 2650.0
+        target_raw = alert.get('target')
+        target_value = alert.get('target_value')  # Coba ambil target_value dulu
         condition = alert.get('condition')
         chat_id = alert.get('chat_id')
         alert_id = alert.get('id')
 
         print(f"\n--- Processing Alert ID: {alert_id} ---")
-        print(f"Instrument: {inst}, Target: {target}, Target Value: {target_value}, Condition: {condition}")
+        
+        # Tentukan target numerik untuk perbandingan
+        if target_value is not None and isinstance(target_value, (int, float)) and target_value > 0:
+            target_num = float(target_value)
+            target_display = str(target_raw) if target_raw else str(target_num)
+            print(f"DEBUG: Using target_value field: {target_num}")
+        else:
+            target_num = parse_target_value(target_raw)
+            target_display = str(target_raw) if target_raw else f"{target_num:,.2f}"
+            print(f"DEBUG: Parsed target from 'target' field: {target_num}")
+        
+        print(f"Instrument: {inst}, Target Num: {target_num}, Target Display: {target_display}, Condition: {condition}")
 
         ticker = ticker_map.get(inst)
         if not ticker:
@@ -93,14 +125,18 @@ def run_worker():
 
         current_price = get_price(ticker)
         if current_price is None:
+            print(f"DEBUG: Could not fetch price for {ticker}, skipping...")
             continue
 
-        # ✅ GUNAKAN target_value (FLOAT) untuk perbandingan
+        print(f"DEBUG: Current price of {inst} = {current_price}, Target = {target_num}")
+
         triggered = False
-        if condition == "bullish" and current_price >= target_value:
+        if condition == "bullish" and current_price >= target_num:
             triggered = True
-        elif condition == "bearish" and current_price <= target_value:
+            print(f"DEBUG: BULLISH condition met! {current_price} >= {target_num}")
+        elif condition == "bearish" and current_price <= target_num:
             triggered = True
+            print(f"DEBUG: BEARISH condition met! {current_price} <= {target_num}")
 
         if triggered:
             print(f"ACTION: Triggering alert for {inst}!")
@@ -114,18 +150,18 @@ def run_worker():
             # Kirim Telegram
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
             
-            # ✅ Format current_price untuk tampilan
-            if inst in ["XAUUSD", "XAGUSD", "BTCUSD"]:
-                p_fmt = "{:,.2f}"
+            # Format current_price untuk tampilan
+            if inst in ["XAUUSD", "XAGUSD", "BTCUSD", "ETHUSD"]:
+                current_fmt = f"{current_price:,.2f}"
             else:
-                p_fmt = "{:,.4f}"
+                current_fmt = f"{current_price:,.4f}"
             
             msg = (
                 f"<b>🦅 AEROVULPIS SENTINEL ALERT</b>\n"
                 f"━━━━━━━━━━━━━━━━━━\n"
                 f"<b>INSTRUMENT:</b> {inst}\n"
-                f"<b>TARGET:</b> {target}\n"
-                f"<b>CURRENT:</b> {p_fmt.format(current_price)}\n"
+                f"<b>TARGET:</b> {target_display}\n"
+                f"<b>CURRENT:</b> {current_fmt}\n"
                 f"<b>TIME:</b> {now_wib}\n"
                 f"━━━━━━━━━━━━━━━━━━\n"
                 f"<i>[STATUS]: TARGET REACHED</i>"
@@ -135,7 +171,7 @@ def run_worker():
             else:
                 print("FAILED: Could not send Telegram message.")
         else:
-            print(f"INFO: Target not reached yet.")
+            print(f"INFO: Target not reached. Current={current_price}, Target={target_num}, Condition={condition}")
 
 if __name__ == "__main__":
     run_worker()

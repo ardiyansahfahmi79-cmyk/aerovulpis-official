@@ -5,7 +5,6 @@ from supabase import create_client, Client
 from datetime import datetime, timedelta
 import pytz
 import yfinance as yf
-import json
 
 url = st.secrets["supabase_url"]
 key = st.secrets["supabase_key"]
@@ -75,224 +74,66 @@ def get_cached_price(instrument_name):
 
 
 def economic_calendar_widget():
-    """Economic Radar Widget - RAPIH dengan format Actual/Forecast/Previous"""
+    """Economic Radar Widget"""
     
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&family=Share+Tech+Mono&display=swap');
-        
-        .econ-radar-container {
-            border: 1px solid rgba(0, 212, 255, 0.3);
-            border-radius: 8px;
-            padding: 28px;
-            background: rgba(0, 20, 40, 0.5);
-            box-shadow: 0 0 25px rgba(0, 212, 255, 0.08);
-            margin-bottom: 10px;
-            position: relative;
-            overflow: hidden;
-        }
-        
         .radar-header-stack {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 20px;
-            width: 100%;
-            gap: 6px;
+            display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; width: 100%; gap: 6px;
         }
-        
         .radar-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 26px;
-            font-weight: 700;
-            color: #00d4ff;
-            text-shadow: 0 0 12px rgba(0, 212, 255, 0.6);
-            margin: 0;
-            padding: 0 10px;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            text-align: center;
-            line-height: 1;
+            font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 700;
+            color: #00d4ff; text-shadow: 0 0 12px rgba(0, 212, 255, 0.6);
+            margin: 0; text-transform: uppercase; letter-spacing: 3px; text-align: center;
         }
-        
-        .radar-subtitle-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-        
-        .radar-logo {
-            width: 14px;
-            height: 14px;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-        
-        .radar-circle {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border: 1px solid #00d4ff;
-            border-radius: 50%;
-            opacity: 0.5;
-            animation: rdp 2s infinite;
-        }
-        
-        .radar-sweep {
-            position: absolute;
-            width: 50%;
-            height: 1px;
-            background: linear-gradient(to right, transparent, #00d4ff);
-            top: 50%;
-            left: 50%;
-            transform-origin: left center;
-            animation: rsw 2s linear infinite;
-        }
-        
-        @keyframes rdp {
-            0%, 100% { transform: scale(1); opacity: 0.4; }
-            50% { transform: scale(1.2); opacity: 0.8; }
-        }
-        
-        @keyframes rsw {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        
+        .radar-subtitle-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .status-indicator {
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 10px;
-            color: #00ff88;
-            letter-spacing: 1px;
-            background: rgba(0, 255, 136, 0.05);
-            padding: 2px 8px;
-            border-radius: 3px;
-            border: 1px solid rgba(0, 255, 136, 0.2);
-            display: flex;
-            align-items: center;
+            font-family: 'Share Tech Mono', monospace; font-size: 10px; color: #00ff88;
+            letter-spacing: 1px; background: rgba(0, 255, 136, 0.05); padding: 4px 12px;
+            border-radius: 3px; border: 1px solid rgba(0, 255, 136, 0.2);
+            display: flex; align-items: center;
         }
-        
         .status-dot {
-            height: 5px;
-            width: 5px;
-            background: #00ff88;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 6px;
-            box-shadow: 0 0 5px #00ff88;
-            animation: pg 2s infinite;
+            height: 6px; width: 6px; background: #00ff88; border-radius: 50%;
+            display: inline-block; margin-right: 8px;
+            box-shadow: 0 0 8px #00ff88; animation: pg 2s infinite;
         }
-        
         @keyframes pg {
             0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.6); }
-            70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(0, 255, 136, 0); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(0, 255, 136, 0); }
             100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
-        
-        .econ-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 11px;
+        .econ-event-row {
+            background: rgba(0, 18, 36, 0.5);
+            border: 1px solid rgba(0, 212, 255, 0.08);
+            border-radius: 3px;
+            padding: 12px 14px;
+            margin-bottom: 4px;
+            transition: all 0.3s ease;
         }
-        
-        .econ-table th {
-            background: rgba(0, 212, 255, 0.08);
-            color: #00d4ff;
-            padding: 10px 8px;
-            text-align: center;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 9px;
-            letter-spacing: 2px;
-            border-bottom: 1px solid rgba(0, 212, 255, 0.3);
-        }
-        
-        .econ-table td {
-            padding: 10px 8px;
-            text-align: center;
-            border-bottom: 1px solid rgba(0, 212, 255, 0.06);
-            color: #8899bb;
-        }
-        
-        .econ-table tr:hover td {
+        .econ-event-row:hover {
             background: rgba(0, 212, 255, 0.03);
-            color: #c0d0e0;
+            border-color: rgba(0, 212, 255, 0.25);
         }
-        
-        .impact-high {
-            color: #ff2a6d;
-            text-shadow: 0 0 4px rgba(255, 42, 109, 0.4);
-            font-weight: 700;
-        }
-        
-        .impact-med {
-            color: #ffcc00;
-        }
-        
-        .impact-low {
-            color: #00ff88;
-        }
-        
-        .actual-val {
-            color: #00ff88;
-            font-weight: 700;
-        }
-        
-        .forecast-val {
-            color: #557799;
-        }
-        
-        .previous-val {
-            color: #445566;
-        }
-        
-        .impact-legend {
-            display: flex;
-            justify-content: center;
-            gap: 18px;
-            margin-top: 14px;
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 10px;
-            flex-wrap: wrap;
-        }
-        
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            color: #8899bb;
-        }
-        
-        .star-icon {
-            font-size: 11px;
-        }
-        
-        .high-impact { color: #ff2a6d; text-shadow: 0 0 4px rgba(255, 42, 109, 0.4); }
-        .med-impact { color: #ffcc00; }
-        .low-impact { color: #00ff88; }
+        .impact-high { color: #ff2a6d; text-shadow: 0 0 4px rgba(255, 42, 109, 0.4); }
+        .impact-med { color: #ffcc00; }
+        .impact-low { color: #00ff88; }
     </style>
     """, unsafe_allow_html=True)
 
     # Header
     st.markdown("""
-    <div class="econ-radar-container">
-        <div class="radar-header-stack">
-            <h2 class="radar-title">ECONOMIC RADAR</h2>
-            <div class="radar-subtitle-row">
-                <div class="radar-logo"><div class="radar-circle"></div><div class="radar-sweep"></div></div>
-                <div class="status-indicator"><span class="status-dot"></span>LIVE CONNECTION</div>
-            </div>
+    <div class="radar-header-stack">
+        <h2 class="radar-title">ECONOMIC RADAR</h2>
+        <div class="radar-subtitle-row">
+            <div class="status-indicator"><span class="status-dot"></span>LIVE CONNECTION</div>
         </div>
+    </div>
     """, unsafe_allow_html=True)
 
-    # Ambil data economic calendar dari API (fallback: data statis)
+    # Ambil data
     events = []
-    
-    # Coba ambil dari free API
     try:
         today = datetime.now().strftime('%Y-%m-%d')
         end_date = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
@@ -304,11 +145,6 @@ def economic_calendar_widget():
             data = resp.json()
             if data.get('result'):
                 for item in data['result'][:15]:
-                    actual = item.get('actual', '')
-                    forecast = item.get('forecast', '')
-                    previous = item.get('previous', '')
-                    
-                    # Format angka
                     def fmt_val(v):
                         if v is None or v == '' or v == 'N/A':
                             return '—'
@@ -320,8 +156,7 @@ def economic_calendar_widget():
                                 return f"{num:.2f}"
                             elif abs(num) > 0:
                                 return f"{num:.4f}"
-                            else:
-                                return str(v)
+                            return str(v)
                         except:
                             return str(v)
                     
@@ -329,66 +164,54 @@ def economic_calendar_widget():
                         'time': item.get('date', '')[-8:-3] if item.get('date') else '—',
                         'currency': item.get('currency', '—'),
                         'event': item.get('title', 'Unknown'),
-                        'actual': fmt_val(actual),
-                        'forecast': fmt_val(forecast),
-                        'previous': fmt_val(previous),
+                        'actual': fmt_val(item.get('actual', '')),
+                        'forecast': fmt_val(item.get('forecast', '')),
+                        'previous': fmt_val(item.get('previous', '')),
                         'impact': item.get('importance', 1)
                     })
     except Exception:
         pass
 
-    # Jika API gagal, tampilkan data default
     if not events:
         events = [
             {'time': '—', 'currency': 'USD', 'event': 'WAITING FOR DATA...', 'actual': '—', 'forecast': '—', 'previous': '—', 'impact': 1},
             {'time': '—', 'currency': 'USD', 'event': 'REFRESH TO LOAD ECONOMIC CALENDAR', 'actual': '—', 'forecast': '—', 'previous': '—', 'impact': 2},
         ]
-    
-    # Render table
-    table_html = """
-    <table class="econ-table">
-        <thead>
-            <tr>
-                <th>TIME</th>
-                <th>CUR</th>
-                <th>EVENT</th>
-                <th>ACTUAL</th>
-                <th>FORECAST</th>
-                <th>PREVIOUS</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
+
+    # Render event
     for ev in events:
-        impact_class = 'impact-high' if ev['impact'] >= 3 else ('impact-med' if ev['impact'] == 2 else 'impact-low')
-        impact_stars = '★★★' if ev['impact'] >= 3 else ('★★☆' if ev['impact'] == 2 else '★☆☆')
+        stars = '★★★' if ev['impact'] >= 3 else ('★★☆' if ev['impact'] == 2 else '★☆☆')
+        impact_css = 'impact-high' if ev['impact'] >= 3 else ('impact-med' if ev['impact'] == 2 else 'impact-low')
         
-        table_html += f"""
-            <tr>
-                <td style="color:#00d4ff;">{ev['time']}</td>
-                <td><span class="{impact_class}">{ev['currency']} {impact_stars}</span></td>
-                <td style="text-align:left;">{ev['event']}</td>
-                <td class="actual-val">{ev['actual']}</td>
-                <td class="forecast-val">{ev['forecast']}</td>
-                <td class="previous-val">{ev['previous']}</td>
-            </tr>
-        """
-    
-    table_html += """
-        </tbody>
-    </table>
-    """
-    
-    st.markdown(table_html, unsafe_allow_html=True)
-    
+        st.markdown(f"""
+        <div class="econ-event-row" style="display:flex;align-items:center;gap:10px;font-family:'Share Tech Mono',monospace;">
+            <span style="color:#00d4ff;min-width:45px;font-size:11px;">{ev['time']}</span>
+            <span class="{impact_css}" style="min-width:60px;font-size:10px;letter-spacing:1px;">{ev['currency']} {stars}</span>
+            <span style="color:#8899bb;flex:1;font-size:11px;text-align:left;">{ev['event']}</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        c1, c2, c3, c4 = st.columns([0.8, 0.8, 0.8, 3.6])
+        with c1:
+            st.markdown(f"<p style='font-size:8px;color:#557799;margin:0;letter-spacing:1px;'>ACT</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-family:Share Tech Mono;font-size:13px;color:#00ff88;margin:0;font-weight:700;'>{ev['actual']}</p>", unsafe_allow_html=True)
+        with c2:
+            st.markdown(f"<p style='font-size:8px;color:#557799;margin:0;letter-spacing:1px;'>FCT</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-family:Share Tech Mono;font-size:13px;color:#557799;margin:0;'>{ev['forecast']}</p>", unsafe_allow_html=True)
+        with c3:
+            st.markdown(f"<p style='font-size:8px;color:#557799;margin:0;letter-spacing:1px;'>PRV</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-family:Share Tech Mono;font-size:13px;color:#445566;margin:0;'>{ev['previous']}</p>", unsafe_allow_html=True)
+        with c4:
+            st.markdown("")
+        
+        st.markdown("<hr style='border-color:rgba(0,212,255,0.05);margin:2px 0;'>", unsafe_allow_html=True)
+
     # Legend
     st.markdown("""
-        <div class="impact-legend">
-            <div class="legend-item"><span class="star-icon high-impact">★★★</span> High Impact</div>
-            <div class="legend-item"><span class="star-icon med-impact">★★☆</span> Medium</div>
-            <div class="legend-item"><span class="star-icon low-impact">★☆☆</span> Low</div>
-        </div>
+    <div style="display:flex;justify-content:center;gap:18px;margin-top:14px;font-family:'Share Tech Mono',monospace;font-size:10px;">
+        <span class="impact-high">★★★ High Impact</span>
+        <span class="impact-med">★★☆ Medium</span>
+        <span class="impact-low">★☆☆ Low</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -469,7 +292,7 @@ def smart_alert_widget():
         price_target = 0.0
         st.caption("Format tidak valid. Gunakan koma untuk ribuan (contoh: 2,650)")
 
-    # Preview - Cyber Digital Style
+    # Preview - Cyber Digital
     if price_target > 0:
         formatted_preview = f"{price_target:,.{decimal_places}f}"
         st.markdown(f"""
@@ -488,7 +311,7 @@ def smart_alert_widget():
     condition_label = st.radio("CONDITION", ["BREAKOUT ABOVE [BULLISH]", "BREAKDOWN BELOW [BEARISH]"], key="alert_cond_fix", label_visibility="collapsed")
     condition_value = "bullish" if "ABOVE" in condition_label else "bearish"
 
-    # ========== ACTIVATE BUTTON (FIXED - SKIP target_value JIKA TIDAK ADA) ==========
+    # ========== ACTIVATE BUTTON ==========
     if st.button("LOCK TARGET & ACTIVATE SENSOR", key="alert_activate_fix", type="primary", use_container_width=True):
         if price_target > 0 and telegram_chat_id:
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
@@ -498,7 +321,6 @@ def smart_alert_widget():
             if "active_alerts" not in st.session_state:
                 st.session_state.active_alerts = []
             
-            # Insert tanpa target_value dulu (hindari error kolom tidak ada)
             alert_data = {
                 "instrument": selected_instrument,
                 "target": formatted_target_display,
@@ -512,7 +334,6 @@ def smart_alert_widget():
                 supabase = create_client(url, key)
                 supabase.table("active_alerts").insert(alert_data).execute()
                 
-                # Simpan target_value ke session state untuk monitoring lokal
                 alert_data["target_value"] = target_value_float
                 st.session_state.active_alerts.append(alert_data)
                 

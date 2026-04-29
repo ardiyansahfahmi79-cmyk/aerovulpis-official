@@ -73,13 +73,13 @@ def get_cached_price(instrument_name):
 
 
 def economic_calendar_widget():
-    """Economic Radar Widget - Pure HTML Table"""
+    """Economic Radar Widget - TradingView iframe"""
     
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&family=Share+Tech+Mono&display=swap');
         .radar-header-stack {
-            display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; width: 100%; gap: 6px;
+            display: flex; flex-direction: column; align-items: center; margin-bottom: 14px; width: 100%; gap: 6px;
         }
         .radar-title {
             font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 700;
@@ -89,57 +89,30 @@ def economic_calendar_widget():
         .radar-subtitle-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .status-indicator {
             font-family: 'Share Tech Mono', monospace; font-size: 10px; color: #00ff88;
-            letter-spacing: 1px; background: rgba(0, 255, 136, 0.05); padding: 4px 12px;
+            letter-spacing: 1px; background: rgba(0, 255, 136, 0.05); padding: 2px 8px;
             border-radius: 3px; border: 1px solid rgba(0, 255, 136, 0.2);
             display: flex; align-items: center;
         }
         .status-dot {
-            height: 6px; width: 6px; background: #00ff88; border-radius: 50%;
-            display: inline-block; margin-right: 8px;
-            box-shadow: 0 0 8px #00ff88; animation: pg 2s infinite;
+            height: 5px; width: 5px; background: #00ff88; border-radius: 50%;
+            display: inline-block; margin-right: 6px; box-shadow: 0 0 5px #00ff88;
+            animation: pg 2s infinite;
         }
         @keyframes pg {
             0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.6); }
-            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(0, 255, 136, 0); }
+            70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(0, 255, 136, 0); }
             100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
         }
-        .econ-radar-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 10px;
+        .tradingview-widget-container iframe { border-radius: 6px !important; filter: brightness(0.9) contrast(1.05); }
+        .impact-legend {
+            display: flex; justify-content: center; gap: 18px; margin-top: 14px;
+            font-family: 'Share Tech Mono', monospace; font-size: 10px; flex-wrap: wrap;
         }
-        .econ-radar-table th {
-            background: rgba(0, 212, 255, 0.06);
-            color: #00d4ff;
-            padding: 10px 6px;
-            text-align: center;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 8px;
-            letter-spacing: 2px;
-            border-bottom: 1px solid rgba(0, 212, 255, 0.3);
-        }
-        .econ-radar-table td {
-            padding: 8px 6px;
-            text-align: center;
-            border-bottom: 1px solid rgba(0, 212, 255, 0.04);
-            color: #8899bb;
-        }
-        .econ-radar-table tr:hover td {
-            background: rgba(0, 212, 255, 0.02);
-            color: #c0d0e0;
-        }
-        .econ-radar-table .event-name { text-align: left; }
-        .econ-radar-table .actual-cell { color: #00ff88; font-weight: 700; }
-        .econ-radar-table .forecast-cell { color: #557799; }
-        .econ-radar-table .previous-cell { color: #445566; }
-        .impact-high { color: #ff2a6d !important; text-shadow: 0 0 4px rgba(255, 42, 109, 0.4); }
-        .impact-med { color: #ffcc00 !important; }
-        .impact-low { color: #00ff88 !important; }
-        .radar-footer {
-            display: flex; justify-content: center; gap: 18px; margin-top: 16px;
-            font-family: 'Share Tech Mono', monospace; font-size: 10px;
-        }
+        .legend-item { display: flex; align-items: center; gap: 6px; color: #8899bb; }
+        .star-icon { font-size: 11px; }
+        .high-impact { color: #ff2a6d; text-shadow: 0 0 4px rgba(255, 42, 109, 0.4); }
+        .med-impact { color: #ffcc00; }
+        .low-impact { color: #00ff88; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -152,93 +125,32 @@ def economic_calendar_widget():
     </div>
     """, unsafe_allow_html=True)
 
-    events = []
+    tradingview_html = """
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+      {
+        "colorTheme": "dark",
+        "isTransparent": true,
+        "width": "100%",
+        "height": "450",
+        "locale": "en",
+        "importanceFilter": "-1,0,1",
+        "currencyFilter": "USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD"
+      }
+      </script>
+    </div>
+    """
     try:
-        today = datetime.now().strftime('%Y-%m-%d')
-        end_date = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
-        resp = requests.get(
-            f"https://economic-calendar.tradingview.com/events?from={today}T00:00:00Z&to={end_date}T23:59:59Z&countries=US,EU,GB,JP,AU,CA,CH,NZ",
-            timeout=10
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get('result'):
-                for item in data['result'][:12]:
-                    def fmt_val(v):
-                        if v is None or v == '' or v == 'N/A':
-                            return '—'
-                        try:
-                            num = float(v)
-                            if abs(num) >= 1000:
-                                return f"{num:,.1f}"
-                            elif abs(num) >= 1:
-                                return f"{num:.2f}"
-                            elif abs(num) > 0:
-                                return f"{num:.4f}"
-                            return str(v)
-                        except:
-                            return str(v)
-                    
-                    events.append({
-                        'time': item.get('date', '')[-8:-3] if item.get('date') else '—',
-                        'currency': item.get('currency', '—'),
-                        'event': item.get('title', 'Unknown')[:45],
-                        'actual': fmt_val(item.get('actual', '')),
-                        'forecast': fmt_val(item.get('forecast', '')),
-                        'previous': fmt_val(item.get('previous', '')),
-                        'impact': item.get('importance', 1)
-                    })
-    except Exception:
-        pass
-
-    if not events:
-        events = [
-            {'time': '—', 'currency': 'USD', 'event': 'Waiting for data...', 'actual': '—', 'forecast': '—', 'previous': '—', 'impact': 1},
-            {'time': '—', 'currency': 'USD', 'event': 'Refresh to load economic calendar', 'actual': '—', 'forecast': '—', 'previous': '—', 'impact': 2},
-        ]
-
-    table_html = """
-    <table class="econ-radar-table">
-        <thead>
-            <tr>
-                <th style="width:50px;">TIME</th>
-                <th style="width:65px;">CUR</th>
-                <th class="event-name">EVENT</th>
-                <th style="width:80px;">ACTUAL</th>
-                <th style="width:80px;">FORECAST</th>
-                <th style="width:80px;">PREVIOUS</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    for ev in events:
-        stars = '★★★' if ev['impact'] >= 3 else ('★★☆' if ev['impact'] == 2 else '★☆☆')
-        impact_css = 'impact-high' if ev['impact'] >= 3 else ('impact-med' if ev['impact'] == 2 else 'impact-low')
-        
-        table_html += f"""
-            <tr>
-                <td style="color:#00d4ff;">{ev['time']}</td>
-                <td class="{impact_css}">{ev['currency']} {stars}</td>
-                <td class="event-name">{ev['event']}</td>
-                <td class="actual-cell">{ev['actual']}</td>
-                <td class="forecast-cell">{ev['forecast']}</td>
-                <td class="previous-cell">{ev['previous']}</td>
-            </tr>
-        """
-    
-    table_html += """
-        </tbody>
-    </table>
-    """
-    
-    st.markdown(table_html, unsafe_allow_html=True)
+        st.components.v1.html(tradingview_html, height=450)
+    except Exception as e:
+        st.error(f"ECONOMIC RADAR ERROR: {str(e)}")
 
     st.markdown("""
-    <div class="radar-footer">
-        <span class="impact-high">★★★ High Impact</span>
-        <span class="impact-med">★★☆ Medium</span>
-        <span class="impact-low">★☆☆ Low</span>
+    <div class="impact-legend">
+        <div class="legend-item"><span class="star-icon high-impact">★★★</span> High Impact</div>
+        <div class="legend-item"><span class="star-icon med-impact">★★☆</span> Medium</div>
+        <div class="legend-item"><span class="star-icon low-impact">★☆☆</span> Low</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -337,14 +249,15 @@ def smart_alert_widget():
         if price_target > 0 and telegram_chat_id:
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
             formatted_target_display = f"{price_target:,.{decimal_places}f}"
-            target_value_float = round(price_target, decimal_places)
+            # SIMPAN SEBAGAI ANGKA MURNI (tanpa koma) untuk kolom DOUBLE PRECISION
+            target_numeric = round(price_target, decimal_places)
 
             if "active_alerts" not in st.session_state:
                 st.session_state.active_alerts = []
             
             alert_data = {
                 "instrument": selected_instrument,
-                "target": formatted_target_display,
+                "target": target_numeric,        # FLOAT: 4582.0 (bukan "4,582.00")
                 "condition": condition_value,
                 "chat_id": telegram_chat_id,
                 "time_created": now_wib,
@@ -355,8 +268,10 @@ def smart_alert_widget():
                 supabase = create_client(url, key)
                 supabase.table("active_alerts").insert(alert_data).execute()
                 
-                alert_data["target_value"] = target_value_float
-                st.session_state.active_alerts.append(alert_data)
+                # Simpan juga ke session_state untuk monitoring lokal
+                session_alert = alert_data.copy()
+                session_alert["target_display"] = formatted_target_display  # "4,582.00" untuk tampilan
+                st.session_state.active_alerts.append(session_alert)
                 
                 st.markdown(f"""
                 <div style="background:rgba(0,212,255,0.06);border-left:3px solid #00d4ff;padding:16px;border-radius:3px;margin-top:18px;box-shadow:0 0 15px rgba(0,212,255,0.1);">

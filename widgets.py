@@ -196,10 +196,10 @@ def smart_alert_widget():
         """
         Parse input string ke float.
         Mendukung format:
-        - "2,650"     → 2650.0  (koma = pemisah ribuan)
-        - "2,650.75"  → 2650.75 (koma = ribuan, titik = desimal)
-        - "1,2345"    → 1.2345  (koma = desimal untuk forex)
-        - "2650"      → 2650.0  (tanpa pemisah)
+        - "2,650"     -> 2650.0  (koma = pemisah ribuan)
+        - "2,650.75"  -> 2650.75 (koma = ribuan, titik = desimal)
+        - "1,2345"    -> 1.2345  (koma = desimal untuk forex)
+        - "2650"      -> 2650.0  (tanpa pemisah)
         """
         if not input_str or not input_str.strip():
             return 0.0
@@ -218,14 +218,14 @@ def smart_alert_widget():
             after_last_comma = parts[-1]
             
             if len(parts) == 2 and len(after_last_comma) <= 2:
-                # Format: 1,23 → desimal (1.23)
+                # Format: 1,23 -> desimal (1.23)
                 return float(cleaned.replace(",", "."))
             else:
-                # Format: 2,650 → ribuan (2650.0)
+                # Format: 2,650 -> ribuan (2650.0)
                 return float(cleaned.replace(",", ""))
         
         elif has_comma and has_dot:
-            # Format: 2,650.75 → koma = ribuan, titik = desimal
+            # Format: 2,650.75 -> koma = ribuan, titik = desimal
             cleaned = cleaned.replace(",", "")  # Hapus koma ribuan
             return float(cleaned)
         
@@ -238,12 +238,17 @@ def smart_alert_widget():
         price_target = parse_localized_number(raw_target_input)
     except ValueError:
         price_target = 0.0
-        st.caption("⚠️ Format tidak valid. Gunakan koma untuk ribuan (contoh: 2,650)")
+        st.caption("\u26a0\ufe0f Format tidak valid. Gunakan koma untuk ribuan (contoh: 2,650)")
 
-    # Tampilkan preview hasil parsing
+    # Tampilkan preview hasil parsing - CYBER DIGITAL STYLE
     if price_target > 0:
-        formatted_preview = f"{price_target:,.{decimal_places}f}"  # Contoh: 2,650.00
-        st.caption(f"💾 TARGET TERSIMPAN: **{formatted_preview}**")
+        formatted_preview = f"{price_target:,.{decimal_places}f}"
+        st.markdown(f"""
+        <div style="background:rgba(0,255,136,0.03);border:1px solid rgba(0,255,136,0.15);padding:10px;border-radius:3px;margin-top:8px;text-align:center;">
+            <span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#557799;letter-spacing:2px;">[ TARGET ACQUIRED ]</span><br>
+            <span style="font-family:'Orbitron',sans-serif;font-size:16px;color:#00ff88;text-shadow:0 0 8px rgba(0,255,136,0.4);letter-spacing:2px;">{formatted_preview}</span>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Telegram Chat ID
     st.markdown('<p style="font-family:Orbitron;font-size:9px;color:#8899bb;letter-spacing:2px;text-transform:uppercase;margin:16px 0 4px 0;">TELEGRAM CHAT ID</p>', unsafe_allow_html=True)
@@ -254,7 +259,7 @@ def smart_alert_widget():
     condition_label = st.radio("CONDITION", ["BREAKOUT ABOVE [BULLISH]", "BREAKDOWN BELOW [BEARISH]"], key="alert_cond_fix", label_visibility="collapsed")
     condition_value = "bullish" if "ABOVE" in condition_label else "bearish"
 
-    # ========== ACTIVATE BUTTON (REVISED) ==========
+    # ========== ACTIVATE BUTTON (FIXED - target_value OPTIONAL) ==========
     if st.button("LOCK TARGET & ACTIVATE SENSOR", key="alert_activate_fix", type="primary", use_container_width=True):
         if price_target > 0 and telegram_chat_id:
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
@@ -268,6 +273,7 @@ def smart_alert_widget():
             if "active_alerts" not in st.session_state:
                 st.session_state.active_alerts = []
             
+            # Data alert - target_value disimpan sebagai float
             alert_data = {
                 "instrument": selected_instrument,
                 "target": formatted_target_display,      # TEXT: "2,650.00"
@@ -281,14 +287,25 @@ def smart_alert_widget():
             
             try:
                 supabase = create_client(url, key)
-                supabase.table("active_alerts").insert(alert_data).execute()
                 
+                # Coba insert dengan target_value
+                try:
+                    supabase.table("active_alerts").insert(alert_data).execute()
+                except Exception as col_error:
+                    # Jika kolom target_value tidak ada, hapus field itu dan coba lagi
+                    if "target_value" in str(col_error):
+                        alert_data.pop("target_value", None)
+                        supabase.table("active_alerts").insert(alert_data).execute()
+                    else:
+                        raise col_error
+                
+                # SUCCESS - Cyber Digital confirmation
                 st.markdown(f"""
                 <div style="background:rgba(0,212,255,0.06);border-left:3px solid #00d4ff;padding:16px;border-radius:3px;margin-top:18px;box-shadow:0 0 15px rgba(0,212,255,0.1);">
-                    <p style="font-family:Orbitron;font-size:12px;color:#00d4ff;margin:0 0 8px;letter-spacing:2px;">SENSOR ACTIVATED</p>
+                    <p style="font-family:Orbitron;font-size:12px;color:#00d4ff;margin:0 0 8px;letter-spacing:2px;">/// SENSOR ACTIVATED ///</p>
                     <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">INSTRUMENT: {selected_instrument}</p>
                     <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">TARGET: {formatted_target_display}</p>
-                    <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">STATUS: MONITORING 24/7</p>
+                    <p style="font-family:Share Tech Mono;font-size:9px;color:#00ff88;margin:6px 0 0 0;letter-spacing:1px;">[STATUS]: MONITORING_24/7 | TELEGRAM_LINKED</p>
                 </div>
                 """, unsafe_allow_html=True)
             except Exception as e:

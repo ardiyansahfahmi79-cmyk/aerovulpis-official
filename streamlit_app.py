@@ -337,13 +337,14 @@ def cache_ai_analysis(asset_name, timeframe, analysis):
         pass
 
 # ##############################################################################
-# AUTH CHECK (EMAIL + PASSWORD - NO CALLBACK NEEDED)
+# AUTH SESSION RESTORE (EMAIL + PASSWORD)
 # ##############################################################################
 
 def restore_session():
     """
     Memulihkan sesi user yang sudah login sebelumnya.
-    Email + Password tidak memerlukan callback khusus.
+    Email + Password tidak memerlukan callback khusus -
+    Supabase SDK menyimpan sesi secara otomatis.
     """
     if not st.session_state.get("auth_session"):
         try:
@@ -370,8 +371,8 @@ def restore_session():
                 )
                 send_log(f"AUTH: {st.session_state.user_name} ({st.session_state.user_email}) - Session Restored")
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"DEBUG: No existing session - {str(e)[:100]}")
     return False
 
 # ##############################################################################
@@ -406,6 +407,11 @@ def start_ctrader_websocket():
         import time as ws_time
         
         def get_ctrader_token():
+            """
+            Mendapatkan access token dari cTrader Open API.
+            Endpoint: https://openapi.ctrader.com/apps/token
+            Grant type: client_credentials
+            """
             try:
                 resp = requests.post(
                     "https://openapi.ctrader.com/apps/token",
@@ -432,10 +438,14 @@ def start_ctrader_websocket():
             run_websocket()
             return
         
-        subscribe_symbols = ["1", "2", "3", "4", "100"]
+        subscribe_symbols = ["1", "2", "3", "4", "100"]  # XAUUSD, XAGUSD, EURUSD, GBPUSD, BTCUSD
         symbol_names = {"1": "XAUUSD", "2": "XAGUSD", "3": "EURUSD", "4": "GBPUSD", "100": "BTCUSD"}
         
         def on_message(ws, message):
+            """
+            Callback saat menerima pesan dari WebSocket.
+            Parse harga bid/ask dari SpotEvent.
+            """
             try:
                 data = json.loads(message)
                 if "symbolId" in data and "bid" in data:
@@ -638,22 +648,35 @@ def format_price_display(price, instrument_name):
     """
     name_upper = str(instrument_name).upper() if instrument_name else ""
     
+    # Gold & Silver
     if "XAU" in name_upper or "GOLD" in name_upper:
         return f"{price:,.2f}"
     elif "XAG" in name_upper or "SILVER" in name_upper:
         return f"{price:,.2f}"
+    
+    # Major Cryptocurrency
     elif "BTC" in name_upper or "BITCOIN" in name_upper:
         return f"{price:,.2f}"
     elif "ETH" in name_upper or "ETHEREUM" in name_upper:
         return f"{price:,.2f}"
+    
+    # Alternative Cryptocurrency
     elif any(c in name_upper for c in ["SOL", "BNB", "XRP"]):
         return f"{price:,.2f}"
+    
+    # Forex Pairs
     elif any(fx in name_upper for fx in ["EUR", "GBP", "CHF", "JPY", "AUD", "NZD", "CAD"]):
         return f"{price:,.4f}".rstrip('0').rstrip('.')
+    
+    # Stock Indices
     elif any(idx in name_upper for idx in ["NASDAQ", "S&P", "DOW", "DAX", "IHSG", "SP500"]):
         return f"{price:,.2f}"
+    
+    # Commodities
     elif any(cmd in name_upper for cmd in ["OIL", "WTI", "CRUDE", "GAS", "COPPER", "PALLADIUM", "PLATINUM"]):
         return f"{price:,.2f}"
+    
+    # Default formatting
     else:
         if price >= 1000:
             return f"{price:,.2f}"

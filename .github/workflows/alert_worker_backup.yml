@@ -1,0 +1,33 @@
+name: 🦅 AEROVULPIS BACKUP MONITOR
+
+on:
+  schedule:
+    # Backup tiap 30 menit (kalo Railway mati)
+    - cron: '*/30 * * * *'
+  
+  # Bisa manual trigger
+  workflow_dispatch:
+
+jobs:
+  check_alerts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Dependencies
+        run: pip install yfinance supabase requests pytz
+      
+      - name: Run Alert Worker (Backup)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python alert_worker.py

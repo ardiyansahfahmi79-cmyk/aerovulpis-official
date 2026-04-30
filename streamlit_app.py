@@ -690,7 +690,7 @@ def format_price_display(price, instrument_name):
     
     # Forex Pairs
     elif any(fx in name_upper for fx in ["EUR", "GBP", "CHF", "JPY", "AUD", "NZD", "CAD"]):
-        return f"{price:,.4f}".rstrip('0').rstrip('.')
+        return f"{price:,.4f}"
     
     # Stock Indices
     elif any(idx in name_upper for idx in ["NASDAQ", "S&P", "DOW", "DAX", "IHSG", "SP500"]):

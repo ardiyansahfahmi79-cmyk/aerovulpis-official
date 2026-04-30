@@ -1,25 +1,27 @@
-name: AeroVulpis Alert Check
+name: 🦅 AEROVULPIS BACKUP MONITOR
 
 on:
   schedule:
-    - cron: '*/5 * * * *' # Jalankan setiap 5 menit
-  workflow_dispatch: # Bisa dijalankan manual
+    # Tiap 15 menit (AMAN FREE TIER - 1440 menit/bulan)
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
 
 jobs:
   check-alerts:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
-      - name: Install dependencies
-        run: |
-          pip install yfinance supabase requests pytz
+      - name: Install Dependencies
+        run: pip install yfinance supabase requests pytz
 
       - name: Run Alert Worker
         env:

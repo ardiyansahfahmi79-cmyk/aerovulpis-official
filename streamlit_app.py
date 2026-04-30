@@ -2703,3 +2703,704 @@ instruments = {
         "PLATINUM": "PL=F"
     }
 }
+# ##############################################################################
+# NEWS AGGREGATOR (DIPERBAIKI - KATEGORI GEOPOLITICS + FOREX FIX)
+# ##############################################################################
+
+def get_news_data(category="General", max_articles=10):
+    """
+    Mengambil berita finansial dari multiple sources.
+    
+    Sumber berita (berdasarkan prioritas):
+    1. Marketaux API (berita global - paling lengkap)
+    2. Currents API (berita finansial terkini)
+    3. Tiingo API (berita saham & forex)
+    4. NewsAPI (fallback gratis)
+    
+    Cache berlaku 5 menit. Berita difilter 24 jam terakhir.
+    """
+    from news_cache_manager import initialize_news_cache, should_update_news, get_cached_news, update_news_cache
+    
+    # Initialize cache system
+    initialize_news_cache()
+    
+    # Force refresh mechanism
+    force_refresh = False
+    if "last_news_fetch" not in st.session_state:
+        st.session_state.last_news_fetch = {}
+    
+    last_fetch = st.session_state.last_news_fetch.get(category)
+    if last_fetch is None or (datetime.now() - last_fetch).total_seconds() > 300:
+        force_refresh = True
+        st.session_state.last_news_fetch[category] = datetime.now()
+    
+    # Return cache if valid
+    if not force_refresh and not should_update_news(category):
+        cached_news = get_cached_news(category)
+        if cached_news:
+            return cached_news, None
+
+    berita_final = []
+    urls_terpakai = set()
+    
+    # Category mapping (DIPERBAIKI - Konflik → Geopolitics, Forex lebih luas)
+    category_map = {
+        "Stock": "stocks, equities, earnings, wall street",
+        "Geopolitics": "geopolitics, war, conflict, sanctions, central banks, tariffs, trade war",
+        "Gold & Silver": "gold, silver, precious metals, commodities, XAUUSD",
+        "Forex": "forex, currency, EURUSD, GBPUSD, USDJPY, central banks, interest rates, federal reserve, ECB, BOJ, BOE",
+        "General": "finance, economy, market, breaking news"
+    }
+    api_query = category_map.get(category, "finance,economy,market")
+    
+    # Keywords tambahan untuk Forex
+    forex_keywords = ["EURUSD", "GBPUSD", "USDJPY", "forex", "currency", "central bank", "interest rate", "federal reserve", "ECB", "BOJ", "BOE"]
+
+    # 1. Marketaux API (PRIORITAS UTAMA - paling banyak berita)
+    if marketaux_key:
+        try:
+            since_date = (datetime.now() - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M')
+            # Untuk Forex, gunakan multiple query agar lebih banyak hasil
+            if category == "Forex":
+                search_terms = ["forex", "currency markets", "central banks", "interest rates", "EURUSD", "GBPUSD"]
+                for term in search_terms[:3]:  # Batasi 3 query untuk hemat API
+                    try:
+                        url_m = f"https://api.marketaux.com/v1/news/all?api_token={marketaux_key}&language=en&search={term}&limit=10&published_after={since_date}"
+                        res_m = requests.get(url_m, timeout=10).json()
+                        if res_m.get('data'):
+                            for item in res_m.get('data', []):
+                                if item.get('url') and item['url'] not in urls_terpakai:
+                                    berita_final.append({
+                                        'publishedAt': item.get('published_at', datetime.now().isoformat()),
+                                        'title': item.get('title', 'NO TITLE'),
+                                        'description': item.get('description', ''),
+                                        'source': item.get('source', 'GLOBAL FINANCIAL NETWORK'),
+                                        'url': item['url']
+                                    })
+                                    urls_terpakai.add(item['url'])
+                    except Exception:
+                        pass
+            else:
+                url_m = f"https://api.marketaux.com/v1/news/all?api_token={marketaux_key}&language=en&search={api_query}&limit=20&published_after={since_date}"
+                res_m = requests.get(url_m, timeout=10).json()
+                if res_m.get('data'):
+                    for item in res_m.get('data', []):
+                        if item.get('url') and item['url'] not in urls_terpakai:
+                            berita_final.append({
+                                'publishedAt': item.get('published_at', datetime.now().isoformat()),
+                                'title': item.get('title', 'NO TITLE'),
+                                'description': item.get('description', ''),
+                                'source': item.get('source', 'GLOBAL FINANCIAL NETWORK'),
+                                'url': item['url']
+                            })
+                            urls_terpakai.add(item['url'])
+        except Exception:
+            pass
+
+    # 2. Currents API
+    if currents_api_key:
+        try:
+            currents_cat = category.lower()
+            if category == "Geopolitics":
+                currents_cat = "world"
+            elif category == "Gold & Silver":
+                currents_cat = "commodities"
+            elif category == "Forex":
+                currents_cat = "finance"
+            
+            url_c = f"https://api.currentsapi.services/v1/latest-news?apiKey={currents_api_key}&language=en&category={currents_cat}&limit=15"
+            res_c = requests.get(url_c, timeout=10).json()
+            if res_c.get('news'):
+                for item in res_c.get('news', []):
+                    if item.get('url') and item['url'] not in urls_terpakai:
+                        # Filter Forex: cek keywords di title
+                        if category == "Forex":
+                            title_lower = item.get('title', '').lower()
+                            if not any(kw.lower() in title_lower for kw in forex_keywords):
+                                continue
+                        
+                        berita_final.append({
+                            'publishedAt': item.get('published', datetime.now().isoformat()),
+                            'title': item.get('title', 'NO TITLE'),
+                            'description': item.get('description', ''),
+                            'source': 'CURRENTS FINANCIAL',
+                            'url': item['url']
+                        })
+                        urls_terpakai.add(item['url'])
+        except Exception:
+            pass
+
+    # 3. Tiingo API
+    tiingo_key = st.secrets.get("TIINGO_KEY") or os.getenv("TIINGO_KEY")
+    if tiingo_key:
+        try:
+            start_date = (datetime.now() - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%S')
+            url_t = f"https://api.tiingo.com/tiingo/news?token={tiingo_key}&limit=15&startDate={start_date}"
+            if category == "Stock":
+                url_t += "&tags=stocks"
+            elif category == "Forex":
+                url_t += "&tags=forex,currencies"
+            elif category == "Gold & Silver":
+                url_t += "&tags=commodities"
+            
+            res_t = requests.get(url_t, timeout=10).json()
+            if isinstance(res_t, list):
+                for item in res_t:
+                    if item.get('url') and item['url'] not in urls_terpakai:
+                        berita_final.append({
+                            'publishedAt': item.get('publishedDate', datetime.now().isoformat()),
+                            'title': item.get('title', 'NO TITLE'),
+                            'description': item.get('description', item.get('title', '')),
+                            'source': 'FINANCIAL NEWS NETWORK',
+                            'url': item['url']
+                        })
+                        urls_terpakai.add(item['url'])
+        except Exception:
+            pass
+
+    # 4. NewsAPI (fallback gratis)
+    newsapi_key = st.secrets.get("NEWSAPI_KEY") or os.getenv("NEWSAPI_KEY")
+    if newsapi_key and len(berita_final) < 5:
+        try:
+            if category == "Forex":
+                news_query = "forex OR currency OR EURUSD OR central bank"
+            else:
+                news_query = api_query
+            url_n = f"https://newsapi.org/v2/everything?q={news_query}&language=en&pageSize=10&sortBy=publishedAt&apiKey={newsapi_key}"
+            res_n = requests.get(url_n, timeout=10).json()
+            if res_n.get('articles'):
+                for item in res_n.get('articles', []):
+                    if item.get('url') and item['url'] not in urls_terpakai:
+                        berita_final.append({
+                            'publishedAt': item.get('publishedAt', datetime.now().isoformat()),
+                            'title': item.get('title', 'NO TITLE'),
+                            'description': item.get('description', ''),
+                            'source': item.get('source', {}).get('name', 'NEWS NETWORK'),
+                            'url': item['url']
+                        })
+                        urls_terpakai.add(item['url'])
+        except Exception:
+            pass
+
+    # Return cache if all APIs fail
+    if not berita_final:
+        cached_news = get_cached_news(category)
+        if cached_news:
+            return cached_news, "DISPLAYING CACHED DATA | LIVE FEED UNAVAILABLE"
+        return [], "NO NEWS AVAILABLE"
+
+    # Sort by newest first
+    try:
+        berita_final = sorted(berita_final, key=lambda x: str(x.get('publishedAt', '')), reverse=True)
+    except Exception:
+        pass
+    
+    # Limit results
+    berita_final = berita_final[:max_articles]
+    
+    # Convert to WIB timezone
+    tz_wib = pytz.timezone('Asia/Jakarta')
+    for b in berita_final:
+        try:
+            raw_date = str(b.get('publishedAt', ''))
+            if raw_date:
+                raw_date = raw_date.replace('Z', '+00:00')
+                try:
+                    dt_utc = datetime.fromisoformat(raw_date)
+                except Exception:
+                    dt_utc = datetime.strptime(raw_date[:19], "%Y-%m-%dT%H:%M:%S")
+                    dt_utc = dt_utc.replace(tzinfo=pytz.UTC)
+                dt_wib = dt_utc.astimezone(tz_wib)
+                b['publishedAt'] = dt_wib.strftime("%Y-%m-%d %H:%M WIB")
+            else:
+                b['publishedAt'] = 'N/A'
+        except Exception:
+            b['publishedAt'] = 'N/A'
+    
+    # Update cache
+    update_news_cache(category, berita_final)
+    return berita_final, None
+
+# ##############################################################################
+# SMART ALERT MONITORING SYSTEM
+# ##############################################################################
+
+def check_smart_alerts():
+    """
+    Continuous monitoring of active price alerts.
+    
+    Flow:
+    1. Ambil semua alert yang belum triggered
+    2. Cek harga terkini dari database cache
+    3. Bandingkan dengan target harga (dukung target_value FLOAT)
+    4. Jika tercapai, kirim notifikasi Telegram
+    5. Tandai alert sebagai triggered
+    """
+    if "active_alerts" not in st.session_state or not st.session_state.active_alerts:
+        return
+
+    telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or st.secrets.get("TELEGRAM_BOT_TOKEN")
+    if not telegram_bot_token:
+        return
+
+    # Collect unique instruments
+    unique_instruments = list(set([
+        a["instrument"] for a in st.session_state.active_alerts
+        if not a.get("triggered", False)
+    ]))
+    
+    if not unique_instruments:
+        return
+
+    # Map instruments to tickers
+    instrument_to_ticker = {
+        "XAUUSD": "GC=F",
+        "BTCUSD": "BTC-USD",
+        "XAGUSD": "SI=F",
+        "EURUSD": "EURUSD=X",
+        "GBPUSD": "GBPUSD=X",
+        "USDJPY": "USDJPY=X"
+    }
+    for cat in instruments.values():
+        for name, ticker in cat.items():
+            instrument_to_ticker[name] = ticker
+
+    # Get current prices
+    current_prices = {}
+    for inst in unique_instruments:
+        # Try database cache first
+        cached_data = get_cached_market_price_full(inst)
+        if cached_data and cached_data.get("price"):
+            current_prices[inst] = cached_data["price"]
+        else:
+            # Fallback to live data
+            ticker = instrument_to_ticker.get(inst)
+            if ticker:
+                m_data = get_market_data(ticker)
+                if m_data:
+                    current_prices[inst] = m_data.get("price")
+
+    # Check each alert
+    for alert in st.session_state.active_alerts:
+        if not alert.get("triggered", False):
+            inst_name = alert.get("instrument")
+            current_price = current_prices.get(inst_name)
+            
+            if current_price is None:
+                continue
+            
+            # AMBIL target_raw DAN target_value
+            target_raw = alert.get("target")           # FLOAT: 4567.0 atau string
+            target_value = alert.get("target_value")   # FLOAT: 4567.0 (dari widget baru)
+            condition = alert.get("condition")
+            
+            # TENTUKAN target_num (numerik) untuk perbandingan
+            if target_value is not None and isinstance(target_value, (int, float)) and target_value > 0:
+                target_num = float(target_value)
+            elif isinstance(target_raw, (int, float)):
+                target_num = float(target_raw)
+            else:
+                # Fallback: parse dari target_raw string
+                try:
+                    target_num = float(str(target_raw).replace(",", ""))
+                except (ValueError, AttributeError):
+                    target_num = 0.0
+            
+            triggered = False
+
+            if condition == "bullish" and current_price >= target_num:
+                triggered = True
+            elif condition == "bearish" and current_price <= target_num:
+                triggered = True
+
+            if triggered:
+                alert["triggered"] = True
+                now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%Y-%m-%d %H:%M:%S WIB")
+                
+                # Format prices
+                formatted_price = format_price_display(current_price, inst_name)
+                formatted_target = format_price_display(target_num, inst_name)
+                
+                # Build notification
+                alert_message = (
+                    f"/// AEROVULPIS TARGET ACQUIRED ///\n"
+                    f"INSTR: {inst_name}\n"
+                    f"PRICE: {formatted_price}\n"
+                    f"TARGET: {formatted_target}\n"
+                    f"TIME: {now_wib}\n"
+                    f"/// MONITORING COMPLETE ///"
+                )
+                
+                # Send via Telegram
+                url = f"https://api.telegram.org/bot{telegram_bot_token}/sendMessage"
+                payload = {
+                    'chat_id': alert.get("chat_id"),
+                    'text': alert_message
+                }
+                try:
+                    requests.post(url, json=payload, timeout=10)
+                    st.toast(f"TARGET ACQUIRED: {inst_name} @ {formatted_target}", icon="!")
+                except Exception:
+                    pass
+# ##############################################################################
+# UI HEADER
+# ##############################################################################
+
+st.markdown(f"""
+<div class="main-title-container">
+    <div class="main-logo-container">
+        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png" alt="AEROVULPIS" class="custom-logo">
+    </div>
+    <h1 class="main-title">AEROVULPIS</h1>
+    <p class="subtitle-text">V3.5 ULTIMATE</p>
+</div>
+""", unsafe_allow_html=True)
+
+# ##############################################################################
+# SIDEBAR CONTROL CENTER
+# ##############################################################################
+
+with st.sidebar:
+    # Sidebar logo
+    st.markdown("""
+    <div style='text-align:center; margin-bottom:-10px;'>
+        <img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' style='width:48px; filter:drop-shadow(0 0 12px rgba(0,212,255,0.5));'>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown(f"<h2 style='font-family:Orbitron; text-align:center; font-size:16px; color:#00d4ff; letter-spacing:4px; margin-bottom:0;'>{t['control_center']}</h2>", unsafe_allow_html=True)
+    
+    # Tier colors
+    tier_colors = {
+        "free": "#556680",
+        "trial": "#00d4ff",
+        "weekly": "#00ff88",
+        "monthly": "#ffcc00",
+        "six_months": "#ff8800",
+        "yearly": "#ff2a6d"
+    }
+    tier_names = {
+        "free": "FREE",
+        "trial": "TRIAL",
+        "weekly": "WEEKLY",
+        "monthly": "MONTHLY",
+        "six_months": "6M PRO",
+        "yearly": "ULTIMATE"
+    }
+    
+    # ====================== AUTHENTICATION SECTION ======================
+    if st.session_state.auth_session and st.session_state.user_name:
+        # User is logged in
+        tier_color = tier_colors.get(st.session_state.user_tier, "#556680")
+        tier_name = tier_names.get(st.session_state.user_tier, "FREE")
+        avatar_url = st.session_state.get('user_avatar', '')
+        
+        # User info card
+        st.markdown(f"""
+        <div style="background:rgba(0,15,30,0.7); border:1px solid {tier_color}40; border-radius:4px; padding:16px; margin:8px 0; text-align:center;">
+            {f'<img src="{avatar_url}" style="width:40px;height:40px;border-radius:2px;margin-bottom:10px;border:1px solid {tier_color};">' if avatar_url else '<div style="width:40px;height:40px;border-radius:2px;margin:0 auto 10px;background:linear-gradient(160deg,#001a33,#003060);display:flex;align-items:center;justify-content:center;font-size:18px;">V</div>'}
+            <p style="font-family:Rajdhani;font-size:10px;color:#6688aa;margin:0;letter-spacing:1px;">{t['welcome']}</p>
+            <p style="font-family:Orbitron;font-size:12px;color:#e0e6f0;margin:3px 0;letter-spacing:1px;">{st.session_state.user_name.upper()}</p>
+            <p style="font-family:Share Tech Mono;font-size:8px;color:#557799;margin:2px 0;">{t['user_id_label']}: {st.session_state.user_id[:16]}...</p>
+            <p style="font-family:Share Tech Mono;font-size:8px;color:#557799;margin:2px 0;">{t['tier_label']}: <span style="color:{tier_color};">{tier_name}</span></p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Logout & Activation buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button(t['logout'], use_container_width=True, key="logout_btn"):
+                try:
+                    get_supabase_client().auth.sign_out()
+                except Exception:
+                    pass
+                for key in ['auth_session', 'user_id', 'user_name', 'user_email', 'user_avatar']:
+                    st.session_state[key] = None
+                st.session_state.user_tier = "free"
+                st.session_state.show_activation = False
+                st.rerun()
+        
+        with col2:
+            if st.button(t['activate_key'], use_container_width=True, key="show_activation_btn"):
+                st.session_state.show_activation = not st.session_state.show_activation
+        
+        # License Activation Form
+        if st.session_state.show_activation:
+            st.markdown(f"""
+            <div style="background:rgba(0,10,25,0.8);border:1px solid rgba(0,212,255,0.2);border-radius:4px;padding:18px;margin:12px 0;text-align:center;position:relative;">
+                <div style="position:absolute;top:0;left:0;width:100%;height:1px;background:linear-gradient(90deg,transparent,#00d4ff,transparent);animation:scanHorizontal 3s infinite;"></div>
+                <p style="font-family:Orbitron;font-size:11px;color:#00d4ff;margin:0 0 4px;letter-spacing:2px;">{t['license_activation']}</p>
+                <p style="font-family:Share Tech Mono;font-size:8px;color:#557799;margin:0 0 12px;">{t['enter_license_key']}</p>
+            """, unsafe_allow_html=True)
+            
+            key_input = st.text_input(
+                t['enter_key'],
+                value="",
+                key="activation_key_input",
+                placeholder=t['license_placeholder'],
+                label_visibility="collapsed"
+            )
+            st.markdown('<style>div[data-testid="stTextInput"] input{background:rgba(0,0,0,0.6)!important;border:1px solid rgba(0,212,255,0.3)!important;color:#00ff88!important;font-family:Share Tech Mono!important;letter-spacing:3px!important;text-align:center!important;font-size:14px!important;padding:10px!important;}</style>', unsafe_allow_html=True)
+            
+            if st.button(t['key_activate_button'], use_container_width=True, key="activate_btn_main", type="primary"):
+                if key_input and st.session_state.user_id:
+                    with st.spinner(t['processing']):
+                        time.sleep(2)
+                        success, message = activate_key(st.session_state.user_id, key_input.strip().upper())
+                    if success:
+                        st.session_state.user_tier, _ = get_user_tier(st.session_state.user_id)
+                        st.success(f"{t['activation_success']}")
+                        st.info(message)
+                        st.balloons()
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.error(f"{t['activation_failed']}: {message}")
+                else:
+                    st.warning("ENTER VALID LICENSE KEY")
+            st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        # User not logged in - DIGITAL CYBER LOGIN FORM (EMAIL + PASSWORD)
+        st.markdown(f"""
+        <div style="text-align:center;padding:14px;margin:8px 0;background:rgba(0,15,30,0.5);border:1px solid rgba(0,212,255,0.1);border-radius:4px;">
+            <p style="font-family:Orbitron;font-size:10px;color:#00d4ff;margin-bottom:0;letter-spacing:2px;">{t['sign_in_prompt']}</p>
+            <p style="font-family:Share Tech Mono;font-size:9px;color:#557799;margin:2px 0 0 0;">{t['sign_in_desc']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="digital-auth-container">', unsafe_allow_html=True)
+
+        with st.form("email_password_login_form"):
+            st.markdown(f"""
+            <p style="font-family:Orbitron;font-size:9px;color:#557799;letter-spacing:3px;margin:0 0 8px;">{t.get('login_title', 'AUTHENTICATION SYSTEM')}</p>
+            """, unsafe_allow_html=True)
+            
+            email_input = st.text_input(
+                t.get('login_email', 'EMAIL'),
+                placeholder=t.get('login_email_placeholder', 'ENTER EMAIL ADDRESS'),
+                key="login_email",
+                label_visibility="collapsed"
+            )
+            st.markdown('<div class="auth-input">', unsafe_allow_html=True)
+            st.markdown("""<style>
+                div[data-testid="stTextInput"] input {
+                    background: rgba(0, 0, 0, 0.6) !important;
+                    border: 1px solid rgba(0, 212, 255, 0.25) !important;
+                    color: #00ff88 !important;
+                    font-family: 'Share Tech Mono', monospace !important;
+                    letter-spacing: 2px !important;
+                    text-align: center !important;
+                    font-size: 12px !important;
+                    padding: 12px !important;
+                    border-radius: 3px !important;
+                }
+                div[data-testid="stTextInput"] input::placeholder {
+                    color: #445566 !important;
+                    font-family: 'Share Tech Mono', monospace !important;
+                    letter-spacing: 1px !important;
+                }
+            </style>""", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            password_input = st.text_input(
+                t.get('login_password', 'PASSWORD'),
+                type="password",
+                placeholder="ENTER PASSWORD",
+                key="login_password",
+                label_visibility="collapsed"
+            )
+            st.markdown('<div class="auth-input">', unsafe_allow_html=True)
+            st.markdown("""<style>
+                div[data-testid="stTextInput"] input[type="password"] {
+                    background: rgba(0, 0, 0, 0.6) !important;
+                    border: 1px solid rgba(0, 212, 255, 0.25) !important;
+                    color: #00ff88 !important;
+                    font-family: 'Share Tech Mono', monospace !important;
+                    letter-spacing: 2px !important;
+                    text-align: center !important;
+                    font-size: 12px !important;
+                    padding: 12px !important;
+                    border-radius: 3px !important;
+                }
+            </style>""", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            col_btn1, col_btn2 = st.columns(2)
+            
+            with col_btn1:
+                st.markdown('<div class="auth-btn-primary">', unsafe_allow_html=True)
+                login_submitted = st.form_submit_button(
+                    t.get('login_btn', 'ACCESS TERMINAL'),
+                    use_container_width=True,
+                    type="primary"
+                )
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with col_btn2:
+                st.markdown('<div class="auth-btn-primary">', unsafe_allow_html=True)
+                signup_submitted = st.form_submit_button(
+                    t.get('signup_btn', 'REGISTER'),
+                    use_container_width=True,
+                    type="primary"
+                )
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            if login_submitted and email_input and password_input:
+                try:
+                    supabase_auth = get_supabase_client()
+                    resp = supabase_auth.auth.sign_in_with_password({
+                        "email": email_input.strip(),
+                        "password": password_input
+                    })
+                    if resp and resp.user:
+                        user = resp.user
+                        st.session_state.auth_session = resp.session.access_token if resp.session else "active"
+                        st.session_state.user_id = user.id
+                        st.session_state.user_name = user.user_metadata.get("full_name") or \
+                                                   (user.email.split("@")[0] if user.email else "USER")
+                        st.session_state.user_email = user.email or ""
+                        st.session_state.user_avatar = user.user_metadata.get("avatar_url", "")
+                        st.session_state.user_tier, _ = get_user_tier(user.id)
+                        sync_user_to_supabase(user.id, user.email or "", st.session_state.user_name, st.session_state.user_avatar)
+                        send_log(f"LOGIN: {st.session_state.user_name} ({st.session_state.user_email})")
+                        st.rerun()
+                    else:
+                        st.error("INVALID EMAIL OR PASSWORD")
+                except Exception as e:
+                    st.error(f"AUTH FAILED: {str(e)}")
+
+            if signup_submitted and email_input and password_input:
+                if len(password_input) < 6:
+                    st.error("PASSWORD MUST BE AT LEAST 6 CHARACTERS")
+                else:
+                    try:
+                        supabase_auth = get_supabase_client()
+                        resp = supabase_auth.auth.sign_up({
+                            "email": email_input.strip(),
+                            "password": password_input
+                        })
+                        if resp and resp.user:
+                            user = resp.user
+                            st.session_state.auth_session = resp.session.access_token if resp.session else "active"
+                            st.session_state.user_id = user.id
+                            st.session_state.user_name = user.user_metadata.get("full_name") or \
+                                                       (email_input.split("@")[0] if email_input else "USER")
+                            st.session_state.user_email = user.email or ""
+                            st.session_state.user_avatar = ""
+                            st.session_state.user_tier, _ = get_user_tier(user.id)
+                            sync_user_to_supabase(user.id, user.email or "", st.session_state.user_name, "")
+                            send_log(f"REGISTER: {st.session_state.user_name} ({st.session_state.user_email})")
+                            st.rerun()
+                        else:
+                            st.success("REGISTRATION SUCCESSFUL. YOU CAN NOW LOGIN.")
+                    except Exception as e:
+                        st.error(f"REGISTRATION FAILED: {str(e)}")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Sidebar footer
+    st.markdown("<p style='font-family:Share Tech Mono;font-size:9px;color:#445566;text-align:center;margin:8px 0;'>AEROVULPIS V3.5 | DYNAMIHATCH</p>", unsafe_allow_html=True)
+    st.caption("2026 | SYSTEM ACTIVE")
+    
+    # Category & Asset selectors
+    category = st.selectbox(t['category'], list(instruments.keys()))
+    asset_name = st.selectbox(t['asset'], list(instruments[category].keys()))
+    ticker_input = instruments[category][asset_name]
+    ticker_display = f"{asset_name} [{ticker_input}]"
+    
+    st.markdown("---")
+    
+    # Timeframe selector
+    tf_options = {
+        "15M": {"period": "5d", "interval": "15m"},
+        "30M": {"period": "5d", "interval": "30m"},
+        "1H": {"period": "1mo", "interval": "1h"},
+        "3H": {"period": "1mo", "interval": "1h"},
+        "4H": {"period": "1mo", "interval": "1h"},
+        "1D": {"period": "1y", "interval": "1d"},
+        "1W": {"period": "2y", "interval": "1wk"}
+    }
+    selected_tf_display = st.selectbox(t['timeframe'], list(tf_options.keys()), index=0)
+    period = tf_options[selected_tf_display]["period"]
+    interval = tf_options[selected_tf_display]["interval"]
+    
+    # Navigation menu
+    menu_selection = option_menu(
+        menu_title=t['navigation'],
+        options=[
+            "Live Dashboard",
+            "AeroVulpis Sentinel",
+            "Signal Analysis",
+            "Market Sessions",
+            "Market News",
+            "Economic Radar",
+            "Smart Alert Center",
+            "Chatbot AI",
+            "Risk Management",
+            "Settings",
+            "Help & Support"
+        ],
+        icons=[
+            "activity",
+            "shield-shaded",
+            "graph-up-arrow",
+            "globe",
+            "newspaper",
+            "calendar-event",
+            "bell-fill",
+            "chat-dots",
+            "shield-fill",
+            "gear",
+            "question-circle"
+        ],
+        menu_icon="cast",
+        default_index=0,
+        styles={
+            "container": {"padding": "5!important", "background-color": "transparent"},
+            "icon": {"color": "#00d4ff", "font-size": "13px"},
+            "nav-link": {
+                "font-size": "11px",
+                "text-align": "left",
+                "margin": "2px 0",
+                "padding": "10px 12px",
+                "border-radius": "3px",
+                "font-family": "Rajdhani",
+                "font-weight": "500",
+                "letter-spacing": "1px",
+                "background": "rgba(0,212,255,0.015)",
+                "border": "1px solid rgba(0,212,255,0.06)",
+                "transition": "all 0.25s ease"
+            },
+            "nav-link-selected": {
+                "background": "linear-gradient(160deg,rgba(0,48,96,0.4),rgba(0,28,64,0.6))",
+                "border": "1px solid #00d4ff",
+                "color": "#00d4ff",
+                "box-shadow": "0 0 18px rgba(0,212,255,0.12)",
+                "font-weight": "700"
+            },
+        }
+    )
+    
+    # Daily usage indicator
+    user_limits = LIMITS.get(st.session_state.user_tier, LIMITS["free"])
+    st.markdown("---")
+    st.markdown(f"""
+    <div style="background:rgba(0,15,30,0.5);border:1px solid rgba(0,212,255,0.1);border-radius:4px;padding:12px;margin-top:8px;">
+        <p style="font-family:Orbitron;font-size:8px;color:#557799;margin:0 0 8px;letter-spacing:2px;">{t['daily_usage_label']}</p>
+        <div style="margin-bottom:6px;">
+            <p style="font-family:Share Tech Mono;font-size:10px;color:#00d4ff;margin:2px 0;display:flex;justify-content:space-between;">
+                <span>AI ANALYSIS</span><span>{st.session_state.daily_analysis_count}/{user_limits['analysis_per_day']}</span>
+            </p>
+            <div style="background:rgba(255,255,255,0.05);height:3px;border-radius:1px;overflow:hidden;">
+                <div style="background:#00d4ff;width:{min(100,(st.session_state.daily_analysis_count/user_limits['analysis_per_day'])*100)}%;height:100%;border-radius:1px;"></div>
+            </div>
+        </div>
+        <div>
+            <p style="font-family:Share Tech Mono;font-size:10px;color:#00ff88;margin:2px 0;display:flex;justify-content:space-between;">
+                <span>CHATBOT</span><span>{st.session_state.daily_chatbot_count}/{user_limits['chatbot_per_day']}</span>
+            </p>
+            <div style="background:rgba(255,255,255,0.05);height:3px;border-radius:1px;overflow:hidden;">
+                <div style="background:#00ff88;width:{min(100,(st.session_state.daily_chatbot_count/user_limits['chatbot_per_day'])*100)}%;height:100%;border-radius:1px;"></div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)

@@ -2322,7 +2322,7 @@ st.markdown("""
         "DISCIPLINE IS THE KEY | EMOTION IS THE ENEMY | TRUST THE SYSTEM"
     </p>
     <p style="font-family:Orbitron;font-size:11px;color:#00ff88;margin:8px 0;letter-spacing:3px;">
-        FAHMI &mdash; AEROVULPIS ARCHITECT
+        FAHMI — AEROVULPIS ARCHITECT
     </p>
     <p style="font-family:Share Tech Mono;font-size:8px;color:#334455;letter-spacing:2px;margin-top:6px;">
         DYNAMIHATCH IDENTITY | V3.5 ULTIMATE | 2026

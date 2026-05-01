@@ -2329,3 +2329,341 @@ st.markdown("""
     </p>
 </div>
 """, unsafe_allow_html=True)
+# ==============================================================================
+# 6. ECONOMIC RADAR (TERBUKA SEMUA TIER)
+# ==============================================================================
+elif menu_selection == "Economic Radar":
+    economic_calendar_widget()
+    st.markdown(f"""
+    <div style="text-align:center;padding:12px;margin-top:8px;background:rgba(0,20,40,0.5);border:1px solid rgba(0,212,255,0.15);border-radius:4px;">
+        <p class="cyber-glow-text" style="font-size:13px;margin:0;letter-spacing:3px;">{t['economic_title']}</p>
+        <p style="font-family:Share Tech Mono;font-size:9px;color:#557799;margin:4px 0 0;">{t['economic_subtitle']}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ==============================================================================
+# 8. CHATBOT AI (TERBUKA SEMUA TIER)
+# ==============================================================================
+elif menu_selection == "Chatbot AI":
+    st.markdown(f'<h2 style="font-family:Orbitron;font-size:20px;color:#00d4ff;letter-spacing:3px;">{t["chatbot_title"]}</h2>', unsafe_allow_html=True)
+    st.caption(f"AEROVULPIS ENGINE | {tier_names.get(st.session_state.user_tier,'FREE')} | {st.session_state.daily_chatbot_count}/{user_limits['chatbot_per_day']}")
+    
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]): st.markdown(message["content"])
+    
+    if prompt := st.chat_input("INPUT QUERY..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.markdown(prompt)
+        with st.chat_message("assistant"):
+            m_data = get_market_data(ticker_input)
+            context_str = f"INSTR: {ticker_display} | PRICE: {format_price_display(m_data['price'], asset_name) if m_data else 'N/A'}"
+            if st.session_state.get("active_alerts"): context_str += f" | ALERTS: {len(st.session_state.active_alerts)}"
+            response = get_groq_response(prompt, context_str)
+            st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
+# ==============================================================================
+# 10. TINGKATKAN LEVEL (UPGRADE PAGE - CYBER-TECH FUTURISTIC & QRIS ASLI)
+# ==============================================================================
+elif menu_selection == "Tingkatkan Level":
+    if "show_payment_modal" not in st.session_state: st.session_state.show_payment_modal = False
+    if "selected_package" not in st.session_state: st.session_state.selected_package = None
+    if "selected_price" not in st.session_state: st.session_state.selected_price = ""
+    if "selected_duration" not in st.session_state: st.session_state.selected_duration = ""
+    if "payment_proof_uploaded" not in st.session_state: st.session_state.payment_proof_uploaded = False
+
+    st.markdown("""
+    <div class="upgrade-container">
+        <h2 class="upgrade-title">UPGRADE ACCESS</h2>
+        <p class="upgrade-subtitle">Select Your Plan · Unlock Full Potential · Professional Trading Terminal</p>
+    """, unsafe_allow_html=True)
+
+    packages = [
+        {"name": "TRIAL", "duration": "1 DAY", "price": "999", "price_label": "Rp999", "features": ["Full Access 24 Hours", "5 AI Analysis/Day", "20 Chatbot/Day"], "featured": False, "id": "trial"},
+        {"name": "WEEKLY", "duration": "7 DAYS", "price": "16,999", "price_label": "Rp16.999", "features": ["Full Access 7 Days", "20 AI Analysis/Day", "100 Chatbot/Day"], "featured": False, "id": "weekly"},
+        {"name": "MONTHLY", "duration": "30 DAYS", "price": "27,999", "price_label": "Rp27.999", "features": ["Full Access 30 Days", "50 AI Analysis/Day", "200 Chatbot/Day", "Smart Alert 24/7"], "featured": True, "id": "monthly"},
+        {"name": "6 MONTHS", "duration": "180 DAYS", "price": "96,000", "price_label": "Rp96.000", "features": ["Full Access 180 Days", "100 AI Analysis/Day", "500 Chatbot/Day", "Priority Alert"], "featured": False, "id": "six_months"},
+        {"name": "YEARLY", "duration": "365 DAYS", "price": "137,000", "price_label": "Rp137.000", "features": ["Full Access 365 Days", "Unlimited AI Analysis", "Unlimited Chatbot", "VIP Priority Support"], "featured": True, "id": "yearly"},
+    ]
+
+    cards_html = '<div class="pricing-grid">'
+    for pkg in packages:
+        featured_class = "featured" if pkg["featured"] else ""
+        badge_html = '<div class="pricing-badge">BEST</div>' if pkg["featured"] else ""
+        features_html = "".join([f"<li>{f}</li>" for f in pkg["features"]])
+        cards_html += f"""
+        <div class="pricing-card {featured_class}">
+            {badge_html}
+            <p class="pricing-name">{pkg['name']}</p>
+            <p class="pricing-duration">{pkg['duration']}</p>
+            <p class="pricing-price"><span class="currency">Rp</span>{pkg['price']}</p>
+            <ul class="pricing-features">{features_html}</ul>
+        </div>
+        """
+    cards_html += '</div>'
+    st.markdown(cards_html, unsafe_allow_html=True)
+
+    cols = st.columns(5)
+    for i, pkg in enumerate(packages):
+        with cols[i]:
+            if st.button(f"SELECT {pkg['name']}", key=f"btn_{pkg['id']}_{i}", width='stretch'):
+                st.session_state.show_payment_modal = True
+                st.session_state.selected_package = pkg['name']
+                st.session_state.selected_price = pkg['price_label']
+                st.session_state.selected_duration = pkg['duration']
+                st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    if st.session_state.show_payment_modal:
+        user_id = st.session_state.get('user_id', 'GUEST')
+        user_name = st.session_state.get('user_name', 'USER')
+        pkg_name = st.session_state.selected_package
+        pkg_price = st.session_state.selected_price
+
+        qr_data = f"DYNAMIHATCH|{pkg_name}|{pkg_price}|{user_id}"
+        qr_base64 = generate_qr_base64(qr_data)
+        if qr_base64:
+            qr_img_html = f'<img src="data:image/png;base64,{qr_base64}" alt="QR Code Pembayaran" style="width:180px;height:180px;border-radius:4px;">'
+        else:
+            qr_img_html = f"""<svg width="180" height="180" xmlns="http://www.w3.org/2000/svg">
+                <rect width="180" height="180" fill="white"/>
+                <rect x="30" y="50" width="120" height="80" fill="none" stroke="black" stroke-width="2"/>
+                <text x="90" y="85" text-anchor="middle" font-family="monospace" font-size="12" fill="black">QR CODE</text>
+                <text x="90" y="105" text-anchor="middle" font-family="monospace" font-size="10" fill="gray">{pkg_name}</text>
+            </svg>"""
+
+        st.markdown(f"""
+        <div class="payment-modal-overlay" id="payment-modal">
+            <div class="payment-modal">
+                <div class="dynamihatch-watermark">DYNAMIHATCH</div>
+                <p class="payment-modal-title">PAYMENT GATEWAY</p>
+                <p class="payment-modal-subtitle">Secure QRIS Transaction · Encrypted · Verified</p>
+                <div class="qr-container">{qr_img_html}</div>
+                <div class="payment-steps">
+                    <span>STEP 01</span> Scan QRIS code using any e-wallet (GoPay, DANA, OVO, ShopeePay)<br>
+                    <span>STEP 02</span> Complete payment of <b style="color:#00ff88;">{pkg_price}</b><br>
+                    <span>STEP 03</span> Upload payment proof below & submit
+                </div>
+                <div class="payment-info-grid">
+                    <div class="payment-info-item"><div class="payment-info-label">Package</div><div class="payment-info-value">{pkg_name}</div></div>
+                    <div class="payment-info-item"><div class="payment-info-label">Amount</div><div class="payment-info-value">{pkg_price}</div></div>
+                    <div class="payment-info-item"><div class="payment-info-label">User ID</div><div class="payment-info-value">{user_id[:20] if user_id else 'GUEST'}...</div></div>
+                    <div class="payment-info-item"><div class="payment-info-label">Status</div><div class="payment-info-value" style="color:#ffcc00;">AWAITING PAYMENT</div></div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_up, col_btn = st.columns([2, 1])
+        with col_up:
+            uploaded_file = st.file_uploader("Upload Payment Proof (Screenshot/Photo)", type=["png","jpg","jpeg"], key="payment_proof_uploader", label_visibility="collapsed")
+            if uploaded_file:
+                st.session_state.payment_proof_uploaded = True
+                st.success("Proof uploaded successfully.")
+        with col_btn:
+            if st.button("SUBMIT PROOF", key="submit_payment", width='stretch'):
+                if st.session_state.payment_proof_uploaded:
+                    send_log(f"PAYMENT_SUBMIT: User={user_name}({user_id}) | Pkg={pkg_name} | Amount={pkg_price}")
+                    st.success("PAYMENT PROOF SUBMITTED! Admin will verify within 1x24 hours.")
+                    st.info("Once verified, you will receive a LICENSE KEY via Telegram. Activate in sidebar.")
+                    time.sleep(3)
+                    st.session_state.show_payment_modal = False
+                    st.session_state.payment_proof_uploaded = False
+                    st.rerun()
+                else:
+                    st.warning("Please upload payment proof first.")
+
+        st.markdown("""
+        <div class="trust-badge-container">
+            <div class="trust-badge">PAYMENT PROCESSED BY <span class="highlight">DYNAMIHATCH</span></div>
+            <div class="trust-badge">SUPERVISED BY <span class="highlight">KOMDIGI</span> & <span class="highlight">BANK INDONESIA</span></div>
+            <div class="trust-badge">SECURED BY <span class="highlight">DANA PROTECTION</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("CANCEL & CLOSE", key="close_payment_modal"):
+            st.session_state.show_payment_modal = False
+            st.rerun()
+
+# ==============================================================================
+# 11. SETTINGS (TERBUKA SEMUA TIER)
+# ==============================================================================
+elif menu_selection == "Settings":
+    st.markdown(f'<h2 style="font-family:Orbitron;font-size:20px;color:#00d4ff;letter-spacing:3px;">{t["settings_title"]}</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    
+    new_lang = st.selectbox(t['lang_select'], ["ID", "EN"], index=0 if st.session_state.lang == "ID" else 1)
+    if new_lang != st.session_state.lang:
+        st.session_state.lang = new_lang
+        st.rerun()
+    
+    if st.button(t['clear_cache'], width='stretch'):
+        st.cache_data.clear()
+        st.session_state.cached_analysis = {}
+        st.session_state.last_news_fetch = {}
+        st.success("SYSTEM CACHE CLEARED")
+        time.sleep(1)
+        st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ==============================================================================
+# 12. HELP & SUPPORT (TERBUKA SEMUA TIER)
+# ==============================================================================
+elif menu_selection == "Help & Support":
+    st.markdown(f'<h2 style="font-family:Orbitron;text-align:center;font-size:24px;color:#00d4ff;letter-spacing:4px;margin-bottom:24px;">{t["help_title"]}</h2>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="help-center-container">
+        <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);border-radius:6px;padding:18px;text-align:center;">
+            <p style="font-family:Orbitron;font-size:12px;color:#00d4ff;margin:0 0 8px;letter-spacing:2px;">BANTUAN & SUPPORT</p>
+            <p style="font-family:Share Tech Mono;font-size:11px;color:#8899bb;margin:0 0 12px;">Kendala pembayaran atau lisensi</p>
+            <a href="https://t.me/WartaPrime" target="_blank" style="text-decoration:none;">
+                <div style="background:linear-gradient(160deg,#001a33,#002850);border:1px solid rgba(0,212,255,0.35);border-radius:3px;padding:10px 16px;display:inline-block;">
+                    <span style="font-family:Orbitron;font-size:11px;color:#00d4ff;letter-spacing:2px;">@WartaPrime</span>
+                </div>
+            </a>
+        </div>
+        <div style="background:rgba(0,255,136,0.03);border:1px solid rgba(0,255,136,0.15);border-radius:6px;padding:18px;text-align:center;">
+            <p style="font-family:Orbitron;font-size:12px;color:#00ff88;margin:0 0 8px;letter-spacing:2px;">KOMUNITAS RESMI</p>
+            <p style="font-family:Share Tech Mono;font-size:11px;color:#8899bb;margin:0 0 12px;">Diskusi, sinyal, dan update</p>
+            <a href="https://t.me/+BARDIaUrXydkZDVl" target="_blank" style="text-decoration:none;">
+                <div style="background:linear-gradient(160deg,#001a33,#002850);border:1px solid rgba(0,255,136,0.3);border-radius:3px;padding:10px 16px;display:inline-block;">
+                    <span style="font-family:Orbitron;font-size:11px;color:#00ff88;letter-spacing:2px;">AeroVulpis Group</span>
+                </div>
+            </a>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("SENTINEL PRO INTELLIGENCE", expanded=True):
+        st.markdown("""
+        **Sentinel Pro** adalah dashboard analisis profesional yang didukung oleh sistem kecerdasan buatan AeroVulpis Sentinel Core.
+        **Kemampuan Utama:**
+        - Grafik real-time dengan berbagai pilihan jangka waktu
+        - Deep Analysis Pro menghasilkan laporan lengkap mencakup Level Support/Resistance, Wawasan Fundamental, dan Skenario Trading Bullish/Bearish
+        - Analisis struktur pasar untuk timing entry dan exit yang presisi
+        **Sumber Data:** Data harga diambil langsung dari penyedia data independen untuk akurasi tinggi pada Gold, Silver, Forex, dan Crypto.
+        **Cara Penggunaan:** Pilih instrumen dan jangka waktu dari sidebar, buka halaman Sentinel, klik "INITIATE DEEP ANALYSIS PRO".
+        """)
+    
+    with st.expander("LIVE DASHBOARD"):
+        st.markdown("""
+        **Live Dashboard** menyediakan pemantauan pasar real-time.
+        **Fitur:**
+        - Harga live dengan indikator sumber data (REAL-TIME / CACHE / LIVE)
+        - Cyber Gauge yang menunjukkan kekuatan teknikal dengan animasi
+        - Grafik harga interaktif dengan indikator moving average
+        - Analisis cepat dengan satu klik
+        **Catatan Penting:** Harga yang ditampilkan mungkin memiliki selisih dengan platform trading seperti MetaTrader 5 (MT5) akibat perbedaan sumber data, spread broker, dan waktu pembaruan. AeroVulpis menggunakan data dari penyedia independen dan tidak terhubung langsung ke broker manapun.
+        """)
+    
+    with st.expander("SIGNAL ANALYSIS"):
+        st.markdown("""
+        **Signal Analysis Matrix** menampilkan 20 indikator teknikal dalam format grid.
+        **Kategori Indikator:**
+        - **Trend:** SMA 50, SMA 200, EMA 9/21, Ichimoku, Parabolic SAR
+        - **Momentum:** RSI, MACD, Stochastic, CCI, Williams %R, MFI, ROC, TRIX, Awesome Oscillator
+        - **Volatilitas:** ATR, Bollinger Bands
+        - **Volume:** Volume SMA, Base Line
+        **Warna Sinyal:** Hijau = Bullish | Merah = Bearish | Kuning = Netral
+        """)
+    
+    with st.expander("MARKET SESSIONS & BERITA"):
+        st.markdown("""
+        **Monitor Sesi Pasar Global:**
+        - Tracking real-time sesi Asia (Tokyo), Eropa (London), dan Amerika (New York)
+        - Progress bar menunjukkan persentase sesi berjalan
+        - Deteksi Golden Hour (tumpang tindih London-New York)
+        - Rekomendasi strategi berdasarkan sesi aktif
+        **Agregator Berita:**
+        - Berita dari berbagai jaringan finansial global
+        - Filter kategori: General, Stock, Geopolitics, Gold & Silver, Forex
+        - Penyimpanan sementara dengan tombol refresh
+        - Tautan langsung ke sumber berita
+        """)
+    
+    with st.expander("SMART ALERT CENTER"):
+        st.markdown("""
+        **Sistem Pemantauan Harga Otomatis** dengan notifikasi Telegram.
+        **Cara Setup:**
+        1. Pilih instrumen dari dropdown
+        2. Tentukan harga target
+        3. Masukkan Chat ID Telegram (dapatkan dari @userinfobot)
+        4. Pilih kondisi: Bullish (harga naik) atau Bearish (harga turun)
+        5. Aktifkan sensor untuk pemantauan 24/7
+        **Fitur:**
+        - Pemantauan latar belakang 24/7 via Railway worker
+        - Notifikasi Telegram instan saat target tercapai
+        - Format harga otomatis menyesuaikan jenis instrumen
+        """)
+    
+    with st.expander("CHATBOT AI"):
+        st.markdown("""
+        **Asisten Cerdas** yang memahami konteks instrumen yang dipilih dan harga live.
+        **Kemampuan:**
+        - Analisis teknikal dan interpretasi indikator
+        - Rekomendasi level Entry, Stop Loss, dan Take Profit
+        - Diskusi strategi trading
+        **Batas Harian per Level:**
+        - GRATIS: 20 pesan/hari
+        - TRIAL: 50 pesan/hari
+        - MINGGUAN: 100 pesan/hari
+        - BULANAN: 200 pesan/hari
+        - 6 BULAN: 500 pesan/hari
+        - TAHUNAN: Tidak Terbatas
+        """)
+    
+    with st.expander("ECONOMIC RADAR"):
+        st.markdown("""
+        **Pemindai Ekonomi Global** memantau peristiwa ekonomi berdampak tinggi.
+        **Fitur:**
+        - Kalender ekonomi live dengan cakupan global
+        - Deteksi peristiwa berdampak tinggi
+        - Filter berdasarkan mata uang: USD, EUR, GBP, JPY, AUD, CAD, CHF, NZD
+        **Peristiwa yang Dimonitor:** Suku Bunga Bank Sentral, NFP, CPI, GDP, PMI, Consumer Confidence
+        """)
+    
+    with st.expander("RISK MANAGEMENT"):
+        st.markdown("""
+        **Sistem Manajemen Risiko Empat Pilar:**
+        1. **Aturan Trading** - Tentukan stop loss dan parameter entry
+        2. **Ukuran Posisi** - Hitung ukuran posisi optimal berdasarkan saldo
+        3. **Skor Keyakinan** - Penilaian kekuatan teknikal real-time
+        4. **Strategi Risiko** - Batas kerugian harian dan target profit
+        **Simulator Return:** Rasio Risk-Reward, simulasi mingguan, proyeksi Bulanan/Tahunan.
+        """)
+    
+    with st.expander("TINGKATKAN LEVEL"):
+        st.markdown("""
+        **Upgrade Akses Anda:**
+        - Pilih paket yang sesuai dengan kebutuhan trading Anda
+        - Pembayaran mudah via QRIS (GoPay, DANA, OVO, ShopeePay)
+        - Aktivasi instan setelah verifikasi pembayaran
+        **Paket Tersedia:**
+        - **TRIAL** (1 Hari): Rp999 — Uji coba terjangkau
+        - **WEEKLY** (7 Hari): Rp16.999 — Akses singkat
+        - **MONTHLY** (30 Hari): Rp27.999 — Best seller
+        - **6 MONTHS** (180 Hari): Rp96.000 — Best value
+        - **YEARLY** (365 Hari): Rp137.000 — Ultimate
+        """)
+    
+    with st.expander("AKTIVASI LISENSI & LEVEL"):
+        st.markdown("""
+        **Sistem Manajemen Lisensi**
+        **Cara Masuk:** Masukkan email dan password di sidebar -> klik "ACCESS TERMINAL" untuk login, atau "REGISTER NEW IDENTITY" untuk daftar.
+        **Aktivasi Lisensi:**
+        1. Setelah masuk, klik "ACTIVATE LICENSE KEY"
+        2. Masukkan kunci lisensi (format: XXXX-XXXX-XXXX-XXXX)
+        3. Klik "VALIDATE & ACTIVATE"
+        **Level & Batas Harian:**
+        - **GRATIS:** 5 analisis AI/hari, 20 chat/hari
+        - **TRIAL (1 hari):** 10 analisis/hari, 50 chat/hari
+        - **MINGGUAN:** 20 analisis/hari, 100 chat/hari
+        - **BULANAN:** 50 analisis/hari, 200 chat/hari
+        - **6 BULAN:** 100 analisis/hari, 500 chat/hari
+        - **TAHUNAN:** Tak terbatas
+        """)
+    
+    st.info("PENGATURAN: Ganti bahasa (ID/EN) di halaman Settings. Gunakan tombol Clear Cache jika data terasa lambat.")

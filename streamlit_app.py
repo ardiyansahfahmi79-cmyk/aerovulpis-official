@@ -1764,3 +1764,616 @@ elif menu_selection == "Signal Analysis" or menu_selection == "Signal Analysis (
             else: sig_col = "#ffcc00"
             st.markdown(f'<div class="indicator-box"><div class="indicator-name">{name}</div><div class="indicator-value">{val}</div><div class="indicator-signal" style="color:{sig_col};">{sig}</div></div>', unsafe_allow_html=True)
         st.markdown('</div></div>', unsafe_allow_html=True)
+# ==============================================================================
+# 4. MARKET SESSIONS (PREMIUM)
+# ==============================================================================
+elif menu_selection == "Market Sessions" or menu_selection == "Market Sessions (Premium)":
+    if not user_is_premium:
+        st.error(f"**{t['premium_lock']}**")
+        st.info(t['premium_msg'])
+        st.stop()
+    market_session_status()
+
+# ==============================================================================
+# 5. MARKET NEWS (PREMIUM)
+# ==============================================================================
+elif menu_selection == "Market News" or menu_selection == "Market News (Premium)":
+    if not user_is_premium:
+        st.error(f"**{t['premium_lock']}**")
+        st.info(t['premium_msg'])
+        st.stop()
+        
+    st.markdown(f'<h2 style="font-family:Orbitron;font-size:22px;color:#00d4ff;letter-spacing:3px;margin-bottom:5px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
+    st.markdown(f'<p style="font-family:Share Tech Mono;font-size:9px;color:#557799;margin-bottom:15px;">{t["news_updated"]}</p>', unsafe_allow_html=True)
+    
+    news_categories = ["General", "Stock", "Geopolitics", "Gold & Silver", "Forex"]
+    selected_news_cat = st.segmented_control(t['news_filter'], news_categories, default="General")
+    
+    col_refresh, col_empty = st.columns([1, 3])
+    with col_refresh:
+        if st.button(t['force_refresh'], width='stretch', key="force_news_refresh"):
+            if "last_news_fetch" in st.session_state: st.session_state.last_news_fetch = {}
+            st.cache_data.clear()
+            st.rerun()
+    
+    articles, error = get_news_data(selected_news_cat, 10)
+    if error and not articles: st.error(error)
+    elif articles:
+        for a in articles:
+            st.markdown(f"""
+            <div class="news-card">
+                <p style="font-family:Orbitron;font-size:13px;color:#00d4ff;margin:0 0 5px;letter-spacing:1px;">{a.get('title','NO TITLE')}</p>
+                <p style="font-family:Share Tech Mono;font-size:9px;color:#557799;margin:0 0 8px;">{a.get('source','')} | {a.get('publishedAt','')}</p>
+                <p style="font-family:Rajdhani;font-size:11px;color:#8899bb;line-height:1.5;">{a.get('description','')[:300]}{'...' if len(a.get('description',''))>300 else ''}</p>
+                <a href="{a.get('url','#')}" target="_blank" style="font-family:Share Tech Mono;font-size:9px;color:#00ff88;text-decoration:none;letter-spacing:1px;">[ ACCESS SOURCE ]</a>
+            </div>
+            """, unsafe_allow_html=True)
+    else: st.info(t['no_news'])
+
+# ==============================================================================
+# 6. ECONOMIC RADAR
+# ==============================================================================
+elif menu_selection == "Economic Radar":
+    economic_calendar_widget()
+    st.markdown(f"""
+    <div style="text-align:center;padding:12px;margin-top:8px;background:rgba(0,20,40,0.5);border:1px solid rgba(0,212,255,0.15);border-radius:4px;">
+        <p class="cyber-glow-text" style="font-size:13px;margin:0;letter-spacing:3px;">{t['economic_title']}</p>
+        <p style="font-family:Share Tech Mono;font-size:9px;color:#557799;margin:4px 0 0;">{t['economic_subtitle']}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ==============================================================================
+# 7. SMART ALERT CENTER (PREMIUM)
+# ==============================================================================
+elif menu_selection == "Smart Alert Center" or menu_selection == "Smart Alert Center (Premium)":
+    if not user_is_premium:
+        st.error(f"**{t['premium_lock']}**")
+        st.info(t['premium_msg'])
+        st.stop()
+        
+    st.markdown(f"""
+    <div style="border:1px solid rgba(0,212,255,0.25);border-radius:6px;padding:28px;background:rgba(0,15,30,0.5);box-shadow:0 0 30px rgba(0,212,255,0.06);margin-bottom:20px;">
+        <div style="text-align:center;margin-bottom:22px;">
+            <p class="cyber-glow-text" style="font-size:24px;margin:0;letter-spacing:4px;">{t['alert_title']}</p>
+            <p class="cyber-glow-text" style="font-size:15px;margin:6px 0;letter-spacing:3px;">{t['alert_subtitle']}</p>
+            <div style="display:flex;justify-content:center;gap:24px;margin-top:12px;">
+                <span style="font-family:Share Tech Mono;font-size:10px;color:#00ff88;text-shadow:0 0 8px rgba(0,255,136,0.5);">{t['alert_online']}</span>
+                <span style="font-family:Share Tech Mono;font-size:10px;color:#00d4ff;text-shadow:0 0 8px rgba(0,212,255,0.5);">{t['alert_sync']}</span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    smart_alert_widget()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ==============================================================================
+# 8. CHATBOT AI
+# ==============================================================================
+elif menu_selection == "Chatbot AI":
+    st.markdown(f'<h2 style="font-family:Orbitron;font-size:20px;color:#00d4ff;letter-spacing:3px;">{t["chatbot_title"]}</h2>', unsafe_allow_html=True)
+    st.caption(f"AEROVULPIS ENGINE | {tier_names.get(st.session_state.user_tier,'FREE')} | {st.session_state.daily_chatbot_count}/{user_limits['chatbot_per_day']}")
+    
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]): st.markdown(message["content"])
+    
+    if prompt := st.chat_input("INPUT QUERY..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.markdown(prompt)
+        with st.chat_message("assistant"):
+            m_data = get_market_data(ticker_input)
+            context_str = f"INSTR: {ticker_display} | PRICE: {format_price_display(m_data['price'], asset_name) if m_data else 'N/A'}"
+            if st.session_state.get("active_alerts"): context_str += f" | ALERTS: {len(st.session_state.active_alerts)}"
+            response = get_groq_response(prompt, context_str)
+            st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
+# ==============================================================================
+# 9. RISK MANAGEMENT (REVAMP TOTAL - COMPACT CYBER-TECH)
+# ==============================================================================
+elif menu_selection == "Risk Management":
+    st.markdown(f"""
+    <div class="risk-cyber-container">
+        <h2 class="risk-hud-title">RISK FRAMEWORK v3.5</h2>
+        <p class="risk-hud-subtitle">QUANTUM POSITION SIZING &middot; HOLOGRAPHIC PROJECTION &middot; NEURAL RISK ENGINE</p>
+    """, unsafe_allow_html=True)
+    
+    # Four Pillars Compact (ikon unicode)
+    st.markdown("""
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:12px 0;">
+        <div style="background:rgba(0,20,50,0.5);border:1px solid rgba(0,212,255,0.12);border-radius:3px;padding:10px 4px;text-align:center;">
+            <div style="font-size:14px;color:#00d4ff;margin-bottom:3px;">&#9650;</div>
+            <p style="font-family:Orbitron;font-size:5px;font-weight:700;color:#00d4ff;letter-spacing:1px;margin:0 0 1px;">TRADING RULES</p>
+            <p style="font-family:Share Tech Mono;font-size:4px;color:#557799;margin:0;">SL DEFINITION MATRIX</p>
+        </div>
+        <div style="background:rgba(0,20,50,0.5);border:1px solid rgba(0,255,136,0.12);border-radius:3px;padding:10px 4px;text-align:center;">
+            <div style="font-size:14px;color:#00ff88;margin-bottom:3px;">&#9632;</div>
+            <p style="font-family:Orbitron;font-size:5px;font-weight:700;color:#00ff88;letter-spacing:1px;margin:0 0 1px;">POSITION SIZE</p>
+            <p style="font-family:Share Tech Mono;font-size:4px;color:#557799;margin:0;">QUANTUM SCALE LOGIC</p>
+        </div>
+        <div style="background:rgba(0,20,50,0.5);border:1px solid rgba(188,19,254,0.12);border-radius:3px;padding:10px 4px;text-align:center;">
+            <div style="font-size:14px;color:#bc13fe;margin-bottom:3px;">&#9670;</div>
+            <p style="font-family:Orbitron;font-size:5px;font-weight:700;color:#bc13fe;letter-spacing:1px;margin:0 0 1px;">CONFIDENCE</p>
+            <p style="font-family:Share Tech Mono;font-size:4px;color:#557799;margin:0;">NEURAL REAL-TIME</p>
+        </div>
+        <div style="background:rgba(0,20,50,0.5);border:1px solid rgba(255,42,109,0.12);border-radius:3px;padding:10px 4px;text-align:center;">
+            <div style="font-size:14px;color:#ff2a6d;margin-bottom:3px;">&#9881;</div>
+            <p style="font-family:Orbitron;font-size:5px;font-weight:700;color:#ff2a6d;letter-spacing:1px;margin:0 0 1px;">RISK MGMT</p>
+            <p style="font-family:Share Tech Mono;font-size:4px;color:#557799;margin:0;">TACTICAL PROTOCOL</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="risk-neon-divider"></div>', unsafe_allow_html=True)
+    
+    # Input Section - 3 Columns
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        st.markdown(f'<p class="section-title" style="margin-top:0;font-size:10px;">{t["funding_details"]}</p>', unsafe_allow_html=True)
+        st.markdown('<div class="risk-input-card" style="padding:10px;">', unsafe_allow_html=True)
+        balance = st.number_input("bal", value=1000.0, step=100.0, min_value=100.0, key="sim_balance", label_visibility="collapsed")
+        st.markdown(f'<p style="font-family:Share Tech Mono;font-size:18px;color:#00ff88;text-shadow:0 0 10px rgba(0,255,136,0.4);margin:0;text-align:center;">${balance:,.2f}</p>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(f'<p class="section-title" style="margin-top:0;font-size:10px;">{t["rr_simulator"]}</p>', unsafe_allow_html=True)
+        st.markdown('<div class="risk-input-card" style="padding:10px;">', unsafe_allow_html=True)
+        rr_ratios = {"1:2": 2.0, "1:3": 3.0, "1:4": 4.0, "2:3": 1.5, "2:4": 2.0}
+        selected_rr = st.selectbox("rr", list(rr_ratios.keys()), key="rr_radio", label_visibility="collapsed")
+        st.markdown(f'<p style="font-family:Share Tech Mono;font-size:18px;color:#00d4ff;text-align:center;margin:0;">{selected_rr}</p>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown('<p class="section-title" style="margin-top:0;font-size:10px;">WINS / LOSSES</p>', unsafe_allow_html=True)
+        st.markdown('<div class="risk-input-card" style="padding:6px;">', unsafe_allow_html=True)
+        w1, w2 = st.columns(2)
+        with w1:
+            st.markdown('<p style="font-family:Orbitron;font-size:6px;color:#00ff88;text-align:center;margin:0;">WINS</p>', unsafe_allow_html=True)
+            wins = st.number_input("w", min_value=0, value=3, step=1, key="wins", label_visibility="collapsed")
+        with w2:
+            st.markdown('<p style="font-family:Orbitron;font-size:6px;color:#ff2a6d;text-align:center;margin:0;">LOSS</p>', unsafe_allow_html=True)
+            losses = st.number_input("l", min_value=0, value=2, step=1, key="losses", label_visibility="collapsed")
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Daily Risk + Simulate
+    st.markdown(f'<p class="section-title" style="font-size:10px;">{t["daily_risk"]}</p>', unsafe_allow_html=True)
+    d1, d2, d3 = st.columns([1, 1, 2])
+    with d1:
+        st.markdown('<div class="risk-input-card" style="padding:8px;border-color:rgba(255,42,109,0.3);">', unsafe_allow_html=True)
+        st.markdown('<p style="font-family:Orbitron;font-size:6px;color:#ff2a6d;text-align:center;margin:0 0 3px;">MAX LOSS %</p>', unsafe_allow_html=True)
+        max_loss = st.number_input("ml", 1.0, 100.0, 5.0, 1.0, key="maxl", label_visibility="collapsed")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with d2:
+        st.markdown('<div class="risk-input-card" style="padding:8px;border-color:rgba(0,255,136,0.3);">', unsafe_allow_html=True)
+        st.markdown('<p style="font-family:Orbitron;font-size:6px;color:#00ff88;text-align:center;margin:0 0 3px;">MAX PROFIT %</p>', unsafe_allow_html=True)
+        max_profit = st.number_input("mp", 1.0, 200.0, 10.0, 1.0, key="maxp", label_visibility="collapsed")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with d3:
+        st.markdown('<div class="risk-simulate-btn" style="margin-top:12px;">', unsafe_allow_html=True)
+        simulate_clicked = st.button(t['risk_simulate'], width='stretch', type="primary", key="risk_sim_btn")
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    risk_pct = 1.0
+    
+    if simulate_clicked:
+        ra = balance * (risk_pct / 100)
+        rw = ra * rr_ratios[selected_rr]
+        wn = (wins * rw) - (losses * ra)
+        wr = (wn / balance) * 100 if balance > 0 else 0
+        mr = wr * 4
+        yr = wr * 52
+        fbw = balance + wn
+        fbm = balance + (wn * 4)
+        fby = balance + (wn * 52)
+        mla = balance * (max_loss / 100)
+        mpa = balance * (max_profit / 100)
+        
+        st.markdown('<div class="risk-neon-divider"></div>', unsafe_allow_html=True)
+        st.markdown(f'<p style="font-family:Orbitron;font-size:12px;color:#00d4ff;text-align:center;letter-spacing:3px;margin:0 0 10px;">{t["projection_title"]}</p>', unsafe_allow_html=True)
+        
+        # 3 projection columns
+        periods = [(t['risk_weekly'], wn, wr, fbw), (t['risk_monthly'], wn * 4, mr, fbm), (t['risk_yearly'], wn * 52, yr, fby)]
+        cols = st.columns(3)
+        for i, (pn, net, ret, fbal) in enumerate(periods):
+            with cols[i]:
+                nc = "#00ff88" if net >= 0 else "#ff2a6d"
+                rc = "#00ff88" if ret >= 0 else "#ff2a6d"
+                st.markdown(f"""
+                <div class="risk-projection-card" style="padding:12px;">
+                    <p style="font-family:Orbitron;font-size:9px;color:#00d4ff;text-align:center;letter-spacing:2px;margin:0 0 8px;">{pn}</p>
+                    <p style="font-family:Share Tech Mono;font-size:11px;color:{nc};text-align:center;margin:2px 0;">{t['risk_net']}: {net:+,.2f}</p>
+                    <p style="font-family:Share Tech Mono;font-size:11px;color:{rc};text-align:center;margin:2px 0;">{t['risk_return']}: {ret:+.1f}%</p>
+                    <p style="font-family:Share Tech Mono;font-size:11px;color:#00d4ff;text-align:center;margin:2px 0;">{t['risk_balance']}: {fbal:,.2f}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Risk Parameters Grid
+        st.markdown(f'<p style="font-family:Orbitron;font-size:10px;color:#ff2a6d;text-align:center;letter-spacing:2px;margin:10px 0 5px;">{t["risk_params"]}</p>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:6px 0;">
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_per_trade']}</div><div class="risk-matrix-value" style="color:#ff2a6d;font-size:11px;">{ra:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_reward_trade']}</div><div class="risk-matrix-value" style="color:#00ff88;font-size:11px;">{rw:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_max_loss']}</div><div class="risk-matrix-value" style="color:#ff2a6d;font-size:11px;">-{mla:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_max_profit']}</div><div class="risk-matrix-value" style="color:#00ff88;font-size:11px;">+{mpa:,.2f}</div></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Balance Summary
+        st.markdown(f'<p style="font-family:Orbitron;font-size:10px;color:#00d4ff;text-align:center;letter-spacing:2px;margin:10px 0 5px;">{t["risk_summary"]}</p>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:6px 0;">
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_initial']}</div><div class="risk-matrix-value" style="font-size:11px;">{balance:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_after']} 1W</div><div class="risk-matrix-value" style="font-size:11px;color:{'#00ff88' if fbw>=balance else '#ff2a6d'};">{fbw:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_after']} 1M</div><div class="risk-matrix-value" style="font-size:11px;color:{'#00ff88' if fbm>=balance else '#ff2a6d'};">{fbm:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_after']} 1Y</div><div class="risk-matrix-value" style="font-size:11px;color:{'#00ff88' if fby>=balance else '#ff2a6d'};">{fby:,.2f}</div></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f'<p class="risk-data-stream">SYS.TIMESTAMP: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} &middot; ENCRYPTION: AES-256 &middot; NODE: AEROVULPIS-PRIME</p>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ==============================================================================
+# 10. TINGKATKAN LEVEL (UPGRADE PAGE - CYBER-TECH FUTURISTIC)
+# ==============================================================================
+elif menu_selection == "Tingkatkan Level":
+    # --- Session State tetap di sini untuk memastikan modal berfungsi ---
+    if "show_payment_modal" not in st.session_state:
+        st.session_state.show_payment_modal = False
+    if "selected_package" not in st.session_state:
+        st.session_state.selected_package = None
+    if "selected_price" not in st.session_state:
+        st.session_state.selected_price = ""
+    if "selected_duration" not in st.session_state:
+        st.session_state.selected_duration = ""
+    if "payment_proof_uploaded" not in st.session_state:
+        st.session_state.payment_proof_uploaded = False
+
+    # --- Header ---
+    st.markdown("""
+    <div class="upgrade-container">
+        <h2 class="upgrade-title">UPGRADE ACCESS</h2>
+        <p class="upgrade-subtitle">Select Your Plan &middot; Unlock Full Potential &middot; Professional Trading Terminal</p>
+    """, unsafe_allow_html=True)
+
+    # --- Pricing Grid (5 Kolom) menggunakan Columns ---
+    packages = [
+        {"name": "TRIAL", "duration": "1 DAY", "price": "999", "price_label": "Rp999", "features": ["Full Access 24 Hours", "5 AI Analysis/Day", "20 Chatbot/Day"], "featured": False, "id": "trial"},
+        {"name": "WEEKLY", "duration": "7 DAYS", "price": "16,999", "price_label": "Rp16.999", "features": ["Full Access 7 Days", "20 AI Analysis/Day", "100 Chatbot/Day"], "featured": False, "id": "weekly"},
+        {"name": "MONTHLY", "duration": "30 DAYS", "price": "27,999", "price_label": "Rp27.999", "features": ["Full Access 30 Days", "50 AI Analysis/Day", "200 Chatbot/Day", "Smart Alert 24/7"], "featured": True, "id": "monthly"},
+        {"name": "6 MONTHS", "duration": "180 DAYS", "price": "96,000", "price_label": "Rp96.000", "features": ["Full Access 180 Days", "100 AI Analysis/Day", "500 Chatbot/Day", "Priority Alert"], "featured": False, "id": "six_months"},
+        {"name": "YEARLY", "duration": "365 DAYS", "price": "137,000", "price_label": "Rp137.000", "features": ["Full Access 365 Days", "Unlimited AI Analysis", "Unlimited Chatbot", "VIP Priority Support"], "featured": True, "id": "yearly"},
+    ]
+
+    # Render semua kartu pricing menggunakan st.columns
+    cols = st.columns(5)
+    for i, pkg in enumerate(packages):
+        with cols[i]:
+            featured_class = "featured" if pkg["featured"] else ""
+            badge_html = '<div class="pricing-badge">BEST</div>' if pkg["featured"] else ""
+            
+            # Bangun HTML untuk fitur
+            features_html = "".join([f"<li>{f}</li>" for f in pkg["features"]])
+            
+            card_html = f"""
+            <div class="pricing-card {featured_class}">
+                {badge_html}
+                <p class="pricing-name">{pkg['name']}</p>
+                <p class="pricing-duration">{pkg['duration']}</p>
+                <p class="pricing-price"><span class="currency">Rp</span>{pkg['price']}</p>
+                <ul class="pricing-features">
+                    {features_html}
+                </ul>
+            </div>
+            """
+            st.markdown(card_html, unsafe_allow_html=True)
+            
+            # Tombol SELECT di bawah kartu
+            if st.button(f"SELECT {pkg['name']}", key=f"btn_{pkg['id']}_{i}", width='stretch'):
+                st.session_state.show_payment_modal = True
+                st.session_state.selected_package = pkg['name']
+                st.session_state.selected_price = pkg['price_label']
+                st.session_state.selected_duration = pkg['duration']
+                st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)  # close upgrade-container
+
+    # =====================================================================
+    # PAYMENT MODAL (Muncul jika show_payment_modal == True)
+    # =====================================================================
+    if st.session_state.show_payment_modal:
+        user_id = st.session_state.get('user_id', 'GUEST')
+        user_name = st.session_state.get('user_name', 'USER')
+        pkg_name = st.session_state.selected_package
+        pkg_price = st.session_state.selected_price
+
+        # --- Generate QR Code asli menggunakan library qrcode ---
+        qr_data = f"DYNAMIHATCH|{pkg_name}|{pkg_price}|{user_id}"
+        qr_base64 = generate_qr_base64(qr_data)
+        
+        if qr_base64:
+            qr_img_html = f'<img src="data:image/png;base64,{qr_base64}" alt="QR Code Pembayaran" style="width:180px;height:180px;border-radius:4px;">'
+        else:
+            # Fallback ke SVG jika qrcode tidak terinstall
+            qr_img_html = f"""<svg width="180" height="180" xmlns="http://www.w3.org/2000/svg">
+                <rect width="180" height="180" fill="white"/>
+                <rect x="30" y="50" width="120" height="80" fill="none" stroke="black" stroke-width="2"/>
+                <text x="90" y="85" text-anchor="middle" font-family="monospace" font-size="12" fill="black">QR CODE</text>
+                <text x="90" y="105" text-anchor="middle" font-family="monospace" font-size="10" fill="gray">{pkg_name}</text>
+            </svg>"""
+
+        # --- Modal HTML ---
+        st.markdown(f"""
+        <div class="payment-modal-overlay" id="payment-modal">
+            <div class="payment-modal">
+                <div class="dynamihatch-watermark">DYNAMIHATCH</div>
+                <p class="payment-modal-title">PAYMENT GATEWAY</p>
+                <p class="payment-modal-subtitle">Secure QRIS Transaction &middot; Encrypted &middot; Verified</p>
+                
+                <div class="qr-container">
+                    {qr_img_html}
+                </div>
+                
+                <div class="payment-steps">
+                    <span>STEP 01</span> Scan QRIS code using any e-wallet (GoPay, DANA, OVO, ShopeePay)<br>
+                    <span>STEP 02</span> Complete payment of <b style="color:#00ff88;">{pkg_price}</b><br>
+                    <span>STEP 03</span> Upload payment proof below & submit
+                </div>
+
+                <div class="payment-info-grid">
+                    <div class="payment-info-item">
+                        <div class="payment-info-label">Package</div>
+                        <div class="payment-info-value">{pkg_name}</div>
+                    </div>
+                    <div class="payment-info-item">
+                        <div class="payment-info-label">Amount</div>
+                        <div class="payment-info-value">{pkg_price}</div>
+                    </div>
+                    <div class="payment-info-item">
+                        <div class="payment-info-label">User ID</div>
+                        <div class="payment-info-value">{user_id[:20] if user_id else 'GUEST'}...</div>
+                    </div>
+                    <div class="payment-info-item">
+                        <div class="payment-info-label">Status</div>
+                        <div class="payment-info-value" style="color:#ffcc00;">AWAITING PAYMENT</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # --- Upload Bukti Pembayaran & Tombol Konfirmasi ---
+        col_up, col_btn = st.columns([2, 1])
+        with col_up:
+            uploaded_file = st.file_uploader(
+                "Upload Payment Proof (Screenshot/Photo)",
+                type=["png", "jpg", "jpeg"],
+                key="payment_proof_uploader",
+                label_visibility="collapsed"
+            )
+            if uploaded_file:
+                st.session_state.payment_proof_uploaded = True
+                st.success("Proof uploaded successfully.")
+
+        with col_btn:
+            if st.button("SUBMIT\nPROOF", key="submit_payment", width='stretch'):
+                if st.session_state.payment_proof_uploaded:
+                    send_log(f"PAYMENT_SUBMIT: User={user_name}({user_id}) | Pkg={pkg_name} | Amount={pkg_price}")
+                    st.success("PAYMENT PROOF SUBMITTED! Admin will verify within 1x24 hours.")
+                    st.info("Once verified, you will receive a LICENSE KEY via Telegram. Activate it in the sidebar menu (ACTIVATE LICENSE KEY).")
+                    time.sleep(3)
+                    st.session_state.show_payment_modal = False
+                    st.session_state.payment_proof_uploaded = False
+                    st.rerun()
+                else:
+                    st.warning("Please upload payment proof first.")
+
+        # --- Trust Badges ---
+        st.markdown("""
+        <div class="trust-badge-container">
+            <div class="trust-badge">PAYMENT PROCESSED BY <span class="highlight">DYNAMIHATCH</span></div>
+            <div class="trust-badge">SUPERVISED BY <span class="highlight">KOMDIGI</span> & <span class="highlight">BANK INDONESIA</span></div>
+            <div class="trust-badge">SECURED BY <span class="highlight">DANA PROTECTION</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # --- Tombol Tutup Modal ---
+        if st.button("CANCEL & CLOSE", key="close_payment_modal"):
+            st.session_state.show_payment_modal = False
+            st.rerun()
+
+# ==============================================================================
+# 11. SETTINGS
+# ==============================================================================
+elif menu_selection == "Settings":
+    st.markdown(f'<h2 style="font-family:Orbitron;font-size:20px;color:#00d4ff;letter-spacing:3px;">{t["settings_title"]}</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    
+    new_lang = st.selectbox(t['lang_select'], ["ID", "EN"], index=0 if st.session_state.lang == "ID" else 1)
+    if new_lang != st.session_state.lang:
+        st.session_state.lang = new_lang
+        st.rerun()
+    
+    if st.button(t['clear_cache'], width='stretch'):
+        st.cache_data.clear()
+        st.session_state.cached_analysis = {}
+        st.session_state.last_news_fetch = {}
+        st.success("SYSTEM CACHE CLEARED")
+        time.sleep(1)
+        st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ==============================================================================
+# 12. HELP & SUPPORT
+# ==============================================================================
+elif menu_selection == "Help & Support":
+    st.markdown(f'<h2 style="font-family:Orbitron;text-align:center;font-size:24px;color:#00d4ff;letter-spacing:4px;margin-bottom:24px;">{t["help_title"]}</h2>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="help-center-container">
+        <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);border-radius:6px;padding:18px;text-align:center;">
+            <p style="font-family:Orbitron;font-size:12px;color:#00d4ff;margin:0 0 8px;letter-spacing:2px;">BANTUAN & SUPPORT</p>
+            <p style="font-family:Share Tech Mono;font-size:11px;color:#8899bb;margin:0 0 12px;">Kendala pembayaran atau lisensi</p>
+            <a href="https://t.me/WartaPrime" target="_blank" style="text-decoration:none;">
+                <div style="background:linear-gradient(160deg,#001a33,#002850);border:1px solid rgba(0,212,255,0.35);border-radius:3px;padding:10px 16px;display:inline-block;">
+                    <span style="font-family:Orbitron;font-size:11px;color:#00d4ff;letter-spacing:2px;">@WartaPrime</span>
+                </div>
+            </a>
+        </div>
+        <div style="background:rgba(0,255,136,0.03);border:1px solid rgba(0,255,136,0.15);border-radius:6px;padding:18px;text-align:center;">
+            <p style="font-family:Orbitron;font-size:12px;color:#00ff88;margin:0 0 8px;letter-spacing:2px;">KOMUNITAS RESMI</p>
+            <p style="font-family:Share Tech Mono;font-size:11px;color:#8899bb;margin:0 0 12px;">Diskusi, sinyal, dan update</p>
+            <a href="https://t.me/+BARDIaUrXydkZDVl" target="_blank" style="text-decoration:none;">
+                <div style="background:linear-gradient(160deg,#001a33,#002850);border:1px solid rgba(0,255,136,0.3);border-radius:3px;padding:10px 16px;display:inline-block;">
+                    <span style="font-family:Orbitron;font-size:11px;color:#00ff88;letter-spacing:2px;">AeroVulpis Group</span>
+                </div>
+            </a>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("SENTINEL PRO INTELLIGENCE", expanded=True):
+        st.markdown("""
+        **Sentinel Pro** adalah dashboard analisis profesional yang didukung oleh sistem kecerdasan buatan AeroVulpis Sentinel Core.
+        **Kemampuan Utama:**
+        - Grafik real-time dengan berbagai pilihan jangka waktu
+        - Deep Analysis Pro menghasilkan laporan lengkap mencakup Level Support/Resistance, Wawasan Fundamental, dan Skenario Trading Bullish/Bearish
+        - Analisis struktur pasar untuk timing entry dan exit yang presisi
+        **Sumber Data:** Data harga diambil langsung dari broker untuk akurasi tinggi pada Gold, Silver, Forex, dan Crypto.
+        **Cara Penggunaan:** Pilih instrumen dan jangka waktu dari sidebar, buka halaman Sentinel, klik "INITIATE DEEP ANALYSIS PRO".
+        """)
+    
+    with st.expander("LIVE DASHBOARD"):
+        st.markdown("""
+        **Live Dashboard** menyediakan pemantauan pasar real-time.
+        **Fitur:**
+        - Harga live dengan indikator sumber data (FINNHUB / CACHE / LIVE)
+        - Cyber Gauge yang menunjukkan kekuatan teknikal dengan animasi
+        - Grafik harga interaktif dengan indikator moving average
+        - Analisis cepat dengan satu klik
+        **Catatan Penting:** Harga yang ditampilkan mungkin memiliki selisih beberapa pip dengan platform trading seperti MetaTrader 5 (MT5). Hal ini disebabkan oleh perbedaan sumber data, spread broker, dan waktu pembaruan. AeroVulpis menggunakan data dari penyedia independen dan tidak terhubung langsung ke broker manapun.
+        """)
+    
+    with st.expander("SIGNAL ANALYSIS"):
+        st.markdown("""
+        **Signal Analysis Matrix** menampilkan 20 indikator teknikal dalam format grid.
+        **Kategori Indikator:**
+        - **Trend:** SMA 50, SMA 200, EMA 9/21, Ichimoku, Parabolic SAR
+        - **Momentum:** RSI, MACD, Stochastic, CCI, Williams %R, MFI, ROC, TRIX, Awesome Oscillator
+        - **Volatilitas:** ATR, Bollinger Bands
+        - **Volume:** Volume SMA, Base Line
+        **Warna Sinyal:** Hijau = Bullish | Merah = Bearish | Kuning = Netral
+        """)
+    
+    with st.expander("MARKET SESSIONS & BERITA"):
+        st.markdown("""
+        **Monitor Sesi Pasar Global:**
+        - Tracking real-time sesi Asia (Tokyo), Eropa (London), dan Amerika (New York)
+        - Progress bar menunjukkan persentase sesi berjalan
+        - Deteksi Golden Hour (tumpang tindih London-New York)
+        - Rekomendasi strategi berdasarkan sesi aktif
+        **Agregator Berita:**
+        - Berita dari berbagai jaringan finansial global
+        - Filter kategori: General, Stock, Geopolitics, Gold & Silver, Forex
+        - Penyimpanan sementara dengan tombol refresh
+        - Tautan langsung ke sumber berita
+        """)
+    
+    with st.expander("SMART ALERT CENTER"):
+        st.markdown("""
+        **Sistem Pemantauan Harga Otomatis** dengan notifikasi Telegram.
+        **Cara Setup:**
+        1. Pilih instrumen dari dropdown
+        2. Tentukan harga target
+        3. Masukkan Chat ID Telegram (dapatkan dari @userinfobot)
+        4. Pilih kondisi: Bullish (harga naik) atau Bearish (harga turun)
+        5. Aktifkan sensor untuk pemantauan 24/7
+        **Fitur:**
+        - Pemantauan latar belakang 24/7 via Railway worker
+        - Notifikasi Telegram instan saat target tercapai
+        - Format harga otomatis menyesuaikan jenis instrumen
+        """)
+    
+    with st.expander("CHATBOT AI"):
+        st.markdown("""
+        **Asisten Cerdas** yang memahami konteks instrumen yang dipilih dan harga live.
+        **Kemampuan:**
+        - Analisis teknikal dan interpretasi indikator
+        - Rekomendasi level Entry, Stop Loss, dan Take Profit
+        - Diskusi strategi trading
+        **Batas Harian per Level:**
+        - GRATIS: 20 pesan/hari
+        - TRIAL: 50 pesan/hari
+        - MINGGUAN: 100 pesan/hari
+        - BULANAN: 200 pesan/hari
+        - 6 BULAN: 500 pesan/hari
+        - TAHUNAN: Tidak Terbatas
+        """)
+    
+    with st.expander("ECONOMIC RADAR"):
+        st.markdown("""
+        **Pemindai Ekonomi Global** memantau peristiwa ekonomi berdampak tinggi.
+        **Fitur:**
+        - Kalender ekonomi live dengan cakupan global
+        - Deteksi peristiwa berdampak tinggi
+        - Filter berdasarkan mata uang: USD, EUR, GBP, JPY, AUD, CAD, CHF, NZD
+        **Peristiwa yang Dimonitor:** Suku Bunga Bank Sentral, NFP, CPI, GDP, PMI, Consumer Confidence
+        """)
+    
+    with st.expander("RISK MANAGEMENT"):
+        st.markdown("""
+        **Sistem Manajemen Risiko Empat Pilar:**
+        1. **Aturan Trading** - Tentukan stop loss dan parameter entry
+        2. **Ukuran Posisi** - Hitung ukuran posisi optimal berdasarkan saldo
+        3. **Skor Keyakinan** - Penilaian kekuatan teknikal real-time
+        4. **Strategi Risiko** - Batas kerugian harian dan target profit
+        **Simulator Return:** Rasio Risk-Reward, simulasi mingguan, proyeksi Bulanan/Tahunan.
+        """)
+    
+    with st.expander("TINGKATKAN LEVEL"):
+        st.markdown("""
+        **Upgrade Akses Anda:**
+        - Pilih paket yang sesuai dengan kebutuhan trading Anda
+        - Pembayaran mudah via QRIS (GoPay, DANA, OVO, ShopeePay)
+        - Aktivasi instan setelah verifikasi pembayaran
+        **Paket Tersedia:**
+        - **TRIAL** (1 Hari): Rp999 — Uji coba terjangkau
+        - **WEEKLY** (7 Hari): Rp16.999 — Akses singkat
+        - **MONTHLY** (30 Hari): Rp27.999 — Best seller
+        - **6 MONTHS** (180 Hari): Rp96.000 — Best value
+        - **YEARLY** (365 Hari): Rp137.000 — Ultimate
+        """)
+    
+    with st.expander("AKTIVASI LISENSI & LEVEL"):
+        st.markdown("""
+        **Sistem Manajemen Lisensi**
+        **Cara Masuk:** Masukkan email dan password di sidebar -> klik "ACCESS TERMINAL" untuk login, atau "REGISTER NEW IDENTITY" untuk daftar.
+        **Aktivasi Lisensi:**
+        1. Setelah masuk, klik "ACTIVATE LICENSE KEY"
+        2. Masukkan kunci lisensi (format: XXXX-XXXX-XXXX-XXXX)
+        3. Klik "VALIDATE & ACTIVATE"
+        **Level & Batas Harian:**
+        - **GRATIS:** 5 analisis AI/hari, 20 chat/hari
+        - **TRIAL (1 hari):** 10 analisis/hari, 50 chat/hari
+        - **MINGGUAN:** 20 analisis/hari, 100 chat/hari
+        - **BULANAN:** 50 analisis/hari, 200 chat/hari
+        - **6 BULAN:** 100 analisis/hari, 500 chat/hari
+        - **TAHUNAN:** Tak terbatas
+        """)
+    
+    st.info("PENGATURAN: Ganti bahasa (ID/EN) di halaman Settings. Gunakan tombol Clear Cache jika data terasa lambat.")
+
+# ##############################################################################
+# FOOTER
+# ##############################################################################
+st.markdown("---")
+st.markdown("""
+<div style="text-align:center;padding:25px;opacity:0.55;">
+    <p style="font-family:Share Tech Mono;font-size:14px;color:#556680;margin:0;letter-spacing:2px;">
+        "DISCIPLINE IS THE KEY | EMOTION IS THE ENEMY | TRUST THE SYSTEM"
+    </p>
+    <p style="font-family:Orbitron;font-size:11px;color:#00ff88;margin:8px 0;letter-spacing:3px;">
+        FAHMI &mdash; AEROVULPIS ARCHITECT
+    </p>
+    <p style="font-family:Share Tech Mono;font-size:8px;color:#334455;letter-spacing:2px;margin-top:6px;">
+        DYNAMIHATCH IDENTITY | V3.5 ULTIMATE | 2026
+    </p>
+</div>
+""", unsafe_allow_html=True)

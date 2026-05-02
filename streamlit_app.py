@@ -1568,3 +1568,764 @@ with st.sidebar:
         </div>
     </div>
     """, unsafe_allow_html=True)
+# ##############################################################################
+# PART 2: MAIN APPLICATION LOGIC & FOOTER
+# ##############################################################################
+
+check_smart_alerts()
+
+# ==============================================================================
+# 1. AEROVULPIS SENTINEL PRO (PREMIUM)
+# ==============================================================================
+if menu_selection == "AeroVulpis Sentinel" or menu_selection == "AeroVulpis Sentinel (Premium)":
+    st.markdown(f"""
+    <div class="sentinel-container">
+        <div class="sentinel-header" style="flex-direction:column;align-items:flex-start;">
+            <h2 class="sentinel-title">{t['sentinel_title']}</h2>
+            <div style="display:flex;gap:10px;margin-top:10px;">
+                <span class="status-badge status-open">{t['market_status']}</span>
+                <span class="status-badge status-ai">{t['sentinel_ai_status']}</span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    col_chart, col_intel = st.columns([2, 1])
+    
+    with col_chart:
+        tv_symbol = ticker_input.replace("-USD", "USD").replace("=X", "").replace(".JK", "")
+        if "GC=F" in ticker_input: tv_symbol = "COMEX:GC1!"
+        elif "SI=F" in ticker_input: tv_symbol = "COMEX:SI1!"
+        elif "CL=F" in ticker_input: tv_symbol = "NYMEX:CL1!"
+        
+        tv_html = f"""
+        <div class="tradingview-widget-container" style="height:500px;width:100%;">
+          <div id="tv_sentinel" style="height:500px;"></div>
+          <script src="https://s3.tradingview.com/tv.js"></script>
+          <script>
+          new TradingView.widget({{"autosize":true,"symbol":"{tv_symbol}","interval":"D","timezone":"Asia/Jakarta","theme":"dark","style":"1","locale":"en","enable_publishing":false,"allow_symbol_change":true,"container_id":"tv_sentinel","studies":["RSI@tv-basicstudies","MACD@tv-basicstudies"]}});
+          </script>
+        </div>
+        """
+        st.components.v1.html(tv_html, height=500)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        loading_placeholder = st.empty()
+        
+        if st.button(t['sentinel_btn'], key="sentinel_pro_btn", width='stretch'):
+            market = get_market_data(ticker_input)
+            df = get_historical_data(ticker_input, period, interval)
+            if market and not df.empty:
+                df = add_technical_indicators(df)
+                score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
+                
+                # Animasi cincin loading
+                loading_placeholder.markdown("""
+                <div class="loading-3d-pro-container">
+                    <div class="loading-3d-pro-scene">
+                        <div class="loading-3d-pro-core">
+                            <div class="loading-3d-pro-ring"></div>
+                            <div class="loading-3d-pro-ring"></div>
+                            <div class="loading-3d-pro-ring"></div>
+                            <div class="loading-3d-pro-ring"></div>
+                        </div>
+                        <div class="loading-3d-pro-center"></div>
+                        <div class="loading-3d-pro-particles">
+                            <div class="loading-3d-pro-particle"></div>
+                            <div class="loading-3d-pro-particle"></div>
+                            <div class="loading-3d-pro-particle"></div>
+                            <div class="loading-3d-pro-particle"></div>
+                            <div class="loading-3d-pro-particle"></div>
+                            <div class="loading-3d-pro-particle"></div>
+                        </div>
+                    </div>
+                    <p class="loading-3d-pro-text">SENTINEL PROCESSING</p>
+                    <p class="loading-3d-pro-sub">AEROVULPIS SENTINEL CORE | MARKET MICROSTRUCTURE ANALYSIS</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                progress_bar = st.progress(0)
+                for i in range(100):
+                    time.sleep(0.02)
+                    progress_bar.progress(i + 1)
+                
+                analysis = get_sentinel_analysis(asset_name, market, df, signal, reasons)
+                st.session_state.sentinel_analysis = analysis
+                
+                loading_placeholder.empty()
+                progress_bar.empty()
+            else: st.error("DATA ACQUISITION FAILED | CHECK CONNECTION")
+    
+    with col_intel:
+        st.markdown(f"""<div class="intelligence-panel"><div class="intel-header">{t['sentinel_intel']}</div><div class="intel-content">""", unsafe_allow_html=True)
+        if st.session_state.sentinel_analysis: st.markdown(st.session_state.sentinel_analysis, unsafe_allow_html=True)
+        else: st.info(t['sentinel_placeholder'])
+        st.markdown("</div></div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ==============================================================================
+# 2. LIVE DASHBOARD (TERBUKA UNTUK SEMUA TIER)
+# ==============================================================================
+elif menu_selection == "Live Dashboard":
+    market = get_market_data(ticker_input)
+    df = get_historical_data(ticker_input, period, interval)
+    
+    if market and not df.empty:
+        if selected_tf_display in ["3H", "4H"]:
+            rule = "3h" if selected_tf_display == "3H" else "4h"
+            df = df.resample(rule).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+        
+        df = add_technical_indicators(df)
+        score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
+        
+        c1, c2, c3, c4 = st.columns(4)
+        formatted_price = format_price_display(market['price'], asset_name)
+        data_source = market.get('source', 'LIVE')
+        
+        with c1: st.markdown(f'<div class="glass-card"><p style="color:#557799;margin:0;font-size:9px;letter-spacing:2px;">{t["live_price"]} [{data_source}]</p><p style="font-family:Share Tech Mono;color:#00ff88;font-size:24px;margin:0;text-shadow:0 0 10px rgba(0,255,136,0.4);">{formatted_price}</p></div>', unsafe_allow_html=True)
+        with c2:
+            color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
+            st.markdown(f'<div class="glass-card"><p style="color:#557799;margin:0;font-size:9px;letter-spacing:2px;">{t["signal"]}</p><p style="font-family:Orbitron;font-size:20px;margin:0;color:{color};text-shadow:0 0 15px {color};">{signal}</p></div>', unsafe_allow_html=True)
+        with c3:
+            rsi_val = df["RSI"].iloc[-1] if "RSI" in df.columns else 0.0
+            st.markdown(f'<div class="glass-card"><p style="color:#557799;margin:0;font-size:9px;letter-spacing:2px;">{t["rsi"]}</p><p style="font-family:Share Tech Mono;color:#00d4ff;font-size:24px;margin:0;">{rsi_val:.1f}</p></div>', unsafe_allow_html=True)
+        with c4:
+            atr_val = df["ATR"].iloc[-1] if "ATR" in df.columns else 0.0
+            st.markdown(f'<div class="glass-card"><p style="color:#557799;margin:0;font-size:9px;letter-spacing:2px;">{t["atr"]}</p><p style="font-family:Share Tech Mono;color:#8899bb;font-size:24px;margin:0;">{atr_val:.4f}</p></div>', unsafe_allow_html=True)
+        
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name='PRICE', line=dict(color='#00ff88', width=1.5)))
+        fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"], line=dict(color='#00d4ff', width=1, dash='dot'), name='SMA50'))
+        fig.add_trace(go.Scatter(x=df.index, y=df["SMA200"], line=dict(color='#bc13fe', width=1, dash='dash'), name='SMA200'))
+        fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=10, b=10), height=380, legend=dict(orientation="h", y=-0.15, font=dict(size=10)), xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.03)'), yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.03)'))
+        st.plotly_chart(fig, width='stretch')
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        col_g, col_a = st.columns([1, 1])
+        
+        with col_g:
+            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+            gauge_color = color
+            fig_gauge = go.Figure(go.Indicator(
+                mode="gauge+number+delta", value=score,
+                number={"font": {"family": "Orbitron", "color": "#00d4ff", "size": 42}, "suffix": "%"},
+                title={"text": "TECHNICAL STRENGTH", "font": {"family": "Orbitron", "color": "#00d4ff", "size": 15}},
+                gauge={"axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#00d4ff", "tickfont": {"color": "#8899bb", "size": 10}}, "bar": {"color": gauge_color, "thickness": 0.25}, "bgcolor": "rgba(0,0,0,0)", "borderwidth": 1, "bordercolor": "rgba(0,212,255,0.3)", "steps": [{"range": [0, 30], "color": "rgba(255,42,109,0.15)"}, {"range": [30, 45], "color": "rgba(255,42,109,0.08)"}, {"range": [45, 55], "color": "rgba(255,204,0,0.08)"}, {"range": [55, 70], "color": "rgba(0,255,136,0.08)"}, {"range": [70, 100], "color": "rgba(0,255,136,0.15)"}], "threshold": {"line": {"color": gauge_color, "width": 3}, "thickness": 0.8, "value": score}},
+                delta={"reference": 50, "increasing": {"color": "#00ff88"}, "decreasing": {"color": "#ff2a6d"}, "font": {"size": 12}}
+            ))
+            fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={"color": "#8899bb"}, height=300, margin=dict(l=20, r=20, t=60, b=20))
+            st.plotly_chart(fig_gauge, width='stretch')
+            if st.button(t['refresh'], width='stretch'): st.cache_data.clear(); st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+        
+        with col_a:
+            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-family:Orbitron;font-size:13px;color:#00d4ff;letter-spacing:2px;margin-bottom:10px;'>{t['ai_analysis']}</p>", unsafe_allow_html=True)
+            for r in reasons: st.markdown(f"<p style='font-family:Share Tech Mono;font-size:10px;color:#8899bb;margin:3px 0;'>[ {r} ]</p>", unsafe_allow_html=True)
+            if st.button(t['generate_ai'], width='stretch'):
+                with st.spinner("AEROVULPIS ENGINE PROCESSING..."):
+                    ai_anal = get_deep_analysis(asset_name, market, df, signal, reasons)
+                    st.info(ai_anal)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+# ==============================================================================
+# 3. SIGNAL ANALYSIS (PREMIUM)
+# ==============================================================================
+elif menu_selection == "Signal Analysis" or menu_selection == "Signal Analysis (Premium)":
+    market = get_market_data(ticker_input)
+    df = get_historical_data(ticker_input, period, interval)
+    
+    if not df.empty:
+        if selected_tf_display in ["3H", "4H"]:
+            rule = "3h" if selected_tf_display == "3H" else "4h"
+            df = df.resample(rule).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+        
+        df = add_technical_indicators(df)
+        latest = df.iloc[-1]
+        score, signal, reasons, bull, bear, neut = get_weighted_signal(df)
+        
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+        sig_color = "#00ff88" if "BUY" in signal else "#ff2a6d" if "SELL" in signal else "#ffcc00"
+        st.markdown(f"<p style='font-family:Orbitron;font-size:16px;color:#8899bb;letter-spacing:2px;'>{t['recommendation']}: <span style='color:{sig_color};'>{signal}</span></p>", unsafe_allow_html=True)
+        
+        c1, c2, c3 = st.columns(3)
+        c1.markdown(f'<div style="text-align:center;background:rgba(0,255,136,0.04);padding:12px;border-radius:4px;border:1px solid rgba(0,255,136,0.15);"><p style="color:#00ff88;font-size:10px;margin:0;letter-spacing:2px;">BULLISH</p><p style="font-family:Orbitron;font-size:26px;margin:0;color:#00ff88;">{bull}</p></div>', unsafe_allow_html=True)
+        c2.markdown(f'<div style="text-align:center;background:rgba(255,42,109,0.04);padding:12px;border-radius:4px;border:1px solid rgba(255,42,109,0.15);"><p style="color:#ff2a6d;font-size:10px;margin:0;letter-spacing:2px;">BEARISH</p><p style="font-family:Orbitron;font-size:26px;margin:0;color:#ff2a6d;">{bear}</p></div>', unsafe_allow_html=True)
+        c3.markdown(f'<div style="text-align:center;background:rgba(255,204,0,0.04);padding:12px;border-radius:4px;border:1px solid rgba(255,204,0,0.15);"><p style="color:#ffcc00;font-size:10px;margin:0;letter-spacing:2px;">NEUTRAL</p><p style="font-family:Orbitron;font-size:26px;margin:0;color:#ffcc00;">{neut}</p></div>', unsafe_allow_html=True)
+        
+        st.markdown('<div class="indicator-grid">', unsafe_allow_html=True)
+        indicators_data = [
+            ("RSI (14)", f"{latest.get('RSI',0):.2f}", "BULLISH" if latest.get('RSI',0)<30 else "BEARISH" if latest.get('RSI',0)>70 else "NEUTRAL"),
+            ("MACD", f"{latest.get('MACD',0):.4f}", "BULLISH" if latest.get('MACD',0)>latest.get('Signal_Line',0) else "BEARISH"),
+            ("SMA 50", f"{latest.get('SMA50',0):.4f}".rstrip('0').rstrip('.'), "BULLISH" if latest.get('Close',0)>latest.get('SMA50',0) else "BEARISH"),
+            ("SMA 200", f"{latest.get('SMA200',0):.4f}".rstrip('0').rstrip('.'), "BULLISH" if latest.get('Close',0)>latest.get('SMA200',0) else "BEARISH"),
+            ("CCI (20)", f"{latest.get('CCI',0):.2f}", "BULLISH" if latest.get('CCI',0)<-100 else "BEARISH" if latest.get('CCI',0)>100 else "NEUTRAL"),
+            ("WILLIAMS %R", f"{latest.get('WPR',0):.2f}", "BULLISH" if latest.get('WPR',0)<-80 else "BEARISH" if latest.get('WPR',0)>-20 else "NEUTRAL"),
+            ("MFI (14)", f"{latest.get('MFI',0):.2f}", "BULLISH" if latest.get('MFI',0)<20 else "BEARISH" if latest.get('MFI',0)>80 else "NEUTRAL"),
+            ("EMA 9/21", "CROSS", "BULLISH" if latest.get('EMA9',0)>latest.get('EMA21',0) else "BEARISH"),
+            ("ADX (14)", f"{latest.get('ADX',0):.2f}", "STRONG" if latest.get('ADX',0)>25 else "WEAK"),
+            ("STOCH K", f"{latest.get('Stoch_K',0):.2f}", "BULLISH" if latest.get('Stoch_K',0)<20 else "BEARISH" if latest.get('Stoch_K',0)>80 else "NEUTRAL"),
+            ("ATR (14)", f"{latest.get('ATR',0):.4f}", "HIGH" if latest.get('ATR',0)>df['ATR'].mean() else "LOW"),
+            ("ROC (12)", f"{latest.get('ROC',0):.2f}", "BULLISH" if latest.get('ROC',0)>0 else "BEARISH"),
+            ("TRIX (15)", f"{latest.get('TRIX',0):.4f}", "BULLISH" if latest.get('TRIX',0)>0 else "BEARISH"),
+            ("AO (5/34)", f"{latest.get('AO',0):.4f}", "BULLISH" if latest.get('AO',0)>0 else "BEARISH"),
+            ("KAMA (10)", f"{latest.get('KAMA',0):.2f}", "BULLISH" if latest.get('Close',0)>latest.get('KAMA',0) else "BEARISH"),
+            ("ICHIMOKU A", f"{latest.get('Ichimoku_A',0):.2f}", "BULLISH" if latest.get('Close',0)>latest.get('Ichimoku_A',0) else "BEARISH"),
+            ("ICHIMOKU B", f"{latest.get('Ichimoku_B',0):.2f}", "BULLISH" if latest.get('Close',0)>latest.get('Ichimoku_B',0) else "BEARISH"),
+            ("PARABOLIC SAR", f"{latest.get('Parabolic_SAR',0):.2f}", "BULLISH" if latest.get('Close',0)>latest.get('Parabolic_SAR',0) else "BEARISH"),
+            ("BB UPPER", f"{latest.get('BB_Upper',0):.2f}", "OVERBOUGHT" if latest.get('Close',0)>latest.get('BB_Upper',0) else "NORMAL"),
+            ("BB LOWER", f"{latest.get('BB_Lower',0):.2f}", "OVERSOLD" if latest.get('Close',0)<latest.get('BB_Lower',0) else "NORMAL")
+        ]
+        for name, val, sig in indicators_data:
+            if "BULLISH" in sig or "STRONG" in sig or "OVERSOLD" in sig: sig_col = "#00ff88"
+            elif "BEARISH" in sig or "OVERBOUGHT" in sig: sig_col = "#ff2a6d"
+            else: sig_col = "#ffcc00"
+            st.markdown(f'<div class="indicator-box"><div class="indicator-name">{name}</div><div class="indicator-value">{val}</div><div class="indicator-signal" style="color:{sig_col};">{sig}</div></div>', unsafe_allow_html=True)
+        st.markdown('</div></div>', unsafe_allow_html=True)
+
+# ==============================================================================
+# 4. MARKET SESSIONS (PREMIUM)
+# ==============================================================================
+elif menu_selection == "Market Sessions" or menu_selection == "Market Sessions (Premium)":
+    market_session_status()
+
+# ==============================================================================
+# 5. MARKET NEWS (PREMIUM)
+# ==============================================================================
+elif menu_selection == "Market News" or menu_selection == "Market News (Premium)":
+    st.markdown(f'<h2 style="font-family:Orbitron;font-size:22px;color:#00d4ff;letter-spacing:3px;margin-bottom:5px;">{t["market_news"]}</h2>', unsafe_allow_html=True)
+    st.markdown(f'<p style="font-family:Share Tech Mono;font-size:9px;color:#557799;margin-bottom:15px;">{t["news_updated"]}</p>', unsafe_allow_html=True)
+    
+    news_categories = ["General", "Stock", "Geopolitics", "Gold & Silver", "Forex"]
+    selected_news_cat = st.segmented_control(t['news_filter'], news_categories, default="General")
+    
+    col_refresh, col_empty = st.columns([1, 3])
+    with col_refresh:
+        if st.button(t['force_refresh'], width='stretch', key="force_news_refresh"):
+            if "last_news_fetch" in st.session_state: st.session_state.last_news_fetch = {}
+            st.cache_data.clear()
+            st.rerun()
+    
+    articles, error = get_news_data(selected_news_cat, 10)
+    if error and not articles: st.error(error)
+    elif articles:
+        for a in articles:
+            st.markdown(f"""
+            <div class="news-card">
+                <p style="font-family:Orbitron;font-size:13px;color:#00d4ff;margin:0 0 5px;letter-spacing:1px;">{a.get('title','NO TITLE')}</p>
+                <p style="font-family:Share Tech Mono;font-size:9px;color:#557799;margin:0 0 8px;">{a.get('source','')} | {a.get('publishedAt','')}</p>
+                <p style="font-family:Rajdhani;font-size:11px;color:#8899bb;line-height:1.5;">{a.get('description','')[:300]}{'...' if len(a.get('description',''))>300 else ''}</p>
+                <a href="{a.get('url','#')}" target="_blank" style="font-family:Share Tech Mono;font-size:9px;color:#00ff88;text-decoration:none;letter-spacing:1px;">[ ACCESS SOURCE ]</a>
+            </div>
+            """, unsafe_allow_html=True)
+    else: st.info(t['no_news'])
+
+# ==============================================================================
+# 6. SMART ALERT CENTER (PREMIUM)
+# ==============================================================================
+elif menu_selection == "Smart Alert Center" or menu_selection == "Smart Alert Center (Premium)":
+    st.markdown(f"""
+    <div style="border:1px solid rgba(0,212,255,0.25);border-radius:6px;padding:28px;background:rgba(0,15,30,0.5);box-shadow:0 0 30px rgba(0,212,255,0.06);margin-bottom:20px;">
+        <div style="text-align:center;margin-bottom:22px;">
+            <p class="cyber-glow-text" style="font-size:24px;margin:0;letter-spacing:4px;">{t['alert_title']}</p>
+            <p class="cyber-glow-text" style="font-size:15px;margin:6px 0;letter-spacing:3px;">{t['alert_subtitle']}</p>
+            <div style="display:flex;justify-content:center;gap:24px;margin-top:12px;">
+                <span style="font-family:Share Tech Mono;font-size:10px;color:#00ff88;text-shadow:0 0 8px rgba(0,255,136,0.5);">{t['alert_online']}</span>
+                <span style="font-family:Share Tech Mono;font-size:10px;color:#00d4ff;text-shadow:0 0 8px rgba(0,212,255,0.5);">{t['alert_sync']}</span>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    smart_alert_widget()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ==============================================================================
+# 7. RISK MANAGEMENT (PREMIUM)
+# ==============================================================================
+elif menu_selection == "Risk Management" or menu_selection == "Risk Management (Premium)":
+    st.markdown(f"""
+    <div class="risk-cyber-container">
+        <h2 class="risk-hud-title">RISK FRAMEWORK v3.5</h2>
+        <p class="risk-hud-subtitle">QUANTUM POSITION SIZING &middot; HOLOGRAPHIC PROJECTION &middot; NEURAL RISK ENGINE</p>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:12px 0;">
+        <div style="background:rgba(0,20,50,0.5);border:1px solid rgba(0,212,255,0.12);border-radius:3px;padding:10px 4px;text-align:center;">
+            <div style="font-size:14px;color:#00d4ff;margin-bottom:3px;">&#9650;</div>
+            <p style="font-family:Orbitron;font-size:5px;font-weight:700;color:#00d4ff;letter-spacing:1px;margin:0 0 1px;">TRADING RULES</p>
+            <p style="font-family:Share Tech Mono;font-size:4px;color:#557799;margin:0;">SL DEFINITION MATRIX</p>
+        </div>
+        <div style="background:rgba(0,20,50,0.5);border:1px solid rgba(0,255,136,0.12);border-radius:3px;padding:10px 4px;text-align:center;">
+            <div style="font-size:14px;color:#00ff88;margin-bottom:3px;">&#9632;</div>
+            <p style="font-family:Orbitron;font-size:5px;font-weight:700;color:#00ff88;letter-spacing:1px;margin:0 0 1px;">POSITION SIZE</p>
+            <p style="font-family:Share Tech Mono;font-size:4px;color:#557799;margin:0;">QUANTUM SCALE LOGIC</p>
+        </div>
+        <div style="background:rgba(0,20,50,0.5);border:1px solid rgba(188,19,254,0.12);border-radius:3px;padding:10px 4px;text-align:center;">
+            <div style="font-size:14px;color:#bc13fe;margin-bottom:3px;">&#9670;</div>
+            <p style="font-family:Orbitron;font-size:5px;font-weight:700;color:#bc13fe;letter-spacing:1px;margin:0 0 1px;">CONFIDENCE</p>
+            <p style="font-family:Share Tech Mono;font-size:4px;color:#557799;margin:0;">NEURAL REAL-TIME</p>
+        </div>
+        <div style="background:rgba(0,20,50,0.5);border:1px solid rgba(255,42,109,0.12);border-radius:3px;padding:10px 4px;text-align:center;">
+            <div style="font-size:14px;color:#ff2a6d;margin-bottom:3px;">&#9881;</div>
+            <p style="font-family:Orbitron;font-size:5px;font-weight:700;color:#ff2a6d;letter-spacing:1px;margin:0 0 1px;">RISK MGMT</p>
+            <p style="font-family:Share Tech Mono;font-size:4px;color:#557799;margin:0;">TACTICAL PROTOCOL</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="risk-neon-divider"></div>', unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        st.markdown(f'<p class="section-title" style="margin-top:0;font-size:10px;">{t["funding_details"]}</p>', unsafe_allow_html=True)
+        st.markdown('<div class="risk-input-card" style="padding:10px;">', unsafe_allow_html=True)
+        balance = st.number_input("bal", value=1000.0, step=100.0, min_value=100.0, key="sim_balance", label_visibility="collapsed")
+        st.markdown(f'<p style="font-family:Share Tech Mono;font-size:18px;color:#00ff88;text-shadow:0 0 10px rgba(0,255,136,0.4);margin:0;text-align:center;">${balance:,.2f}</p>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(f'<p class="section-title" style="margin-top:0;font-size:10px;">{t["rr_simulator"]}</p>', unsafe_allow_html=True)
+        st.markdown('<div class="risk-input-card" style="padding:10px;">', unsafe_allow_html=True)
+        rr_ratios = {"1:2": 2.0, "1:3": 3.0, "1:4": 4.0, "2:3": 1.5, "2:4": 2.0}
+        selected_rr = st.selectbox("rr", list(rr_ratios.keys()), key="rr_radio", label_visibility="collapsed")
+        st.markdown(f'<p style="font-family:Share Tech Mono;font-size:18px;color:#00d4ff;text-align:center;margin:0;">{selected_rr}</p>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown('<p class="section-title" style="margin-top:0;font-size:10px;">WINS / LOSSES</p>', unsafe_allow_html=True)
+        st.markdown('<div class="risk-input-card" style="padding:6px;">', unsafe_allow_html=True)
+        w1, w2 = st.columns(2)
+        with w1:
+            st.markdown('<p style="font-family:Orbitron;font-size:6px;color:#00ff88;text-align:center;margin:0;">WINS</p>', unsafe_allow_html=True)
+            wins = st.number_input("w", min_value=0, value=3, step=1, key="wins", label_visibility="collapsed")
+        with w2:
+            st.markdown('<p style="font-family:Orbitron;font-size:6px;color:#ff2a6d;text-align:center;margin:0;">LOSS</p>', unsafe_allow_html=True)
+            losses = st.number_input("l", min_value=0, value=2, step=1, key="losses", label_visibility="collapsed")
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<p class="section-title" style="font-size:10px;">{t["daily_risk"]}</p>', unsafe_allow_html=True)
+    d1, d2, d3 = st.columns([1, 1, 2])
+    with d1:
+        st.markdown('<div class="risk-input-card" style="padding:8px;border-color:rgba(255,42,109,0.3);">', unsafe_allow_html=True)
+        st.markdown('<p style="font-family:Orbitron;font-size:6px;color:#ff2a6d;text-align:center;margin:0 0 3px;">MAX LOSS %</p>', unsafe_allow_html=True)
+        max_loss = st.number_input("ml", 1.0, 100.0, 5.0, 1.0, key="maxl", label_visibility="collapsed")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with d2:
+        st.markdown('<div class="risk-input-card" style="padding:8px;border-color:rgba(0,255,136,0.3);">', unsafe_allow_html=True)
+        st.markdown('<p style="font-family:Orbitron;font-size:6px;color:#00ff88;text-align:center;margin:0 0 3px;">MAX PROFIT %</p>', unsafe_allow_html=True)
+        max_profit = st.number_input("mp", 1.0, 200.0, 10.0, 1.0, key="maxp", label_visibility="collapsed")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with d3:
+        st.markdown('<div class="risk-simulate-btn" style="margin-top:12px;">', unsafe_allow_html=True)
+        simulate_clicked = st.button(t['risk_simulate'], width='stretch', type="primary", key="risk_sim_btn")
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    risk_pct = 1.0
+    
+    if simulate_clicked:
+        ra = balance * (risk_pct / 100)
+        rw = ra * rr_ratios[selected_rr]
+        wn = (wins * rw) - (losses * ra)
+        wr = (wn / balance) * 100 if balance > 0 else 0
+        mr = wr * 4
+        yr = wr * 52
+        fbw = balance + wn
+        fbm = balance + (wn * 4)
+        fby = balance + (wn * 52)
+        mla = balance * (max_loss / 100)
+        mpa = balance * (max_profit / 100)
+        
+        st.markdown('<div class="risk-neon-divider"></div>', unsafe_allow_html=True)
+        st.markdown(f'<p style="font-family:Orbitron;font-size:12px;color:#00d4ff;text-align:center;letter-spacing:3px;margin:0 0 10px;">{t["projection_title"]}</p>', unsafe_allow_html=True)
+        
+        periods = [(t['risk_weekly'], wn, wr, fbw), (t['risk_monthly'], wn * 4, mr, fbm), (t['risk_yearly'], wn * 52, yr, fby)]
+        cols = st.columns(3)
+        for i, (pn, net, ret, fbal) in enumerate(periods):
+            with cols[i]:
+                nc = "#00ff88" if net >= 0 else "#ff2a6d"
+                rc = "#00ff88" if ret >= 0 else "#ff2a6d"
+                st.markdown(f"""
+                <div class="risk-projection-card" style="padding:12px;">
+                    <p style="font-family:Orbitron;font-size:9px;color:#00d4ff;text-align:center;letter-spacing:2px;margin:0 0 8px;">{pn}</p>
+                    <p style="font-family:Share Tech Mono;font-size:11px;color:{nc};text-align:center;margin:2px 0;">{t['risk_net']}: {net:+,.2f}</p>
+                    <p style="font-family:Share Tech Mono;font-size:11px;color:{rc};text-align:center;margin:2px 0;">{t['risk_return']}: {ret:+.1f}%</p>
+                    <p style="font-family:Share Tech Mono;font-size:11px;color:#00d4ff;text-align:center;margin:2px 0;">{t['risk_balance']}: {fbal:,.2f}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        st.markdown(f'<p style="font-family:Orbitron;font-size:10px;color:#ff2a6d;text-align:center;letter-spacing:2px;margin:10px 0 5px;">{t["risk_params"]}</p>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:6px 0;">
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_per_trade']}</div><div class="risk-matrix-value" style="color:#ff2a6d;font-size:11px;">{ra:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_reward_trade']}</div><div class="risk-matrix-value" style="color:#00ff88;font-size:11px;">{rw:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_max_loss']}</div><div class="risk-matrix-value" style="color:#ff2a6d;font-size:11px;">-{mla:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_max_profit']}</div><div class="risk-matrix-value" style="color:#00ff88;font-size:11px;">+{mpa:,.2f}</div></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f'<p style="font-family:Orbitron;font-size:10px;color:#00d4ff;text-align:center;letter-spacing:2px;margin:10px 0 5px;">{t["risk_summary"]}</p>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:6px 0;">
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_initial']}</div><div class="risk-matrix-value" style="font-size:11px;">{balance:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_after']} 1W</div><div class="risk-matrix-value" style="font-size:11px;color:{'#00ff88' if fbw>=balance else '#ff2a6d'};">{fbw:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_after']} 1M</div><div class="risk-matrix-value" style="font-size:11px;color:{'#00ff88' if fbm>=balance else '#ff2a6d'};">{fbm:,.2f}</div></div>
+            <div class="risk-matrix-item"><div class="risk-matrix-label">{t['risk_after']} 1Y</div><div class="risk-matrix-value" style="font-size:11px;color:{'#00ff88' if fby>=balance else '#ff2a6d'};">{fby:,.2f}</div></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f'<p class="risk-data-stream">SYS.TIMESTAMP: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} &middot; ENCRYPTION: AES-256 &middot; NODE: AEROVULPIS-PRIME</p>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ==============================================================================
+# 8. ECONOMIC RADAR (TERBUKA SEMUA TIER)
+# ==============================================================================
+elif menu_selection == "Economic Radar":
+    economic_calendar_widget()
+    st.markdown(f"""
+    <div style="text-align:center;padding:12px;margin-top:8px;background:rgba(0,20,40,0.5);border:1px solid rgba(0,212,255,0.15);border-radius:4px;">
+        <p class="cyber-glow-text" style="font-size:13px;margin:0;letter-spacing:3px;">{t['economic_title']}</p>
+        <p style="font-family:Share Tech Mono;font-size:9px;color:#557799;margin:4px 0 0;">{t['economic_subtitle']}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ==============================================================================
+# 9. CHATBOT AI (TERBUKA SEMUA TIER)
+# ==============================================================================
+elif menu_selection == "Chatbot AI":
+    st.markdown(f'<h2 style="font-family:Orbitron;font-size:20px;color:#00d4ff;letter-spacing:3px;">{t["chatbot_title"]}</h2>', unsafe_allow_html=True)
+    st.caption(f"AEROVULPIS ENGINE | {tier_names.get(st.session_state.user_tier,'FREE')} | {st.session_state.daily_chatbot_count}/{user_limits['chatbot_per_day']}")
+    
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]): st.markdown(message["content"])
+    
+    if prompt := st.chat_input("INPUT QUERY..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.markdown(prompt)
+        with st.chat_message("assistant"):
+            m_data = get_market_data(ticker_input)
+            context_str = f"INSTR: {ticker_display} | PRICE: {format_price_display(m_data['price'], asset_name) if m_data else 'N/A'}"
+            if st.session_state.get("active_alerts"): context_str += f" | ALERTS: {len(st.session_state.active_alerts)}"
+            response = get_groq_response(prompt, context_str)
+            st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
+# ==============================================================================
+# 10. TINGKATKAN LEVEL (UPGRADE PAGE) - QR DARI SECRETS & MODAL RAPIH
+# ==============================================================================
+elif menu_selection == "Tingkatkan Level":
+    if "show_payment_modal" not in st.session_state: st.session_state.show_payment_modal = False
+    if "selected_package" not in st.session_state: st.session_state.selected_package = None
+    if "selected_price" not in st.session_state: st.session_state.selected_price = ""
+    if "selected_duration" not in st.session_state: st.session_state.selected_duration = ""
+
+    st.markdown("""
+    <div class="upgrade-container">
+        <h2 class="upgrade-title">UPGRADE ACCESS</h2>
+        <p class="upgrade-subtitle">Select Your Plan · Unlock Full Potential · Professional Trading Terminal</p>
+    """, unsafe_allow_html=True)
+
+    packages = [
+        {"name": "TRIAL", "duration": "1 DAY", "price": "999", "price_label": "Rp999", "features": ["Full Access 24 Hours", "5 AI Analysis/Day", "20 Chatbot/Day"], "featured": False, "id": "trial"},
+        {"name": "WEEKLY", "duration": "7 DAYS", "price": "16,999", "price_label": "Rp16.999", "features": ["Full Access 7 Days", "20 AI Analysis/Day", "100 Chatbot/Day"], "featured": False, "id": "weekly"},
+        {"name": "MONTHLY", "duration": "30 DAYS", "price": "27,999", "price_label": "Rp27.999", "features": ["Full Access 30 Days", "50 AI Analysis/Day", "200 Chatbot/Day", "Smart Alert 24/7"], "featured": True, "id": "monthly"},
+        {"name": "6 MONTHS", "duration": "180 DAYS", "price": "96,000", "price_label": "Rp96.000", "features": ["Full Access 180 Days", "100 AI Analysis/Day", "500 Chatbot/Day", "Priority Alert"], "featured": False, "id": "six_months"},
+        {"name": "YEARLY", "duration": "365 DAYS", "price": "137,000", "price_label": "Rp137.000", "features": ["Full Access 365 Days", "Unlimited AI Analysis", "Unlimited Chatbot", "VIP Priority Support"], "featured": True, "id": "yearly"},
+    ]
+
+    # Build HTML cards
+    cards_html = '<div class="pricing-grid">'
+    for pkg in packages:
+        featured_class = "featured" if pkg["featured"] else ""
+        badge_html = '<div class="pricing-badge">BEST</div>' if pkg["featured"] else ""
+        features_html = "".join([f"<li>{f}</li>" for f in pkg["features"]])
+        cards_html += f"""
+        <div class="pricing-card {featured_class}">
+            {badge_html}
+            <p class="pricing-name">{pkg['name']}</p>
+            <p class="pricing-duration">{pkg['duration']}</p>
+            <p class="pricing-price"><span class="currency">Rp</span>{pkg['price']}</p>
+            <ul class="pricing-features">{features_html}</ul>
+        </div>
+        """
+    cards_html += '</div>'
+    st.markdown(cards_html, unsafe_allow_html=True)
+
+    cols = st.columns(5)
+    for i, pkg in enumerate(packages):
+        with cols[i]:
+            if st.button(f"SELECT {pkg['name']}", key=f"btn_{pkg['id']}_{i}", width='stretch'):
+                st.session_state.show_payment_modal = True
+                st.session_state.selected_package = pkg['name']
+                st.session_state.selected_price = pkg['price_label']
+                st.session_state.selected_duration = pkg['duration']
+                st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # MODAL PEMBAYARAN (MENGGUNAKAN QR DARI SECRETS)
+    if st.session_state.show_payment_modal:
+        user_id = st.session_state.get('user_id', 'GUEST')
+        user_name = st.session_state.get('user_name', 'USER')
+        pkg_name = st.session_state.selected_package
+        pkg_price = st.session_state.selected_price
+
+        # Ambil URL gambar QR dari secrets
+        qr_image_url = st.secrets.get("QRIS_IMAGE_URL", "")
+        if qr_image_url:
+            qr_img_html = f'<img src="{qr_image_url}" alt="QRIS Pembayaran" style="width:180px;height:180px;border-radius:4px;">'
+        else:
+            qr_img_html = '<div class="qr-container"><p style="color:black;padding:20px;">QR Code belum dikonfigurasi</p></div>'
+
+        # Teks untuk telegram
+        telegram_text = f"""Halo Admin, saya ingin membeli paket:
+
+· Paket: {pkg_name}
+· Harga: {pkg_price}
+· ID User: {user_id}
+· Nama: {user_name}
+
+Mohon diproses. Berikut bukti pembayaran (lampirkan gambar)."""
+
+        st.markdown(f"""
+        <div class="payment-modal-overlay" id="payment-modal">
+            <div class="payment-modal">
+                <span class="close-modal-btn" onclick="document.getElementById('payment-modal').style.display='none';">&times;</span>
+                <div class="dynamihatch-watermark">DYNAMIHATCH</div>
+                <p class="payment-modal-title">PAYMENT GATEWAY</p>
+                <p class="payment-modal-subtitle">Secure QRIS Transaction · Encrypted · Verified</p>
+                <div class="qr-container">{qr_img_html}</div>
+                <div class="payment-steps">
+                    <span>STEP 01</span> Klik tombol BAYAR VIA TELEGRAM di bawah<br>
+                    <span>STEP 02</span> Sampaikan pesan dengan format yang tersedia<br>
+                    <span>STEP 03</span> Lampirkan bukti pembayaran
+                </div>
+                <div class="payment-info-grid">
+                    <div class="payment-info-item"><div class="payment-info-label">Package</div><div class="payment-info-value">{pkg_name}</div></div>
+                    <div class="payment-info-item"><div class="payment-info-label">Amount</div><div class="payment-info-value">{pkg_price}</div></div>
+                    <div class="payment-info-item"><div class="payment-info-label">User ID</div><div class="payment-info-value">{user_id[:20] if user_id else 'GUEST'}...</div></div>
+                    <div class="payment-info-item"><div class="payment-info-label">Status</div><div class="payment-info-value" style="color:#ffcc00;">AWAITING PAYMENT</div></div>
+                </div>
+                <div style="text-align:left;background:rgba(0,20,40,0.5);padding:10px;border-radius:4px;margin:12px 0;font-family:Share Tech Mono;font-size:9px;color:#8899bb;white-space:pre-wrap;">{telegram_text}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            telegram_url = "https://t.me/WartaPrime"
+            st.markdown(f'<a href="{telegram_url}" target="_blank"><button style="width:100%;background:#0088cc;color:white;border:none;padding:10px;font-family:Orbitron;font-size:10px;letter-spacing:1px;">BAYAR VIA TELEGRAM</button></a>', unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"""
+            <button onclick="navigator.clipboard.writeText(`{telegram_text}`);" style="width:100%;background:rgba(0,212,255,0.2);border:1px solid #00d4ff;color:#00d4ff;padding:10px;font-family:Orbitron;font-size:10px;letter-spacing:1px;">COPY TEXT</button>
+            """, unsafe_allow_html=True)
+        with col3:
+            if st.button("TUTUP", key="close_payment_modal", width='stretch'):
+                st.session_state.show_payment_modal = False
+                st.rerun()
+
+        st.markdown("""
+        <div class="trust-badge-container">
+            <div class="trust-badge">PAYMENT PROCESSED BY <span class="highlight">DYNAMIHATCH</span></div>
+            <div class="trust-badge">SUPERVISED BY <span class="highlight">KOMDIGI</span> & <span class="highlight">BANK INDONESIA</span></div>
+            <div class="trust-badge">SECURED BY <span class="highlight">DANA PROTECTION</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# ==============================================================================
+# 11. SETTINGS (TERBUKA SEMUA TIER)
+# ==============================================================================
+elif menu_selection == "Settings":
+    st.markdown(f'<h2 style="font-family:Orbitron;font-size:20px;color:#00d4ff;letter-spacing:3px;">{t["settings_title"]}</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    
+    new_lang = st.selectbox(t['lang_select'], ["ID", "EN"], index=0 if st.session_state.lang == "ID" else 1)
+    if new_lang != st.session_state.lang:
+        st.session_state.lang = new_lang
+        st.rerun()
+    
+    if st.button(t['clear_cache'], width='stretch'):
+        st.cache_data.clear()
+        st.session_state.cached_analysis = {}
+        st.session_state.last_news_fetch = {}
+        st.success("SYSTEM CACHE CLEARED")
+        time.sleep(1)
+        st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ==============================================================================
+# 12. HELP & SUPPORT (TERBUKA SEMUA TIER)
+# ==============================================================================
+elif menu_selection == "Help & Support":
+    st.markdown(f'<h2 style="font-family:Orbitron;text-align:center;font-size:24px;color:#00d4ff;letter-spacing:4px;margin-bottom:24px;">{t["help_title"]}</h2>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="help-center-container">
+        <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);border-radius:6px;padding:18px;text-align:center;">
+            <p style="font-family:Orbitron;font-size:12px;color:#00d4ff;margin:0 0 8px;letter-spacing:2px;">BANTUAN & SUPPORT</p>
+            <p style="font-family:Share Tech Mono;font-size:11px;color:#8899bb;margin:0 0 12px;">Kendala pembayaran atau lisensi</p>
+            <a href="https://t.me/WartaPrime" target="_blank" style="text-decoration:none;">
+                <div style="background:linear-gradient(160deg,#001a33,#002850);border:1px solid rgba(0,212,255,0.35);border-radius:3px;padding:10px 16px;display:inline-block;">
+                    <span style="font-family:Orbitron;font-size:11px;color:#00d4ff;letter-spacing:2px;">@WartaPrime</span>
+                </div>
+            </a>
+        </div>
+        <div style="background:rgba(0,255,136,0.03);border:1px solid rgba(0,255,136,0.15);border-radius:6px;padding:18px;text-align:center;">
+            <p style="font-family:Orbitron;font-size:12px;color:#00ff88;margin:0 0 8px;letter-spacing:2px;">KOMUNITAS RESMI</p>
+            <p style="font-family:Share Tech Mono;font-size:11px;color:#8899bb;margin:0 0 12px;">Diskusi, sinyal, dan update</p>
+            <a href="https://t.me/+BARDIaUrXydkZDVl" target="_blank" style="text-decoration:none;">
+                <div style="background:linear-gradient(160deg,#001a33,#002850);border:1px solid rgba(0,255,136,0.3);border-radius:3px;padding:10px 16px;display:inline-block;">
+                    <span style="font-family:Orbitron;font-size:11px;color:#00ff88;letter-spacing:2px;">AeroVulpis Group</span>
+                </div>
+            </a>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("SENTINEL PRO INTELLIGENCE", expanded=True):
+        st.markdown("""
+        **Sentinel Pro** adalah dashboard analisis profesional yang didukung oleh sistem kecerdasan buatan AeroVulpis Sentinel Core.
+        **Kemampuan Utama:**
+        - Grafik real-time dengan berbagai pilihan jangka waktu
+        - Deep Analysis Pro menghasilkan laporan lengkap mencakup Level Support/Resistance, Wawasan Fundamental, dan Skenario Trading Bullish/Bearish
+        - Analisis struktur pasar untuk timing entry dan exit yang presisi
+        **Sumber Data:** Data harga diambil langsung dari penyedia data independen untuk akurasi tinggi pada Gold, Silver, Forex, dan Crypto.
+        **Cara Penggunaan:** Pilih instrumen dan jangka waktu dari sidebar, buka halaman Sentinel, klik "INITIATE DEEP ANALYSIS PRO".
+        """)
+    
+    with st.expander("LIVE DASHBOARD"):
+        st.markdown("""
+        **Live Dashboard** menyediakan pemantauan pasar real-time.
+        **Fitur:**
+        - Harga live dengan indikator sumber data (REAL-TIME / CACHE / LIVE)
+        - Cyber Gauge yang menunjukkan kekuatan teknikal dengan animasi
+        - Grafik harga interaktif dengan indikator moving average
+        - Analisis cepat dengan satu klik
+        **Catatan Penting:** Harga yang ditampilkan mungkin memiliki selisih dengan platform trading seperti MetaTrader 5 (MT5) akibat perbedaan sumber data, spread broker, dan waktu pembaruan. AeroVulpis menggunakan data dari penyedia independen dan tidak terhubung langsung ke broker manapun.
+        """)
+    
+    with st.expander("SIGNAL ANALYSIS"):
+        st.markdown("""
+        **Signal Analysis Matrix** menampilkan 20 indikator teknikal dalam format grid.
+        **Kategori Indikator:**
+        - **Trend:** SMA 50, SMA 200, EMA 9/21, Ichimoku, Parabolic SAR
+        - **Momentum:** RSI, MACD, Stochastic, CCI, Williams %R, MFI, ROC, TRIX, Awesome Oscillator
+        - **Volatilitas:** ATR, Bollinger Bands
+        - **Volume:** Volume SMA, Base Line
+        **Warna Sinyal:** Hijau = Bullish | Merah = Bearish | Kuning = Netral
+        """)
+    
+    with st.expander("MARKET SESSIONS & BERITA"):
+        st.markdown("""
+        **Monitor Sesi Pasar Global:**
+        - Tracking real-time sesi Asia (Tokyo), Eropa (London), dan Amerika (New York)
+        - Progress bar menunjukkan persentase sesi berjalan
+        - Deteksi Golden Hour (tumpang tindih London-New York)
+        - Rekomendasi strategi berdasarkan sesi aktif
+        **Agregator Berita:**
+        - Berita dari berbagai jaringan finansial global
+        - Filter kategori: General, Stock, Geopolitics, Gold & Silver, Forex
+        - Penyimpanan sementara dengan tombol refresh
+        - Tautan langsung ke sumber berita
+        """)
+    
+    with st.expander("SMART ALERT CENTER"):
+        st.markdown("""
+        **Sistem Pemantauan Harga Otomatis** dengan notifikasi Telegram.
+        **Cara Setup:**
+        1. Pilih instrumen dari dropdown
+        2. Tentukan harga target
+        3. Masukkan Chat ID Telegram (dapatkan dari @userinfobot)
+        4. Pilih kondisi: Bullish (harga naik) atau Bearish (harga turun)
+        5. Aktifkan sensor untuk pemantauan 24/7
+        **Fitur:**
+        - Pemantauan latar belakang 24/7 via Railway worker
+        - Notifikasi Telegram instan saat target tercapai
+        - Format harga otomatis menyesuaikan jenis instrumen
+        """)
+    
+    with st.expander("CHATBOT AI"):
+        st.markdown("""
+        **Asisten Cerdas** yang memahami konteks instrumen yang dipilih dan harga live.
+        **Kemampuan:**
+        - Analisis teknikal dan interpretasi indikator
+        - Rekomendasi level Entry, Stop Loss, dan Take Profit
+        - Diskusi strategi trading
+        **Batas Harian per Level:**
+        - GRATIS: 20 pesan/hari
+        - TRIAL: 50 pesan/hari
+        - MINGGUAN: 100 pesan/hari
+        - BULANAN: 200 pesan/hari
+        - 6 BULAN: 500 pesan/hari
+        - TAHUNAN: Tidak Terbatas
+        """)
+    
+    with st.expander("ECONOMIC RADAR"):
+        st.markdown("""
+        **Pemindai Ekonomi Global** memantau peristiwa ekonomi berdampak tinggi.
+        **Fitur:**
+        - Kalender ekonomi live dengan cakupan global
+        - Deteksi peristiwa berdampak tinggi
+        - Filter berdasarkan mata uang: USD, EUR, GBP, JPY, AUD, CAD, CHF, NZD
+        **Peristiwa yang Dimonitor:** Suku Bunga Bank Sentral, NFP, CPI, GDP, PMI, Consumer Confidence
+        """)
+    
+    with st.expander("RISK MANAGEMENT"):
+        st.markdown("""
+        **Sistem Manajemen Risiko Empat Pilar:**
+        1. **Aturan Trading** - Tentukan stop loss dan parameter entry
+        2. **Ukuran Posisi** - Hitung ukuran posisi optimal berdasarkan saldo
+        3. **Skor Keyakinan** - Penilaian kekuatan teknikal real-time
+        4. **Strategi Risiko** - Batas kerugian harian dan target profit
+        **Simulator Return:** Rasio Risk-Reward, simulasi mingguan, proyeksi Bulanan/Tahunan.
+        """)
+    
+    with st.expander("TINGKATKAN LEVEL"):
+        st.markdown("""
+        **Upgrade Akses Anda:**
+        - Pilih paket yang sesuai dengan kebutuhan trading Anda
+        - Pembayaran mudah via Telegram, cukup kirim pesan format yang disediakan
+        - Aktivasi instan setelah verifikasi pembayaran
+        **Paket Tersedia:**
+        - **TRIAL** (1 Hari): Rp999 — Uji coba terjangkau
+        - **WEEKLY** (7 Hari): Rp16.999 — Akses singkat
+        - **MONTHLY** (30 Hari): Rp27.999 — Best seller
+        - **6 MONTHS** (180 Hari): Rp96.000 — Best value
+        - **YEARLY** (365 Hari): Rp137.000 — Ultimate
+        """)
+    
+    with st.expander("AKTIVASI LISENSI & LEVEL"):
+        st.markdown("""
+        **Sistem Manajemen Lisensi**
+        **Cara Masuk:** Masukkan email dan password di sidebar -> klik "ACCESS TERMINAL" untuk login, atau "REGISTER NEW IDENTITY" untuk daftar.
+        **Aktivasi Lisensi:**
+        1. Setelah masuk, klik "ACTIVATE LICENSE KEY"
+        2. Masukkan kunci lisensi (format: XXXX-XXXX-XXXX-XXXX)
+        3. Klik "VALIDATE & ACTIVATE"
+        **Level & Batas Harian:**
+        - **GRATIS:** 5 analisis AI/hari, 20 chat/hari
+        - **TRIAL (1 hari):** 10 analisis/hari, 50 chat/hari
+        - **MINGGUAN:** 20 analisis/hari, 100 chat/hari
+        - **BULANAN:** 50 analisis/hari, 200 chat/hari
+        - **6 BULAN:** 100 analisis/hari, 500 chat/hari
+        - **TAHUNAN:** Tak terbatas
+        """)
+    
+    st.info("PENGATURAN: Ganti bahasa (ID/EN) di halaman Settings. Gunakan tombol Clear Cache jika data terasa lambat.")
+
+# ##############################################################################
+# FOOTER
+# ##############################################################################
+st.markdown("---")
+st.markdown("""
+<div style="text-align:center;padding:25px;opacity:0.55;">
+    <p style="font-family:Share Tech Mono;font-size:14px;color:#556680;margin:0;letter-spacing:2px;">
+        "DISCIPLINE IS THE KEY | EMOTION IS THE ENEMY | TRUST THE SYSTEM"
+    </p>
+    <p style="font-family:Orbitron;font-size:11px;color:#00ff88;margin:8px 0;letter-spacing:3px;">
+        FAHMI — AEROVULPIS ARCHITECT
+    </p>
+    <p style="font-family:Share Tech Mono;font-size:8px;color:#334455;letter-spacing:2px;margin-top:6px;">
+        DYNAMIHATCH IDENTITY | V3.5 ULTIMATE | 2026
+    </p>
+</div>
+""", unsafe_allow_html=True)

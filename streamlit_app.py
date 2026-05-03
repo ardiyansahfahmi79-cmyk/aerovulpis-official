@@ -1091,3 +1091,298 @@ def check_smart_alerts():
                     st.toast(f"TARGET ACQUIRED: {inst_name} @ {formatted_target}", icon="!")
                 except Exception:
                     pass
+# ##############################################################################
+# CSS STYLES & HEADER UI
+# ##############################################################################
+
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
+    :root {
+        --neon-cyan: #00d4ff; --neon-green: #00ff88; --neon-red: #ff2a6d;
+        --deep-blue: #0055ff; --dark-bg: #020408; --card-bg: rgba(10, 14, 23, 0.85);
+        --glass-border: rgba(0, 212, 255, 0.12); --text-primary: #dce4f0;
+        --text-secondary: #8899bb; --text-muted: #556680;
+    }
+    * { font-family: 'Rajdhani', sans-serif; }
+    .stApp { background: radial-gradient(ellipse at 15% 45%, #0a1a30 0%, #030810 35%, #010408 100%); color: var(--text-primary); }
+    .glass-card { background: var(--card-bg); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid var(--glass-border); border-radius: 6px; padding: 20px; box-shadow: 0 4px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.02); margin-bottom: 6px; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .glass-card:hover { border-color: rgba(0,212,255,0.25); box-shadow: 0 6px 36px rgba(0,0,0,0.7), 0 0 16px rgba(0,212,255,0.04); }
+    .session-container { border: 1px solid rgba(0,212,255,0.2); border-radius: 6px; padding: 28px; background: rgba(0,18,36,0.55); box-shadow: 0 0 48px rgba(0,212,255,0.05); margin-bottom: 24px; }
+    .news-card { background: rgba(0,212,255,0.015); border: 1px solid rgba(0,212,255,0.06); padding: 20px; border-radius: 4px; margin-bottom: 10px; transition: all 0.35s cubic-bezier(0.4,0,0.2,1); position: relative; overflow: hidden; }
+    .news-card::before { content: ''; position: absolute; top: 0; left: 0; width: 2px; height: 100%; background: linear-gradient(180deg, var(--neon-cyan) 0%, transparent 100%); opacity: 0.4; }
+    .news-card:hover { background: rgba(0,212,255,0.03); border-color: rgba(0,212,255,0.2); box-shadow: 0 0 20px rgba(0,212,255,0.04); transform: translateX(2px); }
+    .main-title-container { text-align: center; margin-bottom: 0; padding-bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .main-logo-container { position: relative; display: inline-block; animation: floatLogo 5s infinite ease-in-out; padding: 6px 0; margin-bottom: -16px; background: transparent !important; perspective: 1200px; overflow: visible !important; }
+    .custom-logo { width: 88px; filter: drop-shadow(0 0 22px rgba(0,212,255,0.45)); background-color: transparent !important; animation: rotateLogo3D 15s infinite linear; transform-style: preserve-3d; position: relative; z-index: 2; }
+    @keyframes floatLogo { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-7px); } }
+    @keyframes rotateLogo3D { 0% { transform: rotateY(0deg) rotateX(0deg); } 25% { transform: rotateY(90deg) rotateX(4deg); } 50% { transform: rotateY(180deg) rotateX(0deg); } 75% { transform: rotateY(270deg) rotateX(-4deg); } 100% { transform: rotateY(360deg) rotateX(0deg); } }
+    .main-title { font-family: 'Orbitron', sans-serif; font-size: 38px; font-weight: 800; background: linear-gradient(135deg, #00d4ff 0%, #00ff88 30%, #00d4ff 60%, #0055ff 100%); background-size: 300% 300%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: titleShimmer 6s ease infinite; margin: 0; padding: 0; letter-spacing: 10px; text-align: center; }
+    @keyframes titleShimmer { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+    .subtitle-text { text-align: center; color: #556680; font-family: 'Share Tech Mono', monospace; margin-top: -6px; padding: 0; font-size: 11px; letter-spacing: 5px; }
+    .stButton > button { background: linear-gradient(160deg, #001a33, #002850) !important; border: 1px solid rgba(0,212,255,0.35) !important; color: #00d4ff !important; font-family: 'Orbitron', sans-serif !important; font-weight: 600 !important; font-size: 11px !important; padding: 10px 20px !important; border-radius: 3px !important; letter-spacing: 2px !important; transition: all 0.3s ease !important; text-transform: uppercase; }
+    .stButton > button:hover { background: linear-gradient(160deg, #002850, #003870) !important; border-color: #00d4ff !important; box-shadow: 0 0 28px rgba(0,212,255,0.25), 0 0 56px rgba(0,212,255,0.08) !important; color: #ffffff !important; transform: translateY(-1px); }
+    [data-testid="stSidebar"] { background: linear-gradient(180deg, rgba(6,10,18,0.99) 0%, rgba(2,5,10,0.99) 100%) !important; border-right: 1px solid rgba(0,212,255,0.1) !important; }
+    .sentinel-container { border: 1px solid rgba(0,212,255,0.25); border-radius: 6px; padding: 24px; background: rgba(0,12,28,0.6); box-shadow: 0 0 48px rgba(0,212,255,0.06); margin-bottom: 20px; }
+    .sentinel-title { font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 700; color: #00d4ff; text-shadow: 0 0 20px rgba(0,212,255,0.35); letter-spacing: 4px; margin: 0; }
+    .intelligence-panel { background: rgba(0,8,22,0.7); border: 1px solid rgba(0,212,255,0.1); border-radius: 4px; padding: 18px; height: 100%; }
+    .intel-header { font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 600; color: #00d4ff; margin-bottom: 12px; border-left: 2px solid #00d4ff; padding-left: 12px; letter-spacing: 3px; }
+    .status-badge { padding: 4px 14px; border-radius: 2px; font-size: 9px; font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 2px; }
+    .status-open { background: rgba(0,255,136,0.07); color: #00ff88; border: 1px solid rgba(0,255,136,0.25); }
+    .status-ai { background: rgba(0,212,255,0.07); color: #00d4ff; border: 1px solid rgba(0,212,255,0.25); }
+    .cyber-glow-text { font-family: 'Orbitron', sans-serif; color: #00d4ff; text-shadow: 0 0 10px rgba(0,212,255,0.55), 0 0 30px rgba(0,212,255,0.18); letter-spacing: 2px; }
+    .section-title { font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 600; color: #7788aa; letter-spacing: 3px; text-transform: uppercase; margin: 22px 0 8px 0; }
+    .sentinel-cyber-report { background: rgba(0,8,22,0.8); border-left: 3px solid #00d4ff; padding: 18px 20px; border-radius: 3px; margin: 12px 0; font-family: 'Share Tech Mono', monospace; font-size: 11px; color: #8899bb; line-height: 1.7; box-shadow: 0 0 20px rgba(0,212,255,0.06); position: relative; overflow: hidden; }
+    .indicator-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 7px; margin-top: 14px; }
+    .indicator-box { background: rgba(0,28,56,0.35); border: 1px solid rgba(0,212,255,0.08); border-radius: 3px; padding: 14px; text-align: center; transition: all 0.3s ease; }
+    .indicator-name { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: #6688aa; margin-bottom: 6px; letter-spacing: 1px; }
+    .indicator-value { font-family: 'Orbitron', sans-serif; font-size: 15px; color: #e0e6f0; font-weight: 600; }
+    .indicator-signal { font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 700; margin-top: 4px; letter-spacing: 1.5px; }
+    .digital-auth-container { background: rgba(0,15,30,0.7); border: 1px solid rgba(0,212,255,0.2); border-radius: 6px; padding: 20px; margin: 8px 0; text-align: center; position: relative; overflow: hidden; box-shadow: 0 0 24px rgba(0,212,255,0.05); }
+    .help-center-container { max-width: 700px; margin: 0 auto 24px auto; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .fintech-result-card { background: linear-gradient(160deg, rgba(0,18,38,0.9), rgba(0,8,24,0.95)); border: 1px solid rgba(0,212,255,0.18); border-radius: 4px; padding: 22px; margin: 10px 0; position: relative; overflow: hidden; }
+    .risk-metric { font-family: 'Orbitron', sans-serif; font-size: 14px; color: #00d4ff; text-align: center; letter-spacing: 1px; }
+    ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-track { background: #010408; } ::-webkit-scrollbar-thumb { background: #1a3350; border-radius: 2px; } ::-webkit-scrollbar-thumb:hover { background: #00d4ff; }
+    .risk-cyber-container { border: 1px solid rgba(0,212,255,0.25); border-radius: 8px; padding: 24px 20px; background: linear-gradient(160deg, rgba(0,12,32,0.95), rgba(0,4,16,0.98)); box-shadow: 0 0 60px rgba(0,212,255,0.06), inset 0 1px 0 rgba(0,212,255,0.04); margin-bottom: 20px; position: relative; overflow: hidden; }
+    .risk-cyber-container::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, #00d4ff, #00ff88, #bc13fe, transparent); animation: scanHorizontal 4s infinite; }
+    @keyframes scanHorizontal { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    .risk-hud-title { font-family: 'Orbitron', sans-serif; font-size: 22px; font-weight: 800; color: #00d4ff; text-align: center; letter-spacing: 6px; text-shadow: 0 0 35px rgba(0,212,255,0.5), 0 0 70px rgba(0,212,255,0.15); margin-bottom: 2px; }
+    .risk-hud-subtitle { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: #556680; text-align: center; letter-spacing: 4px; margin-bottom: 20px; text-transform: uppercase; }
+    .risk-neon-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(0,212,255,0.2), transparent); margin: 16px 0; }
+    .risk-input-card { background: rgba(0,22,55,0.6); border: 1px solid rgba(0,212,255,0.1); border-radius: 4px; padding: 12px; margin-bottom: 8px; backdrop-filter: blur(8px); }
+    .risk-matrix-item { background: rgba(0,25,60,0.5); border: 1px solid rgba(0,212,255,0.08); border-radius: 4px; padding: 10px 6px; text-align: center; transition: all 0.3s ease; }
+    .risk-matrix-item:hover { border-color: #00d4ff; box-shadow: 0 0 14px rgba(0,212,255,0.1); }
+    .risk-matrix-label { font-family: 'Orbitron', sans-serif; font-size: 6px; color: #557799; letter-spacing: 1.5px; margin-bottom: 4px; }
+    .risk-matrix-value { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #00d4ff; text-shadow: 0 0 8px rgba(0,212,255,0.3); }
+    .risk-simulate-btn button { background: linear-gradient(160deg, #002850, #004080) !important; border: 1px solid #00d4ff !important; color: #00d4ff !important; font-family: 'Orbitron', sans-serif !important; font-weight: 700 !important; font-size: 12px !important; letter-spacing: 4px !important; padding: 14px 24px !important; border-radius: 4px !important; text-shadow: 0 0 20px rgba(0,212,255,0.5) !important; animation: btnPulse 2s infinite; width: 100% !important; }
+    .risk-simulate-btn button:hover { background: linear-gradient(160deg, #003870, #0050a0) !important; box-shadow: 0 0 40px rgba(0,212,255,0.4), 0 0 80px rgba(0,212,255,0.1) !important; color: #ffffff !important; transform: scale(1.02); }
+    @keyframes btnPulse { 0%,100% { box-shadow: 0 0 20px rgba(0,212,255,0.2); } 50% { box-shadow: 0 0 40px rgba(0,212,255,0.4); } }
+    .risk-projection-card { background: linear-gradient(160deg, rgba(0,28,65,0.8), rgba(0,8,35,0.9)); border: 1px solid rgba(0,212,255,0.2); border-radius: 4px; padding: 14px; margin: 6px 0; position: relative; overflow: hidden; }
+    .risk-projection-card::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, #00ff88, transparent); }
+    .risk-projection-card.warning::after { background: linear-gradient(90deg, transparent, #ff2a6d, transparent); }
+    .risk-data-stream { font-family: 'Share Tech Mono', monospace; font-size: 7px; color: #3a5068; text-align: center; letter-spacing: 2px; margin-top: 14px; animation: dataStream 3s infinite; }
+    @keyframes dataStream { 0%,100% { opacity: 0.3; } 50% { opacity: 0.7; } }
+    .upgrade-container { max-width: 1000px; margin: 0 auto; padding: 20px 10px; }
+    .upgrade-title { font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 800; text-align: center; color: #00d4ff; text-shadow: 0 0 35px rgba(0,212,255,0.55), 0 0 70px rgba(0,212,255,0.15); letter-spacing: 6px; margin-bottom: 5px; }
+    .upgrade-subtitle { font-family: 'Share Tech Mono', monospace; font-size: 9px; text-align: center; color: #557799; letter-spacing: 4px; margin-bottom: 30px; text-transform: uppercase; }
+    .pricing-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .pricing-grid { grid-template-columns: repeat(2, 1fr); } }
+    .pricing-card { background: linear-gradient(160deg, rgba(0,15,38,0.9), rgba(0,4,12,0.97)); border: 1px solid rgba(0,212,255,0.15); border-radius: 6px; padding: 22px 12px; text-align: center; transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: relative; overflow: hidden; }
+    .pricing-card:hover { border-color: #00d4ff; box-shadow: 0 0 35px rgba(0,212,255,0.25), 0 0 70px rgba(0,212,255,0.08); transform: translateY(-4px); }
+    .pricing-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 1.5px; background: linear-gradient(90deg, transparent, rgba(0,212,255,0.5), transparent); animation: scanHorizontal 3s infinite; }
+    .pricing-card.featured { border-color: rgba(0,255,136,0.35); box-shadow: 0 0 30px rgba(0,255,136,0.1); }
+    .pricing-card.featured::before { background: linear-gradient(90deg, transparent, #00ff88, transparent); }
+    .pricing-badge { position: absolute; top: 10px; right: -28px; background: #00ff88; color: #000; font-family: 'Orbitron', sans-serif; font-size: 7px; font-weight: 800; letter-spacing: 2px; padding: 3px 30px; transform: rotate(45deg); text-transform: uppercase; }
+    .pricing-name { font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 700; color: #00d4ff; letter-spacing: 3px; margin-bottom: 4px; text-transform: uppercase; }
+    .pricing-duration { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: #557799; letter-spacing: 2px; margin-bottom: 14px; }
+    .pricing-price { font-family: 'Share Tech Mono', monospace; font-size: 26px; font-weight: 700; color: #ffffff; text-shadow: 0 0 20px rgba(0,212,255,0.3); margin-bottom: 14px; }
+    .pricing-price .currency { font-size: 13px; color: #6688aa; font-weight: 400; }
+    .pricing-features { list-style: none; padding: 0; margin: 0 0 16px 0; text-align: left; font-family: 'Rajdhani', sans-serif; font-size: 10px; color: #8899bb; }
+    .pricing-features li { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.02); }
+    .pricing-features li::before { content: "// "; color: #00d4ff; font-family: 'Share Tech Mono', monospace; font-size: 7px; }
+    .payment-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(12px); }
+    .payment-modal { background: linear-gradient(160deg, rgba(0,15,38,0.98), rgba(0,5,18,0.99)); border: 2px solid rgba(0,212,255,0.3); border-radius: 10px; padding: 20px 15px; max-width: 300px; width: 90%; text-align: center; position: relative; box-shadow: 0 0 100px rgba(0,212,255,0.15), 0 0 200px rgba(0,212,255,0.05); }
+    .payment-modal::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg, transparent, #00d4ff, #00ff88, #bc13fe, transparent); animation: scanHorizontal 4s infinite; }
+    .payment-modal-title { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 800; color: #00d4ff; letter-spacing: 4px; margin-bottom: 5px; }
+    .payment-modal-subtitle { font-family: 'Share Tech Mono', monospace; font-size: 7px; color: #557799; letter-spacing: 3px; margin-bottom: 15px; }
+    .close-modal-btn { position: absolute; top: 8px; right: 10px; background: none; border: none; font-size: 20px; color: #00d4ff; cursor: pointer; font-family: 'Orbitron', sans-serif; z-index: 10000; }
+    .close-modal-btn:hover { color: #ff2a6d; }
+    .qr-container { background: #ffffff; padding: 8px; border-radius: 6px; display: inline-block; margin-bottom: 12px; border: 2px solid rgba(0,212,255,0.3); box-shadow: 0 0 30px rgba(0,212,255,0.2); }
+    .payment-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 10px 0; text-align: left; }
+    .payment-info-item { background: rgba(0,20,50,0.5); border: 1px solid rgba(0,212,255,0.1); border-radius: 3px; padding: 6px 8px; }
+    .payment-info-label { font-family: 'Orbitron', sans-serif; font-size: 5px; color: #557799; letter-spacing: 1.5px; text-transform: uppercase; }
+    .payment-info-value { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: #00ff88; }
+    .trust-badge-container { display: flex; justify-content: center; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+    .trust-badge { background: rgba(0,212,255,0.04); border: 1px solid rgba(0,212,255,0.12); border-radius: 3px; padding: 4px 10px; font-family: 'Share Tech Mono', monospace; font-size: 6px; color: #6688aa; letter-spacing: 1px; }
+    .trust-badge .highlight { color: #00d4ff; font-weight: 700; }
+    .payment-steps { text-align: left; font-family: 'Rajdhani', sans-serif; font-size: 9px; color: #8899bb; margin: 8px 0; line-height: 1.6; }
+    .payment-steps span { color: #00d4ff; font-family: 'Orbitron', sans-serif; font-size: 7px; margin-right: 4px; }
+    .dynamihatch-watermark { font-family: 'Orbitron', sans-serif; font-size: 7px; color: rgba(255,255,255,0.03); position: absolute; bottom: 6px; right: 12px; letter-spacing: 2px; }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown(f"""
+<div class="main-title-container">
+    <div class="main-logo-container">
+        <img src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png" alt="AEROVULPIS" class="custom-logo">
+    </div>
+    <h1 class="main-title">AEROVULPIS</h1>
+    <p class="subtitle-text">V3.5 ULTIMATE</p>
+</div>
+""", unsafe_allow_html=True)
+# ##############################################################################
+# SIDEBAR CONTROL CENTER (FIXED - AUTH & DELETE)
+# ##############################################################################
+
+with st.sidebar:
+    st.markdown("""
+    <div style='text-align:center;margin-bottom:-10px;'>
+        <img src='https://files.manuscdn.com/user_upload_by_module/session_file/310519663520709901/oOIKIIkSvIdagiSw.png' style='width:48px;filter:drop-shadow(0 0 12px rgba(0,212,255,0.5));'>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown(f"<h2 style='font-family:Orbitron;text-align:center;font-size:16px;color:#00d4ff;letter-spacing:4px;margin-bottom:0;'>{t['control_center']}</h2>", unsafe_allow_html=True)
+
+    tier_colors = {"free": "#556680", "trial": "#00d4ff", "weekly": "#00ff88", "monthly": "#ffcc00", "six_months": "#ff8800", "yearly": "#ff2a6d"}
+    tier_names = {"free": "FREE", "trial": "TRIAL", "weekly": "WEEKLY", "monthly": "MONTHLY", "six_months": "6M PRO", "yearly": "ULTIMATE"}
+
+    if not st.session_state.auth_session:
+        st.markdown(f"""
+        <div style="text-align:center;padding:14px;margin:8px 0;background:rgba(0,15,30,0.5);border:1px solid rgba(0,212,255,0.1);border-radius:4px;">
+            <p style="font-family:Orbitron;font-size:10px;color:#00d4ff;margin-bottom:0;letter-spacing:2px;">{t['sign_in_prompt']}</p>
+            <p style="font-family:Share Tech Mono;font-size:9px;color:#557799;margin:2px 0 0 0;">{t['sign_in_desc']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="digital-auth-container">', unsafe_allow_html=True)
+        with st.form("email_password_login_form"):
+            st.markdown(f"""<p style="font-family:Orbitron;font-size:9px;color:#557799;letter-spacing:3px;margin:0 0 8px;">{t.get('login_title', 'AUTHENTICATION SYSTEM')}</p>""", unsafe_allow_html=True)
+
+            email_input = st.text_input(t.get('login_email', 'EMAIL'), placeholder="ENTER EMAIL ADDRESS", key="login_email", label_visibility="collapsed")
+            password_input = st.text_input(t.get('login_password', 'PASSWORD'), type="password", placeholder="ENTER PASSWORD", key="login_password", label_visibility="collapsed")
+
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                login_submitted = st.form_submit_button(t.get('login_btn', 'LOGIN'), width='stretch', type="primary")
+            with col_btn2:
+                signup_submitted = st.form_submit_button(t.get('signup_btn', 'REGISTER'), width='stretch', type="primary")
+
+            # LOGIN LOGIC
+            if login_submitted and email_input and password_input:
+                try:
+                    supabase_auth = get_supabase_client()
+                    resp = supabase_auth.auth.sign_in_with_password({"email": email_input.strip(), "password": password_input})
+                    if resp and resp.user:
+                        user = resp.user
+                        st.session_state.auth_session = resp.session.access_token if resp.session else "active"
+                        st.session_state.user_id = user.id
+                        st.session_state.user_name = user.user_metadata.get("full_name") or (user.email.split("@")[0] if user.email else "USER")
+                        st.session_state.user_email = user.email or ""
+                        st.session_state.user_avatar = user.user_metadata.get("avatar_url", "")
+                        st.session_state.user_tier, _ = get_user_tier(user.id)
+                        sync_user_to_supabase(user.id, user.email or "", st.session_state.user_name, st.session_state.user_avatar)
+                        send_log(f"LOGIN: {st.session_state.user_name} ({st.session_state.user_email})")
+                        st.rerun()
+                    else:
+                        st.error("INVALID EMAIL OR PASSWORD")
+                except Exception as e:
+                    error_msg = str(e)
+                    if "Email not confirmed" in error_msg or "email_not_confirmed" in error_msg.lower():
+                        st.error("EMAIL BELUM DIKONFIRMASI | SILAKAN CEK INBOX/SPAM ANDA DAN KLIK LINK KONFIRMASI SEBELUM LOGIN")
+                    elif "Invalid login credentials" in error_msg or "invalid_credentials" in error_msg.lower():
+                        st.error("EMAIL ATAU PASSWORD SALAH | GUNAKAN LUPA PASSWORD JIKA ANDA YAKIN EMAIL SUDAH BENAR ATAU REGISTER UNTUK MEMBUAT AKUN BARU")
+                    elif "User not found" in error_msg or "not_found" in error_msg.lower():
+                        st.error("EMAIL TIDAK TERDAFTAR | SILAKAN REGISTER AKUN BARU ATAU PERIKSA KEMBALI EMAIL ANDA")
+                    else:
+                        st.error(f"AUTH FAILED | {error_msg}")
+
+            # REGISTER LOGIC
+            if signup_submitted and email_input and password_input:
+                if len(password_input) < 6:
+                    st.error("PASSWORD MUST BE AT LEAST 6 CHARACTERS")
+                else:
+                    try:
+                        # CEK EMAIL TERLEBIH DAHULU MENGGUNAKAN ADMIN CLIENT
+                        admin_client = get_supabase_admin()
+                        try:
+                            user_check = admin_client.auth.admin.get_user_by_email(email_input.strip())
+                            if user_check and user_check.user:
+                                st.error("EMAIL SUDAH TERDAFTAR | SILAKAN LOGIN ATAU GUNAKAN FITUR LUPA PASSWORD")
+                                st.stop()
+                        except Exception as check_err:
+                            # Jika user tidak ditemukan, lanjutkan registrasi
+                            if "User not found" not in str(check_err) and "not_found" not in str(check_err).lower():
+                                raise check_err
+                        
+                        # LAKUKAN SIGN UP
+                        supabase_auth = get_supabase_client()
+                        resp = supabase_auth.auth.sign_up({
+                            "email": email_input.strip(),
+                            "password": password_input
+                        })
+                        
+                        if resp and resp.user:
+                            # LANGSUNG LOGIN SETELAH SIGN UP
+                            st.session_state.auth_session = "active"
+                            st.session_state.user_id = resp.user.id
+                            st.session_state.user_name = resp.user.user_metadata.get("full_name") or (email_input.split("@")[0] if email_input else "USER")
+                            st.session_state.user_email = resp.user.email or ""
+                            st.session_state.user_avatar = ""
+                            st.session_state.user_tier, _ = get_user_tier(resp.user.id)
+                            sync_user_to_supabase(resp.user.id, resp.user.email or "", st.session_state.user_name, "")
+                            send_log(f"REGISTER: {st.session_state.user_name} ({st.session_state.user_email})")
+                            st.rerun()
+                        else:
+                            st.error("REGISTRASI GAGAL | SILAKAN COBA LAGI")
+                    except Exception as e:
+                        err = str(e)
+                        if "already registered" in err.lower() or "already exists" in err.lower() or "User already registered" in err:
+                            st.error("EMAIL SUDAH TERDAFTAR | SILAKAN LOGIN ATAU GUNAKAN FITUR LUPA PASSWORD")
+                        elif "weak password" in err.lower() or "password" in err.lower():
+                            st.error("PASSWORD TERLALU LEMAH | GUNAKAN KOMBINASI HURUF BESAR, KECIL, ANGKA, DAN SIMBOL")
+                        else:
+                            st.error(f"REGISTRASI GAGAL | {err}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            if st.button("LUPA PASSWORD", key="forgot_password_btn", width='stretch'):
+                st.session_state.show_forgot_password = True
+        with col_f2:
+            if st.button("DELETE ACCOUNT", key="show_delete_account_btn", width='stretch'):
+                st.session_state.show_delete_account = True
+
+        if st.session_state.get("show_forgot_password", False):
+            with st.container():
+                reset_email = st.text_input("Email untuk reset password", key="reset_email", placeholder="Masukkan email terdaftar")
+                col_r1, col_r2 = st.columns(2)
+                with col_r1:
+                    if st.button("Kirim Link Reset", key="send_reset_btn", width='stretch'):
+                        if reset_email:
+                            try:
+                                supabase_auth = get_supabase_client()
+                                supabase_auth.auth.reset_password_email(reset_email.strip())
+                                st.success(f"Link reset password telah dikirim ke {reset_email} | SILAKAN CEK INBOX/SPAM ANDA | SETELAH KLIK LINK ANDA AKAN DIARAHKAN KE HALAMAN UTAMA UNTUK MENGATUR PASSWORD BARU")
+                                st.session_state.show_forgot_password = False
+                            except Exception as e:
+                                st.error(f"GAGAL MENGIRIM LINK RESET | {str(e)}")
+                        else:
+                            st.warning("MASUKKAN EMAIL TERLEBIH DAHULU")
+                with col_r2:
+                    if st.button("Batal", key="cancel_reset_btn", width='stretch'):
+                        st.session_state.show_forgot_password = False
+                        st.rerun()
+
+        if st.session_state.get("show_delete_account", False):
+            with st.container():
+                st.warning("PERHATIAN | INI AKAN MENGHAPUS AKUN ANDA SECARA PERMANEN | SEMUA DATA TIER AKTIVITAS CACHE AKAN HILANG | MASUKKAN EMAIL AKUN YANG AKAN DIHAPUS")
+                del_email = st.text_input("Email akun", key="del_email", placeholder="Masukkan email")
+                col_d1, col_d2 = st.columns(2)
+                with col_d1:
+                    if st.button("HAPUS AKUN", key="confirm_delete_btn", width='stretch', type="primary"):
+                        if del_email:
+                            success, msg = delete_user_by_email_admin(del_email.strip())
+                            if success:
+                                st.success(msg)
+                                st.session_state.show_delete_account = False
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.error(msg)
+                        else:
+                            st.warning("MASUKKAN EMAIL TERLEBIH DAHULU")
+                with col_d2:
+                    if st.button("Batal", key="cancel_delete_btn", width='stretch'):
+                        st.session_state.show_delete_account = False
+                        st.rerun()
+        st.stop()
+
+    # --- SUDAH LOGIN ---
+    # (Kode asli Anda untuk tampilan sidebar saat sudah login tetap di sini, jangan diubah)
+    # Karena kode asli Anda sangat panjang, pastikan Anda menyalin sisa kode dari file asli Anda
+    # mulai dari bagian "if st.session_state.auth_session:" atau menu navigasi utama
+    # dan menempelkannya DI BAWAH komentar ini.
+    
+    # CONTOH STRUKTUR LANJUTAN (Anda harus menyalin sisa kode asli Anda di sini):
+    # st.markdown(f"<div style='text-align:center;padding:10px;background:rgba(0,212,255,0.05);border-radius:4px;margin-bottom:15px;'><p style='font-family:Orbitron;font-size:11px;color:#00d4ff;margin:0;'>{t['welcome']}, {st.session_state.user_name}</p><p style='font-family:Share Tech Mono;font-size:9px;color:#557799;margin:2px 0 0 0;'>{t['tier_label']}: <span style='color:{tier_colors.get(st.session_state.user_tier, '#fff')}'>{tier_names.get(st.session_state.user_tier, 'UNKNOWN')}</span></p></div>", unsafe_allow_html=True)
+    # ... (lanjutkan dengan kode menu navigasi dan halaman utama Anda) ...

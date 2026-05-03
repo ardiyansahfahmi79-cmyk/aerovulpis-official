@@ -155,8 +155,11 @@ def economic_calendar_widget():
     """, unsafe_allow_html=True)
 
 
-def smart_alert_widget():
-    """SMART ALERT CENTER"""
+def smart_alert_widget(max_alerts=1):
+    """
+    SMART ALERT CENTER – sekarang menerima max_alerts (batas alert aktif harian).
+    max_alerts didasarkan pada tier user.
+    """
     
     instruments_list = [
         "XAUUSD", "XAGUSD", "BTCUSD", "ETHUSD", "SOLUSD",
@@ -176,11 +179,21 @@ def smart_alert_widget():
     data_source = price_data["source"]
     price_display = format_price_display(current_price, selected_instrument)
     
+    # Inisialisasi active_alerts di session_state jika belum ada
+    if "active_alerts" not in st.session_state:
+        st.session_state.active_alerts = []
+    
+    current_alerts_count = len(st.session_state.active_alerts)
+    
     st.markdown(f"""
     <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);padding:14px;border-radius:4px;margin-bottom:16px;text-align:center;">
         <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:#557799;letter-spacing:2px;">CURRENT PRICE</span><br>
         <span style="font-family:'Orbitron',sans-serif;font-size:22px;color:#00ff88;text-shadow:0 0 12px rgba(0,255,136,0.5);letter-spacing:2px;">{price_display}</span>
         <br><span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:#445566;">SOURCE: {data_source}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+        <span style="font-family: 'Orbitron', sans-serif; font-size: 10px; color: #8899bb; letter-spacing: 1px;">SMART ALERT USAGE</span>
+        <span style="font-family: 'Share Tech Mono', monospace; font-size: 12px; color: #00d4ff;">{current_alerts_count}/{max_alerts}</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -246,18 +259,16 @@ def smart_alert_widget():
     condition_value = "bullish" if "ABOVE" in condition_label else "bearish"
 
     if st.button("LOCK TARGET & ACTIVATE SENSOR", key="alert_activate_fix", type="primary", use_container_width=True):
-        if price_target > 0 and telegram_chat_id:
+        if current_alerts_count >= max_alerts:
+            st.error(f"[LIMIT] Smart Alert limit reached ({current_alerts_count}/{max_alerts}). Upgrade tier to add more.")
+        elif price_target > 0 and telegram_chat_id:
             now_wib = datetime.now(pytz.timezone('Asia/Jakarta')).strftime("%d/%m/%Y %H:%M:%S")
             formatted_target_display = f"{price_target:,.{decimal_places}f}"
-            # SIMPAN SEBAGAI ANGKA MURNI (tanpa koma) untuk kolom DOUBLE PRECISION
             target_numeric = round(price_target, decimal_places)
 
-            if "active_alerts" not in st.session_state:
-                st.session_state.active_alerts = []
-            
             alert_data = {
                 "instrument": selected_instrument,
-                "target": target_numeric,        # FLOAT: 4582.0 (bukan "4,582.00")
+                "target": target_numeric,
                 "condition": condition_value,
                 "chat_id": telegram_chat_id,
                 "time_created": now_wib,
@@ -268,9 +279,8 @@ def smart_alert_widget():
                 supabase = create_client(url, key)
                 supabase.table("active_alerts").insert(alert_data).execute()
                 
-                # Simpan juga ke session_state untuk monitoring lokal
                 session_alert = alert_data.copy()
-                session_alert["target_display"] = formatted_target_display  # "4,582.00" untuk tampilan
+                session_alert["target_display"] = formatted_target_display
                 st.session_state.active_alerts.append(session_alert)
                 
                 st.markdown(f"""
@@ -281,6 +291,7 @@ def smart_alert_widget():
                     <p style="font-family:Share Tech Mono;font-size:9px;color:#00ff88;margin:6px 0 0 0;letter-spacing:1px;">[STATUS]: MONITORING_24/7 | TELEGRAM_LINKED</p>
                 </div>
                 """, unsafe_allow_html=True)
+                st.rerun()
             except Exception as e:
                 st.error(f"DATABASE ERROR: {str(e)}")
         else:

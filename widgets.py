@@ -157,8 +157,8 @@ def economic_calendar_widget():
 
 def smart_alert_widget(max_alerts=1):
     """
-    SMART ALERT CENTER – sekarang menerima max_alerts (batas alert aktif harian).
-    max_alerts didasarkan pada tier user.
+    SMART ALERT CENTER - dengan batas alert aktif harian (max_alerts).
+    max_alerts dikirim dari aplikasi utama sesuai tier user.
     """
     
     instruments_list = [
@@ -214,7 +214,7 @@ def smart_alert_widget(max_alerts=1):
         value=default_display,
         key="alert_target_fix_text",
         label_visibility="collapsed",
-        placeholder="Contoh: 2,650"
+        placeholder="Masukkan harga target..."
     )
 
     def parse_localized_number(input_str):
@@ -288,6 +288,7 @@ def smart_alert_widget(max_alerts=1):
                     <p style="font-family:Orbitron;font-size:12px;color:#00d4ff;margin:0 0 8px;letter-spacing:2px;">/// SENSOR ACTIVATED ///</p>
                     <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">INSTRUMENT: {selected_instrument}</p>
                     <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">TARGET: {formatted_target_display}</p>
+                    <p style="font-family:Rajdhani;font-size:13px;color:#00d4ff;opacity:0.9;margin:2px 0;">CHAT ID: {telegram_chat_id}</p>
                     <p style="font-family:Share Tech Mono;font-size:9px;color:#00ff88;margin:6px 0 0 0;letter-spacing:1px;">[STATUS]: MONITORING_24/7 | TELEGRAM_LINKED</p>
                 </div>
                 """, unsafe_allow_html=True)

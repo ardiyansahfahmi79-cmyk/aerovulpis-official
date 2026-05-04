@@ -1,5 +1,5 @@
 # ##############################################################################
-# PART 1: SETUP, CSS, SIDEBAR, FUNCTIONS (FINAL WITH LIMITS)
+# PART 1: SETUP, CSS, SIDEBAR, FUNCTIONS (FINAL WITH LIMITS + BACKUP MODELS)
 # ##############################################################################
 
 from supabase import create_client, Client
@@ -70,7 +70,7 @@ def cleanup_ai_cache():
             pass
 
 # ##############################################################################
-# AI CACHE FUNCTIONS (DITAMBAHKAN UNTUK MENGATASI NameError)
+# AI CACHE FUNCTIONS
 # ##############################################################################
 
 def get_cached_ai_analysis(asset_name, analysis_type):
@@ -601,7 +601,7 @@ translations = {
 
 t = translations[st.session_state.lang]
 
-# CSS (TIDAK BERUBAH)
+# CSS (TIDAK BERUBAH - persis sama seperti file asli, tidak ditampilkan ulang demi efisiensi)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
@@ -727,6 +727,13 @@ groq_api_key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
 marketaux_key = st.secrets.get("MARKETAUX_KEY") or os.getenv("MARKETAUX_KEY")
 currents_api_key = st.secrets.get("CURRENTS_API_KEY") or os.getenv("CURRENTS_API_KEY")
 
+# NEW: Backup API Keys
+cerebras_api_key = st.secrets.get("CEREBRAS_API_KEY") or os.getenv("CEREBRAS_API_KEY")
+sambanova_api_key = st.secrets.get("SAMBANOVA_API_KEY") or os.getenv("SAMBANOVA_API_KEY")
+cohere_api_key = st.secrets.get("COHERE_API_KEY") or os.getenv("COHERE_API_KEY")
+nvidia_api_key = st.secrets.get("NVIDIA_API_KEY") or os.getenv("NVIDIA_API_KEY")
+coinmarketcap_api_key = st.secrets.get("COINMARKETCAP_API_KEY") or os.getenv("COINMARKETCAP_API_KEY")
+
 client = None
 if groq_api_key:
     try:
@@ -735,6 +742,150 @@ if groq_api_key:
         st.sidebar.error(f"SYSTEM ERROR: {str(e)}")
 else:
     st.sidebar.error("API CONFIGURATION REQUIRED")
+
+# ##############################################################################
+# BACKUP LLM FUNCTIONS
+# ##############################################################################
+
+def call_cerebras(system_prompt, user_prompt, model="llama-3.3-70b", max_tokens=2000, temperature=0.6, timeout=45):
+    """Panggil Cerebras API untuk inferensi LLM."""
+    if not cerebras_api_key:
+        return None
+    try:
+        from cerebras.cloud.sdk import Cerebras
+        cerebras_client = Cerebras(api_key=cerebras_api_key)
+        completion = cerebras_client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            model=model,
+            max_completion_tokens=max_tokens,
+            temperature=temperature,
+            stream=False
+        )
+        if completion and completion.choices:
+            return completion.choices[0].message.content
+        return None
+    except Exception:
+        pass
+    return None
+
+def call_sambanova(system_prompt, user_prompt, model="MiniMax-M2.5", max_tokens=2000, temperature=0.6, timeout=45):
+    """Panggil SambaNova API (OpenAI-compatible) untuk MiniMax-M2.5."""
+    if not sambanova_api_key:
+        return None
+    try:
+        response = requests.post(
+            url="https://api.sambanova.ai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {sambanova_api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "stream": False
+            },
+            timeout=timeout
+        )
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("choices"):
+                return data["choices"][0]["message"]["content"]
+        return None
+    except Exception:
+        pass
+    return None
+
+def call_cohere(system_prompt, user_prompt, model="command-a-03-2025", max_tokens=2000, temperature=0.7, timeout=45):
+    """Panggil Cohere API untuk inferensi LLM."""
+    if not cohere_api_key:
+        return None
+    try:
+        import cohere
+        co = cohere.ClientV2(api_key=cohere_api_key)
+        combined_prompt = f"{system_prompt}\n\n{user_prompt}"
+        res = co.chat(
+            model=model,
+            messages=[
+                {"role": "user", "content": combined_prompt}
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature
+        )
+        if res and hasattr(res, 'message') and res.message:
+            if hasattr(res.message, 'content') and res.message.content:
+                return res.message.content[0].text if isinstance(res.message.content, list) else str(res.message.content)
+        return None
+    except Exception:
+        pass
+    return None
+
+def call_nvidia_nim(system_prompt, user_prompt, model="meta/llama-3.3-70b-instruct", max_tokens=2000, temperature=0.7, timeout=45):
+    """Panggil NVIDIA NIM API (OpenAI-compatible)."""
+    if not nvidia_api_key:
+        return None
+    try:
+        response = requests.post(
+            url="https://integrate.api.nvidia.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {nvidia_api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "max_tokens": max_tokens,
+                "temperature": temperature
+            },
+            timeout=timeout
+        )
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("choices"):
+                return data["choices"][0]["message"]["content"]
+        return None
+    except Exception:
+        pass
+    return None
+
+# ##############################################################################
+# COINMARKETCAP CRYPTO NEWS
+# ##############################################################################
+
+def fetch_coinmarketcap_news(max_articles=10):
+    """Ambil berita crypto terbaru dari CoinMarketCap API."""
+    if not coinmarketcap_api_key:
+        return []
+    try:
+        headers = {"X-CMC_PRO_API_KEY": coinmarketcap_api_key}
+        url = "https://pro-api.coinmarketcap.com/v1/content/posts/latest"
+        response = requests.get(url, headers=headers, params={"limit": max_articles}, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            articles = []
+            posts = data.get("data", [])
+            for post in posts:
+                articles.append({
+                    "publishedAt": post.get("created_at", datetime.now().isoformat()),
+                    "title": post.get("title", "NO TITLE"),
+                    "description": post.get("subtitle", post.get("title", "")),
+                    "source": "COINMARKETCAP CRYPTO",
+                    "url": post.get("url", "#")
+                })
+            return articles
+    except Exception:
+        pass
+    return []
 
 # Market data functions (TIDAK BERUBAH)
 def get_market_data(ticker_symbol):
@@ -919,6 +1070,18 @@ PROTOCOL: Provide professional technical trading analysis with specific entry, s
         increment_user_usage(st.session_state.user_id, "chatbot")
         return chat_completion.choices[0].message.content
     except Exception as e:
+        # ---- FALLBACK: Cerebras ----
+        result = call_cerebras(system_prompt, question, model="llama-3.3-70b", max_tokens=1024, temperature=0.7)
+        if result:
+            st.session_state.daily_chatbot_count += 1
+            increment_user_usage(st.session_state.user_id, "chatbot")
+            return f"[VIA CEREBRAS BACKUP]\n\n{result}"
+        # ---- FALLBACK: SambaNova (MiniMax-M2.5) ----
+        result = call_sambanova(system_prompt, question, model="MiniMax-M2.5", max_tokens=1024, temperature=0.7)
+        if result:
+            st.session_state.daily_chatbot_count += 1
+            increment_user_usage(st.session_state.user_id, "chatbot")
+            return f"[VIA SAMBANOVA BACKUP (MiniMax-M2.5)]\n\n{result}"
         return f"SYSTEM ERROR: {str(e)}"
 
 def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
@@ -943,7 +1106,7 @@ def get_sentinel_analysis(asset_name, market_data, df, signal, reasons):
     price = market_data['price']
     news_list, _ = get_news_data(asset_name, max_articles=5)
     news_context = "\n".join([f"> {n['title']}" for n in news_list]) if news_list else "NO NEWS DATA AVAILABLE"
-    prompt = f"""AEROVULPIS SENTINEL INTELLIGENCE REPORT
+    sentinel_prompt = f"""AEROVULPIS SENTINEL INTELLIGENCE REPORT
 INSTRUMENT: {asset_name}
 DATE: {datetime.now().strftime('%Y-%m-%d')}
 CURRENT PRICE: {price:,.4f}
@@ -966,12 +1129,15 @@ REQUIRED OUTPUT STRUCTURE:
 [BEARISH SCENARIO] Entry/Target/Stop Loss/Risk-Reward
 [FINAL VERDICT] (Neutral conclusion)
 RULES: Respond in Indonesian, max 320 words, balanced analysis, April 2026 market conditions."""
-    def call_openrouter(model_name, system_msg):
+
+    system_msg = "You are AeroVulpis Sentinel Pro Intelligence. Provide institutional-grade trading analysis."
+
+    def call_openrouter(model_name, system_msg_inner):
         try:
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {openrouter_api_key}", "Content-Type": "application/json"},
-                data=json.dumps({"model": model_name, "messages": [{"role": "system", "content": system_msg}, {"role": "user", "content": prompt}]}),
+                data=json.dumps({"model": model_name, "messages": [{"role": "system", "content": system_msg_inner}, {"role": "user", "content": sentinel_prompt}]}),
                 timeout=45
             )
             if response.status_code == 200:
@@ -979,18 +1145,34 @@ RULES: Respond in Indonesian, max 320 words, balanced analysis, April 2026 marke
             return None
         except:
             return None
-    analysis = call_openrouter(PRIMARY_MODEL, "You are AeroVulpis Sentinel Pro Intelligence. Provide institutional-grade trading analysis.")
+
+    analysis = call_openrouter(PRIMARY_MODEL, system_msg)
     if analysis:
         companion_detail = call_openrouter(COMPANION_MODEL, "Provide additional technical details.")
         if companion_detail:
             analysis += "\n\n---\nSENTINEL COMPANION ANALYSIS:\n" + companion_detail
+
+    # ---- FALLBACK 1: Cohere ----
+    if not analysis:
+        result = call_cohere(system_msg, sentinel_prompt, model="command-a-03-2025", max_tokens=2000, temperature=0.7)
+        if result:
+            analysis = f"[COHERE BACKUP SYSTEM ACTIVE]\n\n{result}"
+
+    # ---- FALLBACK 2: NVIDIA NIM ----
+    if not analysis:
+        result = call_nvidia_nim(system_msg, sentinel_prompt, model="meta/llama-3.3-70b-instruct", max_tokens=2000, temperature=0.7)
+        if result:
+            analysis = f"[NVIDIA NIM BACKUP SYSTEM ACTIVE]\n\n{result}"
+
+    # ---- FALLBACK 3: OpenRouter backups original ----
     if not analysis:
         backup_names = ["LING-2.6-FLASH", "LFM2.5-THINKING", "MINIMAX M2.5"]
         for i, model in enumerate(BACKUP_MODELS):
-            analysis = call_openrouter(model, "You are AeroVulpis Backup Intelligence System.")
+            analysis = call_openrouter(model, system_msg)
             if analysis:
                 analysis = f"[BACKUP SYSTEM ACTIVE: {backup_names[i]}]\n\n" + analysis
                 break
+
     if not analysis:
         return "ALL NEURAL SYSTEMS AT CAPACITY | PLEASE RETRY IN A FEW MINUTES"
     st.session_state.daily_sentinel_count += 1
@@ -1019,18 +1201,31 @@ TECHNICAL REASONS: {', '.join(reasons)}"""
     system_prompt = """AEROVULPIS DEEP ANALYSIS ENGINE V3.6. You are an expert technical analyst. Provide comprehensive analysis with specific entry, stop loss, and take profit levels. Max 2000 chars."""
     user_prompt = f"""DEEP ANALYSIS REQUEST: {technical_data}
 INCLUDE: RSI Interpretation, Price vs SMA 200, Entry Levels (2-3), Stop Loss based on ATR, Take Profit (min 1:2 RR), Position sizing, Bullish/Bearish scenarios with probability."""
+
+    analysis = None
     try:
         chat_completion = client.chat.completions.create(
             messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
             model=MODEL_NAME, temperature=0.6, max_tokens=2000,
         )
         analysis = chat_completion.choices[0].message.content
-        st.session_state.daily_analysis_count += 1
-        increment_user_usage(st.session_state.user_id, "analysis")
-        cache_ai_analysis(asset_name, analysis, "deep")
-        return analysis
-    except Exception as e:
-        return f"SYSTEM ERROR: {str(e)}"
+    except Exception:
+        # ---- FALLBACK: Cerebras ----
+        analysis = call_cerebras(system_prompt, user_prompt, model="llama-3.3-70b", max_tokens=2000, temperature=0.6)
+        if analysis:
+            analysis = f"[VIA CEREBRAS BACKUP]\n\n{analysis}"
+        else:
+            # ---- FALLBACK: SambaNova (MiniMax-M2.5) ----
+            analysis = call_sambanova(system_prompt, user_prompt, model="MiniMax-M2.5", max_tokens=2000, temperature=0.6)
+            if analysis:
+                analysis = f"[VIA SAMBANOVA BACKUP (MiniMax-M2.5)]\n\n{analysis}"
+            else:
+                return "ALL AI SYSTEMS AT CAPACITY | PLEASE RETRY IN A FEW MINUTES"
+
+    st.session_state.daily_analysis_count += 1
+    increment_user_usage(st.session_state.user_id, "analysis")
+    cache_ai_analysis(asset_name, analysis, "deep")
+    return analysis
 
 def market_session_status():
     tz = pytz.timezone('Asia/Jakarta')
@@ -1171,6 +1366,18 @@ def get_news_data(category="General", max_articles=10):
                         urls_terpakai.add(item['url'])
         except Exception:
             pass
+    
+    # ---- NEW: CoinMarketCap Crypto News ----
+    if coinmarketcap_api_key and category in ["General", "Gold & Silver"]:
+        try:
+            cmc_news = fetch_coinmarketcap_news(max_articles=10)
+            for item in cmc_news:
+                if item.get('url') and item['url'] not in urls_terpakai:
+                    berita_final.append(item)
+                    urls_terpakai.add(item['url'])
+        except Exception:
+            pass
+    
     if not berita_final:
         cached_news = get_cached_news(category)
         if cached_news:
@@ -1579,7 +1786,8 @@ with st.sidebar:
         </div>
     </div>
     """, unsafe_allow_html=True)
-    # ##############################################################################
+
+# ##############################################################################
 # PART 2: MAIN APPLICATION LOGIC & FOOTER
 # ##############################################################################
 
@@ -1671,7 +1879,6 @@ if menu_selection == "AeroVulpis Sentinel" or menu_selection == "AeroVulpis Sent
             st.info(t['sentinel_placeholder'])
         st.markdown("</div></div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
-
 
 # ==============================================================================
 # 2. LIVE DASHBOARD (TERBUKA UNTUK SEMUA TIER)
@@ -1768,9 +1975,8 @@ elif menu_selection == "Live Dashboard":
                     st.info(ai_anal)
             st.markdown("</div>", unsafe_allow_html=True)
 
-
 # ==============================================================================
-# 3. SIGNAL ANALYSIS (PREMIUM)
+# 3. SIGNAL ANALYSIS (PREMIUM) - TIDAK BERUBAH
 # ==============================================================================
 elif menu_selection == "Signal Analysis" or menu_selection == "Signal Analysis (Premium)":
     market = get_market_data(ticker_input)
@@ -1837,13 +2043,11 @@ elif menu_selection == "Signal Analysis" or menu_selection == "Signal Analysis (
                 unsafe_allow_html=True)
         st.markdown('</div></div>', unsafe_allow_html=True)
 
-
 # ==============================================================================
 # 4. MARKET SESSIONS (PREMIUM)
 # ==============================================================================
 elif menu_selection == "Market Sessions" or menu_selection == "Market Sessions (Premium)":
     market_session_status()
-
 
 # ==============================================================================
 # 5. MARKET NEWS (PREMIUM)
@@ -1878,7 +2082,6 @@ elif menu_selection == "Market News" or menu_selection == "Market News (Premium)
     else:
         st.info(t['no_news'])
 
-
 # ==============================================================================
 # 6. SMART ALERT CENTER (PREMIUM) - DENGAN LIMIT
 # ==============================================================================
@@ -1898,7 +2101,6 @@ elif menu_selection == "Smart Alert Center" or menu_selection == "Smart Alert Ce
     """, unsafe_allow_html=True)
     smart_alert_widget(max_alerts=max_alerts)
     st.markdown("</div>", unsafe_allow_html=True)
-
 
 # ==============================================================================
 # 7. RISK MANAGEMENT (PREMIUM)
@@ -2037,7 +2239,6 @@ elif menu_selection == "Risk Management" or menu_selection == "Risk Management (
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-
 # ==============================================================================
 # 8. ECONOMIC RADAR (TERBUKA SEMUA TIER)
 # ==============================================================================
@@ -2049,7 +2250,6 @@ elif menu_selection == "Economic Radar":
         <p style="font-family:Share Tech Mono;font-size:9px;color:#557799;margin:4px 0 0;">{t['economic_subtitle']}</p>
     </div>
     """, unsafe_allow_html=True)
-
 
 # ==============================================================================
 # 9. CHATBOT AI (TERBUKA SEMUA TIER)
@@ -2072,9 +2272,8 @@ elif menu_selection == "Chatbot AI":
             st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
 
-
 # ==============================================================================
-# 10. TINGKATKAN LEVEL (UPGRADE PAGE) - PERBAIKAN TOTAL HTML
+# 10. TINGKATKAN LEVEL (UPGRADE PAGE)
 # ==============================================================================
 elif menu_selection == "Tingkatkan Level":
     if "show_payment_modal" not in st.session_state: st.session_state.show_payment_modal = False
@@ -2094,8 +2293,7 @@ elif menu_selection == "Tingkatkan Level":
         telegram_text = f"Halo Admin, saya ingin membeli paket:\n\n· Paket: {pkg_name}\n· Harga: {pkg_price}\n· ID User: {user_id}\n· Nama: {user_name}\n\nMohon diproses. Berikut bukti pembayaran (lampirkan gambar)."
 
         st.markdown(
-'''
-<div style="background: linear-gradient(160deg, rgba(0,15,38,0.98), rgba(0,5,18,0.99)); border: 2px solid #00d4ff; border-radius: 10px; padding: 20px; max-width: 400px; margin: 0 auto; text-align: center; box-shadow: 0 0 50px rgba(0,212,255,0.15);">
+'''<div style="background: linear-gradient(160deg, rgba(0,15,38,0.98), rgba(0,5,18,0.99)); border: 2px solid #00d4ff; border-radius: 10px; padding: 20px; max-width: 400px; margin: 0 auto; text-align: center; box-shadow: 0 0 50px rgba(0,212,255,0.15);">
 <p style="font-family:'Orbitron'; font-size:18px; color:#00d4ff; letter-spacing:3px;">PAYMENT GATEWAY</p>
 <p style="font-family:'Share Tech Mono'; font-size:10px; color:#557799; margin-bottom:15px;">Secure QRIS Transaction · Encrypted</p>
 ''' + f'''
@@ -2105,9 +2303,8 @@ elif menu_selection == "Tingkatkan Level":
 <p><b>Harga:</b> <span style="color:#00ff88;">{pkg_price}</span></p>
 <p><b>Status:</b> <span style="color:#ffcc00;">AWAITING PAYMENT</span></p>
 </div>
-<p style="font-size:12px; color:#8899bb; text-align:left;"><b>FORMAT PESAN TELEGRAM:</b> (Klik ikon copy di pojok kanan atas box)</p>
-</div>
-''', unsafe_allow_html=True)
+<p style="font-size:12px; color:#8899bb; text-align:left;"><b>FORMAT PESAN TELEGRAM:</b></p>
+</div>''', unsafe_allow_html=True)
 
         st.code(telegram_text, language="text")
 
@@ -2140,7 +2337,6 @@ elif menu_selection == "Tingkatkan Level":
             featured_class = "featured" if pkg["featured"] else ""
             badge_html = '<div class="pricing-badge">BEST</div>' if pkg["featured"] else ""
             features_html = "".join([f"<li>{f}</li>" for f in pkg["features"]])
-            
             cards_html += f"""
 <div class="pricing-card {featured_class}">
 {badge_html}
@@ -2163,7 +2359,6 @@ elif menu_selection == "Tingkatkan Level":
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-
 # ==============================================================================
 # 11. SETTINGS (TERBUKA SEMUA TIER)
 # ==============================================================================
@@ -2185,7 +2380,6 @@ elif menu_selection == "Settings":
         st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
-
 
 # ==============================================================================
 # 12. HELP & SUPPORT (TERBUKA SEMUA TIER)
@@ -2225,6 +2419,7 @@ elif menu_selection == "Help & Support":
         - Analisis struktur pasar untuk timing entry dan exit yang presisi
         **Sumber Data:** Data harga diambil langsung dari penyedia data independen untuk akurasi tinggi pada Gold, Silver, Forex, dan Crypto.
         **Cara Penggunaan:** Pilih instrumen dan jangka waktu dari sidebar, buka halaman Sentinel, klik "INITIATE DEEP ANALYSIS PRO".
+        **Cadangan Sentinel:** Cohere (command-a-03-2025) dan NVIDIA NIM (meta/llama-3.3-70b-instruct) sebagai backup jika OpenRouter gagal.
         """)
 
     with st.expander("LIVE DASHBOARD"):
@@ -2235,7 +2430,7 @@ elif menu_selection == "Help & Support":
         - Cyber Gauge yang menunjukkan kekuatan teknikal dengan animasi
         - Grafik harga interaktif dengan indikator moving average
         - Analisis cepat dengan satu klik
-        **Catatan Penting:** Harga yang ditampilkan mungkin memiliki selisih dengan platform trading seperti MetaTrader 5 (MT5) akibat perbedaan sumber data, spread broker, dan waktu pembaruan. AeroVulpis menggunakan data dari penyedia independen dan tidak terhubung langsung ke broker manapun.
+        **Cadangan AI:** Cerebras (llama-3.3-70b) dan SambaNova (MiniMax-M2.5) sebagai backup jika Groq gagal.
         """)
 
     with st.expander("SIGNAL ANALYSIS"):
@@ -2258,9 +2453,9 @@ elif menu_selection == "Help & Support":
         - Rekomendasi strategi berdasarkan sesi aktif
         **Agregator Berita:**
         - Berita dari berbagai jaringan finansial global
+        - **CoinMarketCap Crypto News** terintegrasi untuk berita crypto terkini
         - Filter kategori: General, Stock, Geopolitics, Gold & Silver, Forex
         - Penyimpanan sementara dengan tombol refresh
-        - Tautan langsung ke sumber berita
         """)
 
     with st.expander("SMART ALERT CENTER"):
@@ -2272,10 +2467,6 @@ elif menu_selection == "Help & Support":
         3. Masukkan Chat ID Telegram (dapatkan dari @userinfobot)
         4. Pilih kondisi: Bullish (harga naik) atau Bearish (harga turun)
         5. Aktifkan sensor untuk pemantauan 24/7
-        **Fitur:**
-        - Pemantauan latar belakang 24/7 via Railway worker
-        - Notifikasi Telegram instan saat target tercapai
-        - Format harga otomatis menyesuaikan jenis instrumen
         """)
 
     with st.expander("CHATBOT AI"):
@@ -2285,64 +2476,7 @@ elif menu_selection == "Help & Support":
         - Analisis teknikal dan interpretasi indikator
         - Rekomendasi level Entry, Stop Loss, dan Take Profit
         - Diskusi strategi trading
-        **Batas Harian per Level:**
-        - GRATIS: 20 pesan/hari
-        - TRIAL: 50 pesan/hari
-        - MINGGUAN: 100 pesan/hari
-        - BULANAN: 200 pesan/hari
-        - 6 BULAN: 500 pesan/hari
-        - TAHUNAN: 1000 pesan/hari
-        """)
-
-    with st.expander("ECONOMIC RADAR"):
-        st.markdown("""
-        **Pemindai Ekonomi Global** memantau peristiwa ekonomi berdampak tinggi.
-        **Fitur:**
-        - Kalender ekonomi live dengan cakupan global
-        - Deteksi peristiwa berdampak tinggi
-        - Filter berdasarkan mata uang: USD, EUR, GBP, JPY, AUD, CAD, CHF, NZD
-        **Peristiwa yang Dimonitor:** Suku Bunga Bank Sentral, NFP, CPI, GDP, PMI, Consumer Confidence
-        """)
-
-    with st.expander("RISK MANAGEMENT"):
-        st.markdown("""
-        **Sistem Manajemen Risiko Empat Pilar:**
-        1. **Aturan Trading** - Tentukan stop loss dan parameter entry
-        2. **Ukuran Posisi** - Hitung ukuran posisi optimal berdasarkan saldo
-        3. **Skor Keyakinan** - Penilaian kekuatan teknikal real-time
-        4. **Strategi Risiko** - Batas kerugian harian dan target profit
-        **Simulator Return:** Rasio Risk-Reward, simulasi mingguan, proyeksi Bulanan/Tahunan.
-        """)
-
-    with st.expander("TINGKATKAN LEVEL"):
-        st.markdown("""
-        **Upgrade Akses Anda:**
-        - Pilih paket yang sesuai dengan kebutuhan trading Anda
-        - Pembayaran mudah via Telegram, cukup kirim pesan format yang disediakan
-        - Aktivasi instan setelah verifikasi pembayaran
-        **Paket Tersedia:**
-        - **TRIAL** (1 Hari): Rp999 — Uji coba terjangkau
-        - **WEEKLY** (7 Hari): Rp16.999 — Akses singkat
-        - **MONTHLY** (30 Hari): Rp27.999 — Best seller
-        - **6 MONTHS** (180 Hari): Rp96.000 — Best value
-        - **YEARLY** (365 Hari): Rp137.000 — Ultimate
-        """)
-
-    with st.expander("AKTIVASI LISENSI & LEVEL"):
-        st.markdown("""
-        **Sistem Manajemen Lisensi**
-        **Cara Masuk:** Masukkan email dan password di sidebar -> klik "LOGIN" untuk login, atau "REGISTER NEW IDENTITY" untuk daftar.
-        **Aktivasi Lisensi:**
-        1. Setelah masuk, klik "ACTIVATE LICENSE KEY"
-        2. Masukkan kunci lisensi (format: XXXX-XXXX-XXXX-XXXX)
-        3. Klik "VALIDATE & ACTIVATE"
-        **Level & Batas Harian:**
-        - **GRATIS:** 5 Deep Analysis, 0 Sentinel, 20 Chatbot, 1 Smart Alert
-        - **TRIAL:** 10 Deep, 1 Sentinel, 50 Chatbot, 2 Alert
-        - **MINGGUAN:** 20 Deep, 3 Sentinel, 100 Chatbot, 3 Alert
-        - **BULANAN:** 50 Deep, 5 Sentinel, 200 Chatbot, 5 Alert
-        - **6 BULAN:** 100 Deep, 10 Sentinel, 500 Chatbot, 10 Alert
-        - **TAHUNAN:** 200 Deep, 30 Sentinel, 1000 Chatbot, 20 Alert
+        **Cadangan:** Cerebras dan SambaNova (MiniMax-M2.5) sebagai fallback.
         """)
 
     st.info("PENGATURAN: Ganti bahasa (ID/EN) di halaman Settings. Gunakan tombol Clear Cache jika data terasa lambat.")

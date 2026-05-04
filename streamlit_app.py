@@ -69,6 +69,51 @@ def cleanup_ai_cache():
         except Exception:
             pass
 
+# ##############################################################################
+# AI CACHE FUNCTIONS (DITAMBAHKAN UNTUK MENGATASI NameError)
+# ##############################################################################
+
+def get_cached_ai_analysis(asset_name, analysis_type):
+    """
+    Mengambil hasil analisis AI yang masih berlaku (15 menit).
+    analysis_type: 'sentinel' atau 'deep'
+    """
+    try:
+        supabase = get_supabase_client()
+        table = "ai_cache_sentinel" if analysis_type == "sentinel" else "ai_cache_deep"
+        res = supabase.table(table).select("*").eq("instrument", asset_name).order("created_at", desc=True).limit(1).execute()
+        if res.data:
+            entry = res.data[0]
+            created_at_str = entry.get("created_at")
+            if created_at_str:
+                try:
+                    created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                except:
+                    created_at = datetime.now(pytz.UTC) - timedelta(minutes=30)
+                if (datetime.now(pytz.UTC) - created_at).total_seconds() < 900:
+                    return entry.get("analysis")
+    except Exception:
+        pass
+    return None
+
+def cache_ai_analysis(asset_name, analysis, analysis_type):
+    """Menyimpan hasil analisis AI ke cache."""
+    try:
+        supabase = get_supabase_client()
+        table = "ai_cache_sentinel" if analysis_type == "sentinel" else "ai_cache_deep"
+        data = {
+            "instrument": asset_name,
+            "analysis": analysis,
+            "created_at": datetime.now(pytz.UTC).isoformat()
+        }
+        supabase.table(table).insert(data).execute()
+    except Exception:
+        pass
+
+# ##############################################################################
+# MARKET PRICE CACHE
+# ##############################################################################
+
 def cache_market_price(symbol, price, change_pct=0.0):
     try:
         supabase = get_supabase_client()
